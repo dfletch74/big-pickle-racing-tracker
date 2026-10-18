@@ -43,17 +43,17 @@ export default function TrackDay({ state, update, toast, dist, setDist, onAddRun
     : null;
   const nextHr = wx && wx.hourly.length ? wx.hourly[wx.hourly.length - 1] : null;
 
-  // Manual override when there's no live data — estimate DA from temp + track elevation
-  // (same standard-pressure assumption the run logger uses).
+  // Manual entries override live weather for the predictor (also the fallback when
+  // live is unavailable). DA is estimated from temp + track elevation, the same
+  // standard-pressure assumption the run logger uses.
   const manualTemp = manual.tempF === '' ? null : Number(manual.tempF);
   const manualHum = manual.humidity === '' ? null : Number(manual.humidity);
   const manualDA = (() => {
-    if (live?.daFt != null || manualTemp == null || track?.elevationFt == null) return null;
+    if (manualTemp == null || track?.elevationFt == null) return null;
     const p = stationPressureHpa(1013.25, track.elevationFt);
     return Math.round(densityAltitudeFt({ tempF: manualTemp, humidityPct: manualHum ?? 0, pressureHpa: p }));
   })();
-  const effTemp = live?.tempF ?? manualTemp;
-  const effDA = live?.daFt ?? manualDA;
+  const effDA = manualDA ?? live?.daFt ?? null;
 
   const buildPass = useMemo(() => {
     if (!last) return null;
@@ -95,13 +95,12 @@ export default function TrackDay({ state, update, toast, dist, setDist, onAddRun
           <SectionTitle>Live conditions</SectionTitle>
           <Btn kind="ghost" onClick={loadWx} disabled={wxBusy} className="!py-1.5 text-xs">{wxBusy ? '…' : 'Refresh'}</Btn>
         </div>
-        {wxErr && <div className="mb-2 text-xs text-amber-300">Live weather unavailable ({wxErr}). Enter conditions manually:</div>}
-        {(!live || wxErr) && (
-          <div className="grid grid-cols-2 gap-2">
-            <Field label="Temp °F"><input type="number" value={manual.tempF} onChange={(e) => setManual({ ...manual, tempF: e.target.value })} className={inputCls} /></Field>
-            <Field label="Humidity %"><input type="number" value={manual.humidity} onChange={(e) => setManual({ ...manual, humidity: e.target.value })} className={inputCls} /></Field>
-          </div>
-        )}
+        {wxErr && <div className="mb-2 text-xs text-amber-300">Live weather unavailable ({wxErr}).</div>}
+        <div className="grid grid-cols-2 gap-2">
+          <Field label="Temp °F"><input type="number" value={manual.tempF} onChange={(e) => setManual({ ...manual, tempF: e.target.value })} className={inputCls} /></Field>
+          <Field label="Humidity %"><input type="number" value={manual.humidity} onChange={(e) => setManual({ ...manual, humidity: e.target.value })} className={inputCls} /></Field>
+        </div>
+        <div className="mt-1 text-[11px] text-white/40">Manual entries override live weather for the predictor below.</div>
         {live && (
           <div className="grid grid-cols-3 gap-2 text-center">
             <div><div className="font-mono text-xl font-bold">{fmtTemp(live.tempF)}</div><div className="text-[10px] text-white/45">TEMP</div></div>

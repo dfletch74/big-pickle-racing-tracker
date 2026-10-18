@@ -254,6 +254,13 @@ function ImportView({ state, update, toast, onBack, onDone }) {
       {result && (
         <Card>
           <div className="mb-2 text-sm font-bold">{result.name}: {result.runs.length} runs ready</div>
+          {result.runs.length > 0 && (
+            <div className={`mb-2 text-xs ${(result.airData ?? 0) === 0 ? 'text-amber-300' : 'text-white/50'}`}>
+              {(result.airData ?? 0) === 0
+                ? '⚠ No air data found — Temp/Altitude (or DA) columns were not recognized. The predictor, cheat sheet and Insight tab need air data.'
+                : `${result.airData} of ${result.runs.length} runs have air data.`}
+            </div>
+          )}
           {result.errors.length > 0 && (
             <div className="mb-2 max-h-32 overflow-y-auto rounded-xl bg-amber-500/10 p-3 text-xs text-amber-200">
               {result.errors.slice(0, 20).map((e, i) => <div key={i}>{e}</div>)}

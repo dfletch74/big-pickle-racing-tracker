@@ -25,9 +25,10 @@ const COLUMNS = {
   thousand: ['1000ft'],
   mph: ['mph'],
   rt: ['rt', 'reaction'],
-  tempF: ['temp', 'temperature'],
-  humidity: ['humidity'],
-  altitudeFt: ['altitude'],
+  tempF: ['temp', 'temperature', 'tempf', 'airtemp', 'oat', 'airtemperature', 'ambienttemp'],
+  humidity: ['humidity', 'humiditypct', 'rh', 'relhumidity', 'relativehumidity'],
+  altitudeFt: ['altitude', 'altitudeft', 'elevation', 'elevationft', 'trackaltitude', 'trackelevation'],
+  daFt: ['daft', 'densityaltitude', 'densityalt', 'da'],
   jet: ['jet'],
   notes: ['notes'],
 };
@@ -113,8 +114,8 @@ export async function parseImportFile(file, carId, fallbackTrack) {
     const tempF = num(get('tempF'));
     const humidity = num(get('humidity'));
     const altitudeFt = num(get('altitudeFt'));
-    let daFt = null;
-    if (isNum(tempF) && isNum(altitudeFt)) {
+    let daFt = num(get('daFt'));
+    if (!isNum(daFt) && isNum(tempF) && isNum(altitudeFt)) {
       // Same standard-pressure assumption the run logger uses (humidity optional).
       const p = stationPressureHpa(1013.25, altitudeFt);
       daFt = Math.round(densityAltitudeFt({ tempF, humidityPct: humidity ?? 0, pressureHpa: p }));
@@ -150,7 +151,8 @@ export async function parseImportFile(file, carId, fallbackTrack) {
       createdAt: Date.now(),
     });
   });
-  return { runs, errors };
+  const airData = runs.filter((r) => isNum(r.daFt)).length;
+  return { runs, errors, matched: Object.keys(colIdx), airData };
 }
 
 const CSV_COLS = [
