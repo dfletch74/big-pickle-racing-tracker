@@ -4,7 +4,7 @@ import { LineChart, WinBar } from '../components/charts';
 import { fmtET, fmtMPH, fmtRT, fmtDate, isNum } from '../lib/format';
 import {
   runsForCar, filterDistance, latestRun, personalBests, consistency,
-  rankOf, winLoss, avg,
+  rankOf, avg,
 } from '../lib/stats';
 
 export default function Dash({ state, onAddRun, onImport, onSeeRuns }) {
@@ -42,8 +42,22 @@ export default function Dash({ state, onAddRun, onImport, onSeeRuns }) {
 
   const pb = useMemo(() => personalBests(runs), [runs]);
   const last = useMemo(() => latestRun(runs), [runs]);
-  const wl = useMemo(() => winLoss(runs), [runs]);
   const avgRT = useMemo(() => avg(runs.map((r) => r.rt).filter((v) => isNum(v) && v >= 0)), [runs]);
+
+  // Win/loss from elimination rounds (Track tab → Eliminations), scoped like the runs.
+  const elimWL = useMemo(() => {
+    let w = 0, l = 0;
+    for (const ev of state.events || []) {
+      if (year !== 'all' && !(ev.date || '').startsWith(year)) continue;
+      if (dist !== 'all' && ev.distance !== dist) continue;
+      for (const r of ev.rounds || []) {
+        if (r.result === 'W') w++;
+        else if (r.result === 'L') l++;
+      }
+    }
+    return { w, l, rate: w + l ? Math.round((w / (w + l)) * 100) : null };
+  }, [state.events, year, dist]);
+  const showWinRate = elimWL.w + elimWL.l > 0;
 
   // Consistency: season (scoped) or last 5 runs, on the dominant distance.
   const [conMode, setConMode] = useState('season'); // season | last5
@@ -121,7 +135,6 @@ export default function Dash({ state, onAddRun, onImport, onSeeRuns }) {
 
   const scopeLabel = `${dist === 'all' ? 'All distances' : dist + ' mi'} · ${year === 'all' ? 'All years' : year}`;
   const distLabel = dist === 'all' ? 'All runs' : `${dist} mi`;
-  const showWinRate = (dist === '1/8' || dist === 'all') && wl.w + wl.l > 0;
 
   return (
     <div className="space-y-4">
@@ -185,7 +198,7 @@ export default function Dash({ state, onAddRun, onImport, onSeeRuns }) {
           {showWinRate && (
             <Card>
               <SectionTitle>Win rate · {scopeLabel}</SectionTitle>
-              <WinBar w={wl.w} l={wl.l} />
+              <WinBar w={elimWL.w} l={elimWL.l} />
             </Card>
           )}
 

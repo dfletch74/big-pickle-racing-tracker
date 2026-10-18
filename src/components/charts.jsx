@@ -103,7 +103,7 @@ export function LineChart({ runs, valueKey, invert = false, formatY, height = 24
   );
 }
 
-/** Win/loss bar for the 1/8-mile view. */
+/** Win/loss bar — fed by elimination rounds. */
 export function WinBar({ w, l }) {
   const total = w + l;
   if (!total) return <div className="text-sm text-white/40">No elimination runs yet.</div>;
