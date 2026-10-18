@@ -1,0 +1,73 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+}
+
+html,
+body {
+  background: #060806;
+  color: #e7ece4;
+}
+
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* slim scrollbars */
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+*::-webkit-scrollbar-thumb {
+  background: #2a332a;
+  border-radius: 4px;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+input,
+select,
+textarea {
+  color-scheme: dark;
+}
+
+/* number input spinners off for the timeslip fields */
+input[type='number']::-webkit-outer-spin-button,
+input[type='number']::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type='number'] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+/* ---------- print: clean run sheet ---------- */
+.print-sheet {
+  display: none;
+}
+@media print {
+  body {
+    background: #fff;
+    color: #000;
+  }
+  .app-chrome {
+    display: none !important;
+  }
+  .print-sheet {
+    display: block !important;
+    color: #000;
+  }
+  .print-sheet * {
+    color: #000 !important;
+    border-color: #999 !important;
+    background: transparent !important;
+  }
+}

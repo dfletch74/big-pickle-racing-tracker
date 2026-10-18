@@ -1,0 +1,273 @@
+import { useEffect, useMemo, useState } from 'react';
+import { Card, SectionTitle, Btn, Field, inputCls, Segmented, Badge, EmptyState } from '../components/ui';
+import { fmtET, fmtMPH, fmtTemp, fmtDA, fmtDate, isNum } from '../lib/format';
+import { runsForCar, filterDistance, latestRun, segmentSplits, bestSegments, regressETonDA, cheatSheet, avg } from '../lib/stats';
+import { DA_BANDS, TEMP_BANDS, airTrendLabel } from '../lib/physics';
+import { fetchTrackWeather } from '../lib/weather';
+import { uid } from '../lib/store';
+
+export default function TrackDay({ state, update, toast, dist, setDist, onAddRun }) {
+  const [trackId, setTrackId] = useState(state.tracks[0]?.id || '');
+  const [wx, setWx] = useState(null);
+  const [wxBusy, setWxBusy] = useState(false);
+  const [wxErr, setWxErr] = useState('');
+  const [manual, setManual] = useState({ tempF: '', humidity: '' });
+  const [noteText, setNoteText] = useState('');
+  const [showElims, setShowElims] = useState(false);
+
+  const track = state.tracks.find((t) => t.id === trackId) || state.tracks[0];
+  const carRuns = useMemo(() => runsForCar(state, state.activeCarId), [state]);
+  const runs = useMemo(() => filterDistance(carRuns, dist), [carRuns, dist]);
+  const last = useMemo(() => latestRun(runs), [runs]);
+  const baseline = state.settings.daBaseline;
+
+  const loadWx = async () => {
+    if (!track) return;
+    setWxBusy(true);
+    setWxErr('');
+    try {
+      const w = await fetchTrackWeather(track);
+      setWx(w);
+    } catch (e) {
+      setWxErr(e.message);
+    }
+    setWxBusy(false);
+  };
+
+  useEffect(() => { loadWx(); /* eslint-disable-next-line */ }, [trackId]);
+
+  const live = wx?.current || null;
+  const trend = wx && wx.hourly.length
+    ? airTrendLabel(live.daFt, wx.hourly[wx.hourly.length - 1].daFt)
+    : null;
+  const nextHr = wx && wx.hourly.length ? wx.hourly[wx.hourly.length - 1] : null;
+
+  // Manual override when there's no live data.
+  const effTemp = live?.tempF ?? (manual.tempF === '' ? null : Number(manual.tempF));
+  const effDA = live?.daFt ?? null;
+
+  const buildPass = useMemo(() => {
+    if (!last) return null;
+    const segs = segmentSplits(last);
+    const bests = bestSegments(runs);
+    return segs.map((s, i) => ({ ...s, best: bests[i]?.best, delta: isNum(s.dur) && isNum(bests[i]?.best) ? s.dur - bests[i].best : null }));
+  }, [last, runs]);
+
+  const reg = useMemo(() => regressETonDA(runs), [runs]);
+  const prediction = reg.slope != null && effDA != null ? reg.predict(effDA) : null;
+
+  const sheets = useMemo(() => ({
+    da: cheatSheet(runs, DA_BANDS, 'daFt'),
+    temp: cheatSheet(runs, TEMP_BANDS, 'tempF'),
+  }), [runs]);
+
+  const notes = state.trackNotes.filter((n) => !track || n.trackId === track.id).sort((a, b) => b.date.localeCompare(a.date));
+
+  const addNote = () => {
+    const t = noteText.trim();
+    if (!t || !track) return;
+    update((s) => { s.trackNotes.push({ id: uid(), trackId: track.id, date: new Date().toISOString().slice(0, 10), text: t }); });
+    setNoteText('');
+    toast('Note saved.');
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center gap-2">
+        <select value={track?.id || ''} onChange={(e) => setTrackId(e.target.value)} className={`${inputCls} flex-1`}>
+          {state.tracks.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+        </select>
+        <Segmented value={dist} onChange={setDist} options={[{ value: '1/4', label: '1/4 mi' }, { value: '1/8', label: '1/8 mi' }]} />
+        <Btn onClick={onAddRun}>Log a run</Btn>
+      </div>
+
+      {/* live conditions */}
+      <Card>
+        <div className="mb-2 flex items-center justify-between">
+          <SectionTitle>Live conditions</SectionTitle>
+          <Btn kind="ghost" onClick={loadWx} disabled={wxBusy} className="!py-1.5 text-xs">{wxBusy ? '…' : 'Refresh'}</Btn>
+        </div>
+        {wxErr && <div className="mb-2 text-xs text-amber-300">Live weather unavailable ({wxErr}). Enter conditions manually:</div>}
+        {(!live || wxErr) && (
+          <div className="grid grid-cols-2 gap-2">
+            <Field label="Temp °F"><input type="number" value={manual.tempF} onChange={(e) => setManual({ ...manual, tempF: e.target.value })} className={inputCls} /></Field>
+            <Field label="Humidity %"><input type="number" value={manual.humidity} onChange={(e) => setManual({ ...manual, humidity: e.target.value })} className={inputCls} /></Field>
+          </div>
+        )}
+        {live && (
+          <div className="grid grid-cols-3 gap-2 text-center">
+            <div><div className="font-mono text-xl font-bold">{fmtTemp(live.tempF)}</div><div className="text-[10px] text-white/45">TEMP</div></div>
+            <div><div className="font-mono text-xl font-bold">{Math.round(live.humidity)}%</div><div className="text-[10px] text-white/45">HUMIDITY</div></div>
+            <div><div className="font-mono text-xl font-bold text-pickle-400">{fmtDA(live.daFt)}</div><div className="text-[10px] text-white/45">DENSITY ALT</div></div>
+          </div>
+        )}
+        {trend && <div className="mt-2 text-center text-xs text-white/60">{trend}{nextHr && <> · next hr ≈ {fmtDA(nextHr.daFt)} ({fmtTemp(nextHr.tempF)})</>}</div>}
+        <div className="mt-1 text-center text-[10px] text-white/35">Higher DA = thinner air = slower. Correcting to a lower DA gives a faster ET.</div>
+      </Card>
+
+      {/* build the pass */}
+      {last ? (
+        <Card>
+          <SectionTitle>Build the pass <span className="normal-case tracking-normal">— {fmtDate(last.date)}</span></SectionTitle>
+          <div className="mb-2 text-xs text-white/50">Last run vs your best per segment:</div>
+          <table className="w-full font-mono text-xs">
+            <tbody>
+              {buildPass.map((s) => (
+                <tr key={s.name} className="border-t border-white/5">
+                  <td className="py-1.5 text-white/60">{s.name}</td>
+                  <td className="text-right">{isNum(s.dur) ? s.dur.toFixed(3) : '—'}</td>
+                  <td className="text-right text-white/40">best {isNum(s.best) ? s.best.toFixed(3) : '—'}</td>
+                  <td className={`text-right ${s.delta > 0.001 ? 'text-amber-300' : 'text-pickle-400'}`}>
+                    {s.delta == null ? '' : s.delta <= 0.0005 ? '✓' : `+${s.delta.toFixed(3)}`}
+                  </td>
+                </tr>
+              ))}
+              <tr className="border-t border-white/10 font-bold">
+                <td className="py-1.5">Full pass</td>
+                <td className="text-right text-pickle-400">{fmtET(last.et)}</td>
+                <td className="text-right text-white/40">@ {fmtMPH(last.mph)}</td>
+                <td />
+              </tr>
+            </tbody>
+          </table>
+        </Card>
+      ) : (
+        <EmptyState title="No runs yet" body="Log a run to build your first pass analysis." action={<Btn onClick={onAddRun}>Log a run</Btn>} />
+      )}
+
+      {/* next pass predictor */}
+      <Card>
+        <SectionTitle>Next pass predictor</SectionTitle>
+        {prediction != null ? (
+          <div>
+            <div className="font-mono text-2xl font-black text-pickle-400">{prediction.toFixed(3)}s <span className="text-sm font-normal text-white/50">predicted ET</span></div>
+            <div className="mt-1 text-xs text-white/45">
+              Linear fit of ET on DA across {reg.n} runs ({(reg.slope * 1000).toFixed(3)}s per 1,000 ft DA) at {fmtDA(effDA)}.
+            </div>
+          </div>
+        ) : (
+          <div className="text-sm text-white/50">Need 3+ runs with DA data and current conditions to predict.</div>
+        )}
+      </Card>
+
+      {/* cheat sheets */}
+      <Card>
+        <SectionTitle>ET cheat sheet</SectionTitle>
+        <div className="mb-1 text-[11px] font-semibold text-white/50">By density altitude</div>
+        <SheetTable rows={sheets.da} />
+        <div className="mb-1 mt-3 text-[11px] font-semibold text-white/50">By temperature</div>
+        <SheetTable rows={sheets.temp} />
+      </Card>
+
+      {/* eliminations */}
+      <Card>
+        <div className="mb-2 flex items-center justify-between">
+          <SectionTitle>Eliminations</SectionTitle>
+          <Btn kind="ghost" onClick={() => setShowElims((s) => !s)} className="!py-1.5 text-xs">{showElims ? 'Hide' : 'Manage'}</Btn>
+        </div>
+        {showElims && <Elims state={state} update={update} toast={toast} track={track} dist={dist} />}
+        {!showElims && <div className="text-xs text-white/45">{state.events.length} event{state.events.length === 1 ? '' : 's'} on record.</div>}
+      </Card>
+
+      {/* track notes */}
+      <Card>
+        <SectionTitle>Track notes</SectionTitle>
+        <div className="mb-2 flex gap-2">
+          <input value={noteText} onChange={(e) => setNoteText(e.target.value)} placeholder="Lane 2 hooking better after 6pm…" className={`${inputCls} flex-1`} />
+          <Btn kind="ghost" onClick={addNote}>Add</Btn>
+        </div>
+        {notes.length === 0 && <div className="text-xs text-white/40">No notes for this track yet.</div>}
+        {notes.map((n) => (
+          <div key={n.id} className="flex items-start justify-between gap-2 border-t border-white/5 py-2 text-sm">
+            <div><span className="mr-2 text-xs text-white/40">{fmtDate(n.date)}</span>{n.text}</div>
+            <button onClick={() => update((s) => { s.trackNotes = s.trackNotes.filter((x) => x.id !== n.id); })} className="text-xs text-red-400/70">✕</button>
+          </div>
+        ))}
+      </Card>
+    </div>
+  );
+}
+
+function SheetTable({ rows }) {
+  return (
+    <table className="w-full font-mono text-xs">
+      <thead><tr className="text-left text-white/40">
+        <th className="py-1 font-medium">Air</th><th className="font-medium">Runs</th><th className="font-medium">Best</th><th className="text-right font-medium">Avg</th>
+      </tr></thead>
+      <tbody>
+        {rows.map((r) => (
+          <tr key={r.id} className="border-t border-white/5">
+            <td className="py-1.5"><b>{r.label}</b> <span className="text-white/40">{r.detail}</span></td>
+            <td className="text-white/60">{r.n}</td>
+            <td className="font-bold text-pickle-400">{r.best != null ? r.best.toFixed(3) : '—'}</td>
+            <td className="text-right">{r.avgET != null ? r.avgET.toFixed(3) : '—'}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
+
+function Elims({ state, update, toast, track, dist }) {
+  const [name, setName] = useState('');
+  const events = state.events;
+
+  const createEvent = () => {
+    update((s) => {
+      s.events.push({ id: uid(), name: name.trim() || `Event ${s.events.length + 1}`, trackId: track?.id, track: track?.name, date: new Date().toISOString().slice(0, 10), distance: dist, rounds: [] });
+    });
+    setName('');
+    toast('Event started.');
+  };
+
+  const addRound = (ev) => {
+    update((s) => {
+      const e = s.events.find((x) => x.id === ev.id);
+      e.rounds.push({ n: e.rounds.length + 1, dial: '', rt: '', et: '', mph: '', oppDial: '', result: '' });
+    });
+  };
+
+  const setRound = (evId, idx, k, v) => {
+    update((s) => {
+      const r = s.events.find((x) => x.id === evId).rounds[idx];
+      r[k] = v;
+    });
+  };
+
+  const delEvent = (id) => {
+    if (!window.confirm('Delete this event and its rounds?')) return;
+    update((s) => { s.events = s.events.filter((e) => e.id !== id); });
+  };
+
+  return (
+    <div className="space-y-3">
+      <div className="flex gap-2">
+        <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Event name (e.g. Friday Night Lights)…" className={`${inputCls} flex-1`} />
+        <Btn onClick={createEvent}>Start event</Btn>
+      </div>
+      {events.length === 0 && <div className="text-xs text-white/40">No events yet.</div>}
+      {events.map((ev) => (
+        <div key={ev.id} className="rounded-xl border border-white/10 p-3">
+          <div className="mb-2 flex items-center justify-between">
+            <div className="text-sm font-bold">{ev.name} <span className="font-normal text-white/40">· {ev.track} · {fmtDate(ev.date)} · {ev.distance}</span></div>
+            <button onClick={() => delEvent(ev.id)} className="text-xs text-red-400/70">Delete</button>
+          </div>
+          {ev.rounds.map((r, i) => (
+            <div key={i} className="mb-2 grid grid-cols-7 items-end gap-1.5 font-mono text-xs">
+              <div className="font-sans font-bold text-white/60">R{r.n}</div>
+              <label>Dial<input value={r.dial} onChange={(e) => setRound(ev.id, i, 'dial', e.target.value)} className={inputCls} placeholder="9.65" /></label>
+              <label>R/T<input value={r.rt} onChange={(e) => setRound(ev.id, i, 'rt', e.target.value)} className={inputCls} /></label>
+              <label>ET<input value={r.et} onChange={(e) => setRound(ev.id, i, 'et', e.target.value)} className={inputCls} /></label>
+              <label>MPH<input value={r.mph} onChange={(e) => setRound(ev.id, i, 'mph', e.target.value)} className={inputCls} /></label>
+              <label>Opp<input value={r.oppDial} onChange={(e) => setRound(ev.id, i, 'oppDial', e.target.value)} className={inputCls} placeholder="dial" /></label>
+              <select value={r.result} onChange={(e) => setRound(ev.id, i, 'result', e.target.value)} className={inputCls}>
+                <option value="">—</option><option value="W">W</option><option value="L">L</option>
+              </select>
+            </div>
+          ))}
+          <Btn kind="ghost" onClick={() => addRound(ev)} className="!py-1.5 text-xs">+ Add round</Btn>
+        </div>
+      ))}
+    </div>
+  );
+}
