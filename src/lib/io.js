@@ -1,5 +1,5 @@
 import { uid } from './store';
-import { densityAltitudeFt } from './physics';
+import { densityAltitudeFt, stationPressureHpa } from './physics';
 import { isNum } from './format';
 
 // SheetJS is loaded lazily (dynamic import inside parseImportFile) so the
@@ -114,9 +114,10 @@ export async function parseImportFile(file, carId, fallbackTrack) {
     const humidity = num(get('humidity'));
     const altitudeFt = num(get('altitudeFt'));
     let daFt = null;
-    if (isNum(tempF) && isNum(humidity) && isNum(altitudeFt)) {
-      // Approximate: assume standard sea-level pressure when unknown.
-      daFt = Math.round(densityAltitudeFt({ tempF, humidityPct: humidity, pressureHpa: 1013.25 }));
+    if (isNum(tempF) && isNum(altitudeFt)) {
+      // Same standard-pressure assumption the run logger uses (humidity optional).
+      const p = stationPressureHpa(1013.25, altitudeFt);
+      daFt = Math.round(densityAltitudeFt({ tempF, humidityPct: humidity ?? 0, pressureHpa: p }));
     }
     runs.push({
       id: uid(),

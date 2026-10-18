@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Card, SectionTitle, Btn, Field, inputCls, Segmented, Badge, EmptyState } from '../components/ui';
 import { fmtET, fmtMPH, fmtTemp, fmtDA, fmtDate, isNum } from '../lib/format';
-import { runsForCar, filterDistance, latestRun, segmentSplits, bestSegments, regressETonDA, cheatSheet, avg } from '../lib/stats';
-import { DA_BANDS, TEMP_BANDS, airTrendLabel } from '../lib/physics';
+import { runsForCar, filterDistance, latestRun, segmentSplits, bestSegments, predictET, cheatSheet, avg } from '../lib/stats';
+import { DA_BANDS, TEMP_BANDS, airTrendLabel, densityAltitudeFt, stationPressureHpa } from '../lib/physics';
 import { fetchTrackWeather } from '../lib/weather';
 import { uid } from '../lib/store';
 
@@ -43,9 +43,17 @@ export default function TrackDay({ state, update, toast, dist, setDist, onAddRun
     : null;
   const nextHr = wx && wx.hourly.length ? wx.hourly[wx.hourly.length - 1] : null;
 
-  // Manual override when there's no live data.
-  const effTemp = live?.tempF ?? (manual.tempF === '' ? null : Number(manual.tempF));
-  const effDA = live?.daFt ?? null;
+  // Manual override when there's no live data — estimate DA from temp + track elevation
+  // (same standard-pressure assumption the run logger uses).
+  const manualTemp = manual.tempF === '' ? null : Number(manual.tempF);
+  const manualHum = manual.humidity === '' ? null : Number(manual.humidity);
+  const manualDA = (() => {
+    if (live?.daFt != null || manualTemp == null || track?.elevationFt == null) return null;
+    const p = stationPressureHpa(1013.25, track.elevationFt);
+    return Math.round(densityAltitudeFt({ tempF: manualTemp, humidityPct: manualHum ?? 0, pressureHpa: p }));
+  })();
+  const effTemp = live?.tempF ?? manualTemp;
+  const effDA = live?.daFt ?? manualDA;
 
   const buildPass = useMemo(() => {
     if (!last) return null;
@@ -54,8 +62,7 @@ export default function TrackDay({ state, update, toast, dist, setDist, onAddRun
     return segs.map((s, i) => ({ ...s, best: bests[i]?.best, delta: isNum(s.dur) && isNum(bests[i]?.best) ? s.dur - bests[i].best : null }));
   }, [last, runs]);
 
-  const reg = useMemo(() => regressETonDA(runs), [runs]);
-  const prediction = reg.slope != null && effDA != null ? reg.predict(effDA) : null;
+  const prediction = useMemo(() => predictET(runs, effDA), [runs, effDA]);
 
   const sheets = useMemo(() => ({
     da: cheatSheet(runs, DA_BANDS, 'daFt'),
@@ -141,13 +148,17 @@ export default function TrackDay({ state, update, toast, dist, setDist, onAddRun
         <SectionTitle>Next pass predictor</SectionTitle>
         {prediction != null ? (
           <div>
-            <div className="font-mono text-2xl font-black text-pickle-400">{prediction.toFixed(3)}s <span className="text-sm font-normal text-white/50">predicted ET</span></div>
-            <div className="mt-1 text-xs text-white/45">
-              Linear fit of ET on DA across {reg.n} runs ({(reg.slope * 1000).toFixed(3)}s per 1,000 ft DA) at {fmtDA(effDA)}.
+            <div className="font-mono text-2xl font-black text-pickle-400">{prediction.et.toFixed(3)}s <span className="text-sm font-normal text-white/50">predicted ET</span></div>
+            <div className="mt-1.5 flex items-center gap-2">
+              <Badge tone={prediction.confidence === 'high' ? 'green' : prediction.confidence === 'medium' ? 'neutral' : 'amber'}>
+                {prediction.confidence === 'high' ? 'Solid' : prediction.confidence === 'medium' ? 'Fair' : 'Thin data'}
+              </Badge>
+              <div className="text-xs text-white/45">{prediction.basis}</div>
             </div>
+            <div className="mt-1 text-xs text-white/40">{prediction.detail}</div>
           </div>
         ) : (
-          <div className="text-sm text-white/50">Need 3+ runs with DA data and current conditions to predict.</div>
+          <div className="text-sm text-white/50">Log a run to get a prediction.</div>
         )}
       </Card>
 

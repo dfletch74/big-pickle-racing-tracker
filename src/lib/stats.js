@@ -267,6 +267,53 @@ export function regressETonDA(runs) {
   return { n, slope, intercept, predict: (da) => intercept + slope * da };
 }
 
+/**
+ * Next-pass ET prediction with honest basis reporting.
+ * Tier 1: linear ET-on-DA regression (3+ runs with DA and DA spread).
+ * Tier 2: average of the runs closest to current DA (some DA data, but thin).
+ * Tier 3: plain average ET (runs exist, but no air data at all).
+ * Returns { et, basis, detail, confidence } or null when there are no runs with ET.
+ */
+export function predictET(runs, daFt) {
+  const withET = runs.filter((r) => isNum(r.et));
+  if (!withET.length) return null;
+  const withDA = withET.filter((r) => isNum(r.daFt));
+
+  if (daFt != null && withDA.length >= 3) {
+    const reg = regressETonDA(withDA);
+    if (reg.slope != null) {
+      const das = withDA.map((r) => r.daFt);
+      const lo = Math.min(...das), hi = Math.max(...das);
+      const inRange = daFt >= lo && daFt <= hi;
+      return {
+        et: reg.predict(daFt),
+        basis: `Linear ET/DA fit across ${withDA.length} runs`,
+        detail: `${(reg.slope * 1000).toFixed(3)}s per 1,000 ft DA at ${Math.round(daFt).toLocaleString()} ft` +
+          (inRange ? '' : ` — current DA is outside your ${Math.round(lo).toLocaleString()}–${Math.round(hi).toLocaleString()} ft data range`),
+        confidence: inRange ? 'high' : 'medium',
+      };
+    }
+  }
+
+  if (daFt != null && withDA.length > 0) {
+    const sorted = [...withDA].sort((a, b) => Math.abs(a.daFt - daFt) - Math.abs(b.daFt - daFt));
+    const k = sorted.slice(0, Math.min(3, sorted.length));
+    const closestGap = Math.abs(k[0].daFt - daFt);
+    return {
+      et: avg(k.map((r) => r.et)),
+      basis: `Average of ${k.length} nearest-air run${k.length > 1 ? 's' : ''} — limited air data`,
+      detail: `Closest logged DA ${Math.round(k[0].daFt).toLocaleString()} ft vs current ${Math.round(daFt).toLocaleString()} ft`,
+      confidence: closestGap <= 500 && k.length >= 2 ? 'medium' : 'low',
+    };
+  }
+
+  return {
+    et: avg(withET.map((r) => r.et)),
+    basis: `Average of ${withET.length} run${withET.length > 1 ? 's' : ''} — no air data`,
+    detail: 'Enter temp above (or get live weather) for a DA-corrected prediction',
+    confidence: withET.length >= 5 ? 'medium' : 'low',
+  };
+}
 /** ET cheat sheet grouped by band list (DA_BANDS or TEMP_BANDS). */
 export function cheatSheet(runs, bands, key) {
   return bands.map((b) => {
