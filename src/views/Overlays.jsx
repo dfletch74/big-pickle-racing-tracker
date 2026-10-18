@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Modal, Card, SectionTitle, Btn, Field, inputCls, Badge } from '../components/ui';
+import { Modal, Card, SectionTitle, Btn, Field, inputCls, Badge, Icon } from '../components/ui';
 import { uid, makeDemoState } from '../lib/store';
 import { runsForCar } from '../lib/stats';
 import { runsToCSV, downloadFile } from '../lib/io';
@@ -88,14 +88,122 @@ export function GarageModal({ state, update, toast, onClose }) {
 
 const TREE_DELAY = { '400': 0.4, '500': 0.5 };
 
+function TreeBulb({ on, color, className = 'h-16 w-16' }) {
+  return (
+    <div
+      className={`${className} rounded-full transition-all duration-150`}
+      style={
+        on
+          ? {
+              background: `radial-gradient(circle at 32% 28%, rgba(255,255,255,0.55), rgba(255,255,255,0) 46%), ${color}`,
+              boxShadow: `0 0 26px ${color}, 0 0 6px ${color}`,
+            }
+          : {
+              background: '#0a0c10',
+              border: '1px solid rgba(255,255,255,0.07)',
+              boxShadow: 'inset 0 3px 10px rgba(0,0,0,0.85)',
+            }
+      }
+    />
+  );
+}
+
+function TreeSeg({ options, value, onChange, labelClass = '' }) {
+  return (
+    <div className="grid grid-cols-2 gap-2">
+      {options.map((o) => (
+        <button
+          key={o.value}
+          onClick={() => onChange(o.value)}
+          className={`rounded-2xl py-3.5 text-[17px] font-bold transition active:scale-[0.98] ${labelClass} ${
+            value === o.value ? 'bg-pickle-400 text-black shadow-glow' : 'bg-white/[0.06] text-white/45 hover:text-white'
+          }`}
+        >
+          {o.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function RacerPicker({ racers, racerId, onPick, onAdd, onClose }) {
+  const [name, setName] = useState('');
+  const avgOf = (r) => {
+    const clean = r.attempts.filter((a) => !a.red);
+    return clean.length ? clean.reduce((a, b) => a + b.rt, 0) / clean.length : null;
+  };
+  const add = () => {
+    const n = name.trim();
+    if (!n) return;
+    onAdd(n);
+    setName('');
+  };
+  return (
+    <div className="fixed inset-0 z-[70] flex items-end justify-center bg-black/75 p-4 sm:items-center" onClick={onClose}>
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="w-full max-w-md rounded-[26px] border border-white/10 bg-[#14161b] p-5 shadow-card"
+      >
+        <div className="mb-1 flex items-center gap-2.5">
+          <Icon name="user" className="h-6 w-6 shrink-0 text-pickle-400" />
+          <h2 className="font-display text-[30px] font-bold uppercase leading-none tracking-[0.04em]">
+            Who&apos;s on the tree?
+          </h2>
+        </div>
+        <p className="mb-4 text-[15px] leading-snug text-white/45">
+          Pick a racer or add a new one — reaction times are tracked per racer.
+        </p>
+        <div className="max-h-[38vh] space-y-2 overflow-y-auto">
+          {racers.map((r) => {
+            const a = avgOf(r);
+            const active = r.id === racerId;
+            return (
+              <button
+                key={r.id}
+                onClick={() => onPick(r.id)}
+                className={`flex w-full items-center justify-between rounded-2xl border px-4 py-3.5 text-left transition active:scale-[0.99] ${
+                  active
+                    ? 'border-pickle-500/60 bg-pickle-500/[0.08]'
+                    : 'border-white/[0.08] bg-white/[0.03] hover:border-white/20'
+                }`}
+              >
+                <span className="text-[17px] font-semibold">{r.name}</span>
+                <span className="font-mono text-sm text-white/45">avg {a != null ? a.toFixed(3) : '—'}</span>
+              </button>
+            );
+          })}
+          {!racers.length && <div className="py-4 text-center text-sm text-white/40">No racers yet — add one below.</div>}
+        </div>
+        <div className="mt-3 flex gap-2">
+          <input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && add()}
+            placeholder="New racer name…"
+            className={`${inputCls} flex-1 !rounded-2xl !bg-white/[0.05] !py-3.5`}
+            autoComplete="off"
+          />
+          <button
+            onClick={add}
+            className="flex items-center gap-1.5 rounded-2xl bg-pickle-500 px-5 font-display text-xl font-bold uppercase tracking-wide text-black transition hover:bg-pickle-400 active:scale-95"
+          >
+            <Icon name="plus" className="h-5 w-5" strokeWidth={2.5} /> Add
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function TreeSimModal({ state, update, toast, onClose }) {
   const [racerId, setRacerId] = useState(state.racers[0]?.id || '');
-  const [tree, setTree] = useState('400');
-  const [mode, setMode] = useState('pro'); // pro | sportsman
+  const [showPicker, setShowPicker] = useState(true);
+  const [tree, setTree] = useState('500');
+  const [mode, setMode] = useState('sportsman');
+  const [showHelp, setShowHelp] = useState(false);
   const [phase, setPhase] = useState('idle'); // idle|staged|holding|running|done
   const [lit, setLit] = useState([]);
   const [lastRT, setLastRT] = useState(null);
-  const [newName, setNewName] = useState('');
   const timers = useRef([]);
   const greenAt = useRef(0);
 
@@ -144,13 +252,12 @@ export function TreeSimModal({ state, update, toast, onClose }) {
 
   const reset = () => { clearTimers(); setLit([]); setPhase('idle'); setLastRT(null); };
 
-  const addRacer = () => {
-    const n = newName.trim();
-    if (!n) return;
+  const addRacer = (n) => {
     const id = uid();
     update((s) => { s.racers.push({ id, name: n, attempts: [] }); });
     setRacerId(id);
-    setNewName('');
+    setShowPicker(false);
+    toast(`Racer added — ${n} is on the tree.`);
   };
 
   const stats = (r) => {
@@ -166,81 +273,194 @@ export function TreeSimModal({ state, update, toast, onClose }) {
 
   const ranked = [...state.racers].map((r) => ({ r, s: stats(r) })).sort((a, b) => (a.s.avg ?? 9) - (b.s.avg ?? 9));
 
-  const bulb = (id, color, size = 'h-10 w-10') => (
-    <div className={`${size} rounded-full border-2 ${lit.includes(id) ? '' : 'opacity-25'}`}
-      style={lit.includes(id) ? { background: color, borderColor: color, boxShadow: `0 0 18px ${color}` } : { borderColor: '#333', background: '#111' }} />
+  const hint = (
+    <div className="mt-5 text-center text-[17px] font-medium text-white/55">
+      {phase === 'idle' && 'Tap Stage to begin'}
+      {phase === 'staged' && 'Press and HOLD — release on green'}
+      {phase === 'holding' && 'Get ready…'}
+      {phase === 'running' && <span className="font-bold text-pickle-400">RELEASE ON GREEN!</span>}
+      {phase === 'done' && lastRT && (lastRT.red
+        ? <span className="font-bold text-red-400">RED LIGHT — {lastRT.rt.toFixed(3)} (foul)</span>
+        : <span className="font-bold text-pickle-400">R/T {lastRT.rt.toFixed(3)}</span>)}
+    </div>
   );
 
   return (
-    <Modal title="Tree simulator" onClose={onClose}>
-      <div className="mb-3 flex flex-wrap gap-2">
-        <select value={racerId} onChange={(e) => setRacerId(e.target.value)} className={`${inputCls} flex-1`}>
-          {state.racers.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
-        </select>
-        <select value={tree} onChange={(e) => setTree(e.target.value)} className={inputCls}>
-          <option value="400">.400 Pro tree</option>
-          <option value="500">.500 Sportsman</option>
-        </select>
-        <select value={mode} onChange={(e) => setMode(e.target.value)} className={inputCls}>
-          <option value="pro">Pro</option>
-          <option value="sportsman">Sportsman</option>
-        </select>
-      </div>
-      <div className="mb-3 flex gap-2">
-        <input value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="New racer name…" className={`${inputCls} flex-1`} />
-        <Btn kind="ghost" onClick={addRacer}>Add</Btn>
-      </div>
-
-      {/* the tree */}
-      <div className="mb-3 flex justify-center gap-3 rounded-2xl bg-black p-5">
-        <div className="flex flex-col items-center gap-2">
-          {bulb('pre', '#3b82f6', 'h-6 w-6')}{bulb('stage', '#3b82f6', 'h-6 w-6')}
-        </div>
-        <div className="flex items-center gap-2">
-          {bulb('a1', '#fbbf24')}{bulb('a2', '#fbbf24')}{bulb('a3', '#fbbf24')}
-        </div>
-        <div className="flex items-center gap-2">
-          {bulb('green', '#22c55e')}{bulb('red', '#ef4444')}
-        </div>
-      </div>
-
-      <div className="mb-1 text-center text-sm text-white/60">
-        {phase === 'idle' && 'Tap STAGE, then press and HOLD — release on green.'}
-        {phase === 'staged' && 'Staged. Press and HOLD the button.'}
-        {phase === 'holding' && 'Get ready…'}
-        {phase === 'running' && 'RELEASE ON GREEN!'}
-        {phase === 'done' && lastRT && (lastRT.red
-          ? <span className="font-bold text-red-400">RED LIGHT — {lastRT.rt.toFixed(3)} (foul)</span>
-          : <span className="font-bold text-pickle-400">R/T {lastRT.rt.toFixed(3)}</span>)}
-      </div>
-
-      <div className="flex gap-2">
-        {phase === 'idle' && <Btn onClick={stage} className="flex-1 !py-3">TAP TO STAGE</Btn>}
-        {(phase === 'staged' || phase === 'holding' || phase === 'running') && (
-          <button
-            onMouseDown={holdStart} onMouseUp={holdEnd} onMouseLeave={holdEnd}
-            onTouchStart={(e) => { e.preventDefault(); holdStart(); }} onTouchEnd={(e) => { e.preventDefault(); holdEnd(); }}
-            className="flex-1 select-none rounded-xl bg-pickle-500 py-4 font-black text-black active:bg-pickle-400"
-          >HOLD — LAUNCH</button>
-        )}
-        {phase === 'done' && <><Btn onClick={stage} className="flex-1 !py-3">STAGE AGAIN</Btn><Btn kind="ghost" onClick={reset}>Reset</Btn></>}
-      </div>
-
-      <div className="mt-4">
-        <SectionTitle>Racer rankings</SectionTitle>
-        {ranked.map(({ r, s }, i) => (
-          <div key={r.id} className="flex items-center justify-between border-t border-white/5 py-1.5 text-sm first:border-0">
-            <span>#{i + 1} <b>{r.name}</b> <span className="text-white/40">· {s.n} attempts</span></span>
-            <span className="font-mono text-xs">
-              avg <b className="text-pickle-400">{s.avg != null ? s.avg.toFixed(3) : '—'}</b>{' '}
-              best {s.best != null ? s.best.toFixed(3) : '—'} · RL {s.rl}
-            </span>
+    <>
+      <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/75 sm:items-center" onClick={onClose}>
+        <div
+          onClick={(e) => e.stopPropagation()}
+          className="max-h-[94vh] w-full overflow-y-auto rounded-t-3xl border border-white/10 bg-coal-950 p-5 sm:max-w-md sm:rounded-3xl"
+        >
+          {/* header */}
+          <div className="mb-4 flex items-center gap-2.5">
+            <Icon name="timer" className="h-6 w-6 shrink-0 text-pickle-400" />
+            <h2 className="font-display text-[30px] font-bold uppercase leading-none tracking-[0.06em]">Tree</h2>
+            <button
+              onClick={() => setShowPicker(true)}
+              className="ml-auto flex max-w-[150px] items-center gap-1.5 rounded-full border border-pickle-500/50 px-3.5 py-1.5 text-sm font-semibold text-pickle-300 transition hover:bg-pickle-500/10 active:scale-95"
+            >
+              <span className="truncate">{racer?.name || 'Pick racer'}</span>
+              <Icon name="chevD" className="h-4 w-4 shrink-0" />
+            </button>
+            <button
+              onClick={onClose}
+              aria-label="Close"
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-white/60 transition hover:bg-white/10 hover:text-white"
+            >
+              <Icon name="x" className="h-5 w-5" />
+            </button>
           </div>
-        ))}
+
+          {/* tree + mode */}
+          <div className="space-y-2">
+            <TreeSeg
+              options={[{ value: '400', label: '.400' }, { value: '500', label: '.500' }]}
+              value={tree} onChange={setTree} labelClass="font-mono"
+            />
+            <TreeSeg
+              options={[{ value: 'sportsman', label: 'SPORTSMAN' }, { value: 'pro', label: 'PRO' }]}
+              value={mode} onChange={setMode} labelClass="font-display tracking-[0.08em]"
+            />
+          </div>
+
+          <button onClick={() => setShowHelp((s) => !s)} className="mx-auto flex items-center gap-2 py-3 text-[15px] text-white/55 transition hover:text-white">
+            <Icon name="info" className="h-[18px] w-[18px]" />
+            How each tree works
+            <Icon name="chevD" className={`h-4 w-4 transition-transform ${showHelp ? 'rotate-180' : ''}`} />
+          </button>
+          {showHelp && (
+            <div className="mx-auto mb-1 max-w-sm rounded-2xl bg-white/[0.04] p-4 text-[13px] leading-relaxed text-white/60">
+              <p><b className="text-white/85">Sportsman (.500):</b> the ambers light one at a time, 0.5s apart — leave on the last amber.</p>
+              <p className="mt-2"><b className="text-white/85">Pro (.400):</b> all three ambers flash together, then green 0.4s later — go when you see amber.</p>
+              <p className="mt-2">Release the instant you see green. Red means you left early — foul.</p>
+            </div>
+          )}
+
+          {/* the tree */}
+          <div className="mx-auto mt-2 w-full max-w-[290px] rounded-[26px] border border-white/[0.08] bg-[#12141a] px-8 py-6">
+            <div className="flex items-start justify-center gap-10">
+              <div className="flex flex-col items-center gap-2">
+                <TreeBulb on={lit.includes('pre')} color="#3b82f6" className="h-10 w-10" />
+                <span className="font-display text-[13px] font-semibold uppercase tracking-[0.22em] text-white/45">Pre</span>
+              </div>
+              <div className="flex flex-col items-center gap-2">
+                <TreeBulb on={lit.includes('stage')} color="#3b82f6" className="h-10 w-10" />
+                <span className="font-display text-[13px] font-semibold uppercase tracking-[0.22em] text-white/45">Stage</span>
+              </div>
+            </div>
+            <div className="my-5 h-px bg-white/[0.07]" />
+            <div className="space-y-5">
+              {[
+                ['a1', 'Amber', '#fbbf24'],
+                ['a2', 'Amber', '#fbbf24'],
+                ['a3', 'Amber', '#fbbf24'],
+                ['green', 'Go', '#22c55e'],
+                ['red', 'Foul', '#ef4444'],
+              ].map(([id, label, color]) => (
+                <div key={id} className="flex items-center gap-5">
+                  <TreeBulb on={lit.includes(id)} color={color} className="h-16 w-16" />
+                  <span className="font-display text-[15px] font-semibold uppercase tracking-[0.26em] text-white/45">{label}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {hint}
+
+          <div className="mt-3">
+            {phase === 'idle' && (
+              <button
+                onClick={stage}
+                className="w-full rounded-2xl bg-white/[0.07] py-5 font-display text-[22px] font-bold uppercase tracking-[0.1em] text-white transition hover:bg-white/[0.1] active:scale-[0.99]"
+              >
+                Tap to stage
+              </button>
+            )}
+            {(phase === 'staged' || phase === 'holding' || phase === 'running') && (
+              <button
+                onMouseDown={holdStart} onMouseUp={holdEnd} onMouseLeave={holdEnd}
+                onTouchStart={(e) => { e.preventDefault(); holdStart(); }} onTouchEnd={(e) => { e.preventDefault(); holdEnd(); }}
+                className="w-full select-none rounded-2xl bg-pickle-400 py-5 font-display text-[22px] font-bold uppercase tracking-[0.1em] text-black shadow-glow transition active:bg-pickle-300"
+              >
+                Hold — launch
+              </button>
+            )}
+            {phase === 'done' && (
+              <div className="flex gap-2">
+                <button
+                  onClick={stage}
+                  className="flex-1 rounded-2xl bg-white/[0.07] py-4 font-display text-xl font-bold uppercase tracking-[0.1em] transition hover:bg-white/[0.1] active:scale-[0.99]"
+                >
+                  Stage again
+                </button>
+                <button
+                  onClick={reset}
+                  className="rounded-2xl border border-white/15 px-5 font-display text-xl font-bold uppercase tracking-[0.08em] text-white/70 transition hover:bg-white/5"
+                >
+                  Reset
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* rankings */}
+          <div className="mt-6 rounded-3xl border border-white/[0.08] bg-[#12141a] p-4">
+            <div className="mb-3 flex items-center gap-2">
+              <Icon name="trophy" className="h-5 w-5 text-pickle-400" />
+              <h3 className="font-display text-[22px] font-bold uppercase tracking-[0.06em]">Racer Rankings</h3>
+            </div>
+            <div className="space-y-2">
+              {ranked.map(({ r, s }, i) => {
+                const top = i === 0 && s.n > 0;
+                return (
+                  <div
+                    key={r.id}
+                    className={`rounded-2xl border p-3.5 ${top ? 'border-pickle-500/50 bg-pickle-500/[0.06]' : 'border-white/[0.06] bg-white/[0.02]'}`}
+                  >
+                    <div className="mb-2 flex items-center gap-1.5">
+                      {top && <Icon name="crown" className="h-4 w-4 shrink-0 text-pickle-400" />}
+                      <span className={`font-bold ${top ? 'text-pickle-300' : ''}`}>{r.name}</span>
+                      {top && <span className="text-xs text-white/40">· Top racer</span>}
+                      <span className="ml-auto text-xs text-white/40">{s.n} attempt{s.n === 1 ? '' : 's'}</span>
+                    </div>
+                    <div className="grid grid-cols-4 gap-2 text-right font-mono">
+                      {[
+                        ['AVG', s.avg, s.avg != null],
+                        ['BEST', s.best, s.best != null],
+                        ['WORST', s.worst, s.worst != null],
+                        ['RL', s.rl, true],
+                      ].map(([label, v, has]) => (
+                        <div key={label}>
+                          <div className="text-[10px] uppercase tracking-wider text-white/40">{label}</div>
+                          <div className={`text-sm font-bold ${label === 'AVG' && has ? 'text-pickle-300' : label === 'RL' && v > 0 ? 'text-red-400' : ''}`}>
+                            {label === 'RL' ? v : has ? v.toFixed(3) : '—'}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+              {!ranked.length && <div className="py-2 text-center text-sm text-white/40">No racers yet.</div>}
+            </div>
+          </div>
+        </div>
       </div>
-    </Modal>
+
+      {showPicker && (
+        <RacerPicker
+          racers={state.racers}
+          racerId={racerId}
+          onPick={(id) => { setRacerId(id); setShowPicker(false); }}
+          onAdd={addRacer}
+          onClose={() => setShowPicker(false)}
+        />
+      )}
+    </>
   );
 }
+
 
 /* ---------------- Settings ---------------- */
 
