@@ -16,6 +16,7 @@ import { isNum } from './format';
 const COLUMNS = {
   date: ['date'],
   et: ['et'],
+  distance: ['distance', 'dist', 'tracklength'],
   track: ['track'],
   sixty: ['60ft'],
   threeThirty: ['330ft'],
@@ -60,6 +61,17 @@ const num = (v) => {
   return Number.isNaN(n) ? null : n;
 };
 
+/** '1/8', '1/8 mile', 'Eighth', … → '1/8'; anything else → '1/4'. */
+const parseDistance = (v) => {
+  if (v instanceof Date && !Number.isNaN(v.getTime())) {
+    // Excel auto-converts a typed "1/8" into Jan 8 (and "1/4" into Jan 4).
+    if (v.getMonth() === 0 && v.getDate() === 8) return '1/8';
+    return '1/4';
+  }
+  const s = String(v ?? '').toLowerCase();
+  return s.includes('1/8') || s.includes('eighth') ? '1/8' : '1/4';
+};
+
 /** Parse a CSV/XLSX file into run-shaped objects. Never throws on bad rows. */
 export async function parseImportFile(file, carId, fallbackTrack) {
   const XLSX = await import('xlsx');
@@ -84,7 +96,14 @@ export async function parseImportFile(file, carId, fallbackTrack) {
   rows.slice(1).forEach((row, i) => {
     const get = (k) => (colIdx[k] == null ? null : row[colIdx[k]]);
     const date = parseDate(get('date'));
-    const et = num(get('et'));
+    const distance = parseDistance(get('distance'));
+    const eighthETCol = num(get('eighthET'));
+    const eighthMPHCol = num(get('eighthMPH'));
+    const mphCol = num(get('mph'));
+    // Some exports leave E.T. blank for 1/8-mile runs and put the time in the
+    // 1/8 ET split column — fall back to it rather than dropping the run.
+    let et = num(get('et'));
+    if (!isNum(et) && distance === '1/8' && isNum(eighthETCol)) et = eighthETCol;
     if (!date || !isNum(et)) {
       errors.push(`Row ${i + 2}: skipped (needs a valid Date and E.T.).`);
       return;
@@ -104,16 +123,18 @@ export async function parseImportFile(file, carId, fallbackTrack) {
       time: '12:00',
       track: String(get('track') ?? fallbackTrack ?? '').trim() || 'Unknown track',
       trackId: null,
-      distance: '1/4',
+      distance,
       runType: 'T/T',
       rt: num(get('rt')),
       sixty: num(get('sixty')),
       threeThirty: num(get('threeThirty')),
-      eighthET: num(get('eighthET')),
-      eighthMPH: num(get('eighthMPH')),
+      // For a 1/8-mile run the E.T./MPH columns ARE the eighth-mile figures —
+      // mirror them into the split fields so the run detail reads correctly.
+      eighthET: isNum(eighthETCol) ? eighthETCol : (distance === '1/8' ? et : null),
+      eighthMPH: isNum(eighthMPHCol) ? eighthMPHCol : (distance === '1/8' ? mphCol : null),
       thousand: num(get('thousand')),
       et,
-      mph: num(get('mph')),
+      mph: mphCol,
       tempF,
       humidity: isNum(humidity) ? Math.round(humidity) : null,
       altitudeFt,

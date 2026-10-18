@@ -38,15 +38,18 @@ export function GarageModal({ state, update, toast, onClose }) {
   };
 
   const remove = (id) => {
-    const n = runsForCar(state, id).length;
-    if (n > 0) { toast(`That car has ${n} runs — delete its runs first.`, 'error'); return; }
+    const car = state.cars.find((c) => c.id === id);
+    if (!car) return;
     if (state.cars.length === 1) { toast('You need at least one car.', 'error'); return; }
-    if (!window.confirm('Delete this car?')) return;
+    const n = runsForCar(state, id).length;
+    const noun = n === 1 ? 'run' : 'runs';
+    if (!window.confirm(`Delete "${car.name}"${n > 0 ? ` and its ${n} ${noun}` : ''}? This can't be undone.`)) return;
     update((s) => {
       s.cars = s.cars.filter((c) => c.id !== id);
+      s.runs = s.runs.filter((r) => r.carId !== id);
       if (s.activeCarId === id) s.activeCarId = s.cars[0].id;
     });
-    toast('Car deleted.');
+    toast(n > 0 ? `Deleted ${car.name} and its ${n} ${noun}.` : `Deleted ${car.name}.`);
   };
 
   return (
