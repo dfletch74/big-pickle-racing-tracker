@@ -3,6 +3,7 @@ import { Modal, Card, SectionTitle, Btn, Field, inputCls, Badge, Icon } from '..
 import { uid, makeDemoState } from '../lib/store';
 import { runsForCar } from '../lib/stats';
 import { runsToCSV, downloadFile } from '../lib/io';
+import { syncTeamData, teamCsvUrl, teamSyncOnOpen, TEAM_CSV_DEFAULT_URL } from '../lib/teamSync';
 import { fmtET, fmtMPH, fmtRT, fmtTemp, fmtDA, fmtDate, isNum } from '../lib/format';
 
 /* ---------------- Garage ---------------- */
@@ -551,6 +552,8 @@ function bundleHash() {
 
 export function SettingsModal({ state, update, reset, toast, onClose }) {
   const [checking, setChecking] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+  const [teamUrl, setTeamUrl] = useState(teamCsvUrl(state));
   const current = bundleHash();
   const loadDemo = () => {
     if (!window.confirm('Load demo data? This REPLACES everything currently in the app.')) return;
@@ -574,6 +577,27 @@ export function SettingsModal({ state, update, reset, toast, onClose }) {
     downloadFile(`big-pickle-runs-${new Date().toISOString().slice(0, 10)}.csv`, runsToCSV(carRuns));
     toast(`Exported ${carRuns.length} runs (${car?.name || 'car'}) to CSV.`);
   };
+
+  // Team data: pull the shared sheet from GitHub on demand.
+  const syncNow = async () => {
+    setSyncing(true);
+    try {
+      const { added, carName } = await syncTeamData(state, update);
+      toast(`Team data synced — ${added} runs into ${carName}.`);
+    } catch (e) {
+      toast(`Team sync failed: ${e.message}`, 'error');
+    }
+    setSyncing(false);
+  };
+  const saveTeamUrl = () => {
+    update((s) => { s.settings = s.settings || {}; s.settings.teamCsvUrl = teamUrl.trim() || TEAM_CSV_DEFAULT_URL; });
+    setTeamUrl(teamUrl.trim() || TEAM_CSV_DEFAULT_URL);
+    toast('Team sheet URL saved.');
+  };
+  const toggleAutoSync = () => {
+    update((s) => { s.settings = s.settings || {}; s.settings.teamSyncOnOpen = !teamSyncOnOpen(s); });
+  };
+  const lastSync = state.settings?.lastTeamSync ? new Date(state.settings.lastTeamSync) : null;
 
   // iOS home-screen apps cache aggressively — this lets the user pull a new
   // version on demand without deleting the icon (data is preserved).
@@ -606,6 +630,22 @@ export function SettingsModal({ state, update, reset, toast, onClose }) {
         <Btn kind="ghost" onClick={exportCSV}>Export runs (CSV)</Btn>
         <Btn kind="ghost" onClick={backup}>Full backup (JSON)</Btn>
       </div>
+      <SectionTitle>Team data</SectionTitle>
+      <div className="mb-2 text-xs text-white/50">
+        Pulls the shared run sheet from GitHub into the Big Pickle car on every open.
+        Runs you log in the app are never touched; spreadsheet edits flow in on the next sync.
+        {lastSync && <span className="text-white/70"> Last synced {lastSync.toLocaleString()} ({state.settings?.lastTeamSyncCount ?? 0} runs).</span>}
+      </div>
+      <div className="mb-2 flex gap-2">
+        <Btn kind="ghost" onClick={syncNow} disabled={syncing}>{syncing ? 'Syncing…' : 'Sync now'}</Btn>
+        <Btn kind={teamSyncOnOpen(state) ? 'ghost' : 'quiet'} onClick={toggleAutoSync}>
+          Auto-sync: {teamSyncOnOpen(state) ? 'on' : 'off'}
+        </Btn>
+      </div>
+      <div className="mb-4 flex gap-2">
+        <input value={teamUrl} onChange={(e) => setTeamUrl(e.target.value)} placeholder="Team CSV URL" className={`${inputCls} min-w-0 flex-1 font-mono !text-xs`} />
+        <Btn kind="quiet" onClick={saveTeamUrl} className="shrink-0 !py-1.5 text-xs">Save</Btn>
+      </div>
       <SectionTitle>Demo data</SectionTitle>
       <div className="mb-4 rounded-xl border border-amber-500/30 bg-amber-500/5 p-3 text-xs text-amber-200/90">
         Demo data is 36 clearly-synthetic runs for trying the app. Loading it <b>replaces</b> your current data. Remove it anytime with "Clear all data".
@@ -615,6 +655,7 @@ export function SettingsModal({ state, update, reset, toast, onClose }) {
       <Btn kind="ghost" onClick={clearAll} className="!border-red-500/40 !text-red-300">Clear all data</Btn>
       <div className="mt-6 text-[11px] text-white/35">
         Local-first: everything lives in this browser's localStorage. No account, no server, no tracking.
+        The team sheet sync is a one-way pull from your GitHub file — the app never sends data anywhere.
         Density altitude uses the standard humidity-corrected formula; ET/MPH weather correction is a simplified
         air-density-ratio model (documented in src/lib/physics.js) — directionally correct: thinner air = slower.
       </div>

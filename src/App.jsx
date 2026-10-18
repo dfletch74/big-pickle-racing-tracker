@@ -8,6 +8,7 @@ import AddRun from './views/AddRun';
 import TrackDay from './views/TrackDay';
 import Insight from './views/Insight';
 import { GarageModal, TreeSimModal, SettingsModal, PrintSheet } from './views/Overlays';
+import { syncTeamData, teamSyncOnOpen } from './lib/teamSync';
 
 const NAV = [
   { id: 'dash', label: 'DASH', icon: 'gauge' },
@@ -48,6 +49,14 @@ export default function App() {
       window.removeEventListener('afterprint', done);
     };
   }, [printRun]);
+
+  // Team data: pull the shared sheet from GitHub on every open (silent —
+  // offline or unchanged is fine, local runs are never touched).
+  useEffect(() => {
+    if (!teamSyncOnOpen(state)) return;
+    syncTeamData(state, update).catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const car = state.cars.find((c) => c.id === state.activeCarId);
 

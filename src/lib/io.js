@@ -94,8 +94,12 @@ export async function parseImportFile(file, carId, fallbackTrack) {
   const headers = rows[0].map(norm);
   const colIdx = {};
   for (const [key, aliases] of Object.entries(COLUMNS)) {
-    const i = headers.findIndex((h) => aliases.includes(h));
-    if (i >= 0) colIdx[key] = i;
+    // Try aliases in order — first alias with a matching header wins. This
+    // prefers an exact "DA" column over a looser "Altitude" one when both exist.
+    for (const a of aliases) {
+      const i = headers.indexOf(a);
+      if (i >= 0) { colIdx[key] = i; break; }
+    }
   }
   const errors = [];
   if (colIdx.date == null) errors.push('Missing required column: Date.');
