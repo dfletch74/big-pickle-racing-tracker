@@ -6,6 +6,10 @@ import { parseImportFile } from './io';
  * sees the crew's current data. The spreadsheet is the source of truth:
  * on each sync, previously synced team runs are replaced wholesale, while
  * runs logged locally in the app are left alone.
+ *
+ * The sheet's Car column decides which car each run belongs to. Cars named
+ * in the sheet are created locally if missing, so car identity survives
+ * across devices regardless of local car IDs.
  */
 
 export const TEAM_CSV_DEFAULT_URL =
@@ -17,6 +21,8 @@ export const teamSyncOnOpen = (state) => state.settings?.teamSyncOnOpen !== fals
 // Runs are the same when date, time, track, ET and distance all match.
 const runKey = (r) => [r.date, r.time, r.track, r.et, r.distance].join('|');
 
+const findCar = (cars, name) => cars.find((c) => (c.name || '').toLowerCase() === (name || '').toLowerCase());
+
 export async function syncTeamData(state, update) {
   const url = teamCsvUrl(state);
   const res = await fetch(url, { cache: 'no-store' });
@@ -24,34 +30,49 @@ export async function syncTeamData(state, update) {
   const text = await res.text();
   if (!text.trim()) throw new Error('Team sheet is empty');
 
-  // The sheet holds Big Pickle's runs — sync into that car, else the active car.
-  const car =
+  const buf = new TextEncoder().encode(text).buffer;
+  const { runs: teamRuns, errors } = await parseImportFile({ arrayBuffer: async () => buf }, null, null);
+  if (errors.length && teamRuns.length === 0) throw new Error(errors[0]);
+
+  // Fallback car for rows with no Car value: Big Pickle, else the active car.
+  const fallbackCar =
     state.cars.find((c) => /big pickle/i.test(c.name || '')) ||
     state.cars.find((c) => c.id === state.activeCarId) ||
     state.cars[0];
-  if (!car) throw new Error('No car to sync into');
+  const fallbackName = fallbackCar?.name || 'Big Pickle';
 
-  const buf = new TextEncoder().encode(text).buffer;
-  const { runs: teamRuns, errors } = await parseImportFile({ arrayBuffer: async () => buf }, car.id, null);
-  if (errors.length && teamRuns.length === 0) throw new Error(errors[0]);
+  const byCar = new Map();
+  for (const r of teamRuns) {
+    const name = (r.carName || '').trim() || fallbackName;
+    if (!byCar.has(name)) byCar.set(name, []);
+    byCar.get(name).push(r);
+  }
 
-  const keys = new Set(teamRuns.map(runKey));
   let added = 0;
+  const carNames = [];
   update((s) => {
-    // Drop previous team syncs, plus any local run that duplicates a team run
-    // (e.g. from a manual import of the same sheet) — everything else stays.
-    s.runs = s.runs.filter((r) => {
-      if (r.carId !== car.id) return true;
-      if (r.source === 'team') return false;
-      return !keys.has(runKey(r));
-    });
-    for (const r of teamRuns) {
-      s.runs.push({ ...r, id: uid(), carId: car.id, source: 'team', createdAt: Date.now() });
-      added++;
-    }
     s.settings = s.settings || {};
+    for (const [name, runs] of byCar) {
+      let car = findCar(s.cars, name);
+      if (!car) {
+        car = { id: uid(), name };
+        s.cars.push(car);
+      }
+      carNames.push(car.name);
+      const keys = new Set(runs.map(runKey));
+      // Drop previous team syncs + local dupes of team runs in this car only.
+      s.runs = s.runs.filter((r) => {
+        if (r.carId !== car.id) return true;
+        if (r.source === 'team') return false;
+        return !keys.has(runKey(r));
+      });
+      for (const r of runs) {
+        s.runs.push({ ...r, id: uid(), carId: car.id, carName: car.name, source: 'team', createdAt: Date.now() });
+        added++;
+      }
+    }
     s.settings.lastTeamSync = new Date().toISOString();
     s.settings.lastTeamSyncCount = added;
   });
-  return { added, carName: car.name };
+  return { added, carNames };
 }

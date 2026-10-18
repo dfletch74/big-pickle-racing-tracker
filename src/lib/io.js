@@ -14,6 +14,7 @@ import { isNum } from './format';
  *              Temp, Humidity, Altitude
  */
 const COLUMNS = {
+  car: ['car', 'carname', 'vehicle'],
   date: ['date'],
   time: ['time'],
   et: ['et'],
@@ -150,6 +151,7 @@ export async function parseImportFile(file, carId, fallbackTrack) {
     runs.push({
       id: uid(),
       carId,
+      carName: String(get('car') ?? '').trim() || null,
       date,
       time,
       track: String(get('track') ?? fallbackTrack ?? '').trim() || 'Unknown track',
@@ -188,7 +190,7 @@ export async function parseImportFile(file, carId, fallbackTrack) {
 }
 
 const CSV_COLS = [
-  ['date', 'Date'], ['time', 'Time'], ['track', 'Track'], ['distance', 'Distance'],
+  ['carName', 'Car'], ['date', 'Date'], ['time', 'Time'], ['track', 'Track'], ['distance', 'Distance'],
   ['runType', 'Run Type'], ['rt', 'R/T'], ['sixty', '60ft'], ['threeThirty', '330ft'],
   ['eighthET', '1/8 ET'], ['eighthMPH', '1/8 MPH'], ['thousand', '1000ft'],
   ['et', 'E.T.'], ['mph', 'MPH'], ['tempF', 'Temp F'], ['humidity', 'Humidity %'],
@@ -198,14 +200,14 @@ const CSV_COLS = [
   ['wl', 'W/L'], ['notes', 'Notes'],
 ];
 
-export function runsToCSV(runs) {
+export function runsToCSV(runs, carNameOf = () => '') {
   const esc = (v) => {
     if (v == null) return '';
     const s = String(v);
     return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
   };
   const head = CSV_COLS.map(([, label]) => label).join(',');
-  const lines = runs.map((r) => CSV_COLS.map(([k]) => esc(r[k])).join(',')).join('\n');
+  const lines = runs.map((r) => CSV_COLS.map(([k]) => esc(k === 'carName' ? (r.carName || carNameOf(r.carId)) : r[k])).join(',')).join('\n');
   return `${head}\n${lines}\n`;
 }
 

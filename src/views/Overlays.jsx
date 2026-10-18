@@ -574,7 +574,8 @@ export function SettingsModal({ state, update, reset, toast, onClose }) {
   const exportCSV = () => {
     // Per-car separation: CSV exports the active car's runs only.
     const carRuns = runsForCar(state, state.activeCarId);
-    downloadFile(`big-pickle-runs-${new Date().toISOString().slice(0, 10)}.csv`, runsToCSV(carRuns));
+    const carNameOf = (id) => state.cars.find((c) => c.id === id)?.name || '';
+    downloadFile(`big-pickle-runs-${new Date().toISOString().slice(0, 10)}.csv`, runsToCSV(carRuns, carNameOf));
     toast(`Exported ${carRuns.length} runs (${car?.name || 'car'}) to CSV.`);
   };
 
@@ -582,8 +583,8 @@ export function SettingsModal({ state, update, reset, toast, onClose }) {
   const syncNow = async () => {
     setSyncing(true);
     try {
-      const { added, carName } = await syncTeamData(state, update);
-      toast(`Team data synced — ${added} runs into ${carName}.`);
+      const { added, carNames } = await syncTeamData(state, update);
+      toast(`Team data synced — ${added} runs (${carNames.join(', ')}).`);
     } catch (e) {
       toast(`Team sync failed: ${e.message}`, 'error');
     }
