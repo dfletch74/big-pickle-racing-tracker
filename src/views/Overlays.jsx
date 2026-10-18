@@ -250,6 +250,12 @@ export function TreeSimModal({ state, update, toast, onClose }) {
     });
   };
 
+  // iOS home-screen apps can cancel touches (system gestures, long-press
+  // callout). Treat it like a release so a result ALWAYS appears.
+  const holdCancel = () => {
+    if (phase === 'holding' || phase === 'running') holdEnd();
+  };
+
   const reset = () => { clearTimers(); setLit([]); setPhase('idle'); setLastRT(null); };
 
   const addRacer = (n) => {
@@ -286,28 +292,38 @@ export function TreeSimModal({ state, update, toast, onClose }) {
       {(phase === 'staged' || phase === 'holding' || phase === 'running') && (
         <button
           onMouseDown={holdStart} onMouseUp={holdEnd} onMouseLeave={holdEnd}
-          onTouchStart={(e) => { e.preventDefault(); holdStart(); }} onTouchEnd={(e) => { e.preventDefault(); holdEnd(); }}
+          onTouchStart={(e) => { e.preventDefault(); holdStart(); }}
+          onTouchEnd={(e) => { e.preventDefault(); holdEnd(); }}
+          onTouchCancel={holdCancel}
+          onContextMenu={(e) => e.preventDefault()}
           className="w-full select-none rounded-2xl bg-pickle-400 py-4 font-display text-[20px] font-bold uppercase tracking-[0.1em] text-black shadow-glow transition active:bg-pickle-300"
-          style={{ touchAction: 'none' }}
+          style={{ touchAction: 'none', WebkitTouchCallout: 'none' }}
         >
           Hold — launch
         </button>
       )}
       {phase === 'done' && (
-        <div className="flex gap-2">
-          <button
-            onClick={stage}
-            className="flex-1 rounded-2xl bg-white/[0.07] py-3.5 font-display text-lg font-bold uppercase tracking-[0.1em] transition hover:bg-white/[0.1] active:scale-[0.99]"
-          >
-            Stage again
-          </button>
-          <button
-            onClick={reset}
-            className="rounded-2xl border border-white/15 px-5 font-display text-lg font-bold uppercase tracking-[0.08em] text-white/70 transition hover:bg-white/5"
-          >
-            Reset
-          </button>
-        </div>
+        <>
+          {lastRT && (
+            <div className={`mb-2 text-center font-mono text-[26px] font-bold leading-none ${lastRT.red ? 'text-red-400' : 'text-pickle-400'}`}>
+              {lastRT.red ? `RED LIGHT ${lastRT.rt.toFixed(3)}` : `R/T ${lastRT.rt.toFixed(3)}`}
+            </div>
+          )}
+          <div className="flex gap-2">
+            <button
+              onClick={stage}
+              className="flex-1 rounded-2xl bg-white/[0.07] py-3.5 font-display text-lg font-bold uppercase tracking-[0.1em] transition hover:bg-white/[0.1] active:scale-[0.99]"
+            >
+              Stage again
+            </button>
+            <button
+              onClick={reset}
+              className="rounded-2xl border border-white/15 px-5 font-display text-lg font-bold uppercase tracking-[0.08em] text-white/70 transition hover:bg-white/5"
+            >
+              Reset
+            </button>
+          </div>
+        </>
       )}
     </>
   );
