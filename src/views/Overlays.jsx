@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Modal, Card, SectionTitle, Btn, Field, inputCls, Badge, Icon } from '../components/ui';
 import { uid, makeDemoState } from '../lib/store';
 import { runsForCar } from '../lib/stats';
@@ -82,6 +82,28 @@ export function GarageModal({ state, update, toast, onClose }) {
       </div>
     </Modal>
   );
+}
+
+/* Native tap: React attaches touchstart as a PASSIVE listener, so calling
+   preventDefault() in a React onTouchStart is silently a no-op — iOS then
+   fires emulated mousedown/mouseup/click after every touch, and those ghosts
+   land on whatever re-rendered under the finger (e.g. STAGE AGAIN), wiping
+   results. This attaches a real non-passive touchstart that prevents the
+   emulation and fires the action directly. Desktop still uses onClick. */
+function useNativeTap(fn) {
+  const fnRef = useRef(fn);
+  fnRef.current = fn;
+  const elRef = useRef(null);
+  return useCallback((el) => {
+    const old = elRef.current;
+    if (old && old._ntap) { old.removeEventListener('touchstart', old._ntap); old._ntap = null; }
+    elRef.current = el;
+    if (el) {
+      const ts = (e) => { e.preventDefault(); fnRef.current(); };
+      el._ntap = ts;
+      el.addEventListener('touchstart', ts, { passive: false });
+    }
+  }, []);
 }
 
 /* ---------------- Tree simulator ---------------- */
@@ -204,10 +226,6 @@ export function TreeSimModal({ state, update, toast, onClose }) {
   const [phase, setPhase] = useState('idle'); // idle|staged|running|done
   const [lit, setLit] = useState([]);
   const [lastRT, setLastRT] = useState(null);
-  // TEMP diagnostic: event/phase trace to pin down the home-screen no-result bug
-  const [dbg, setDbg] = useState('');
-  const mark = (s) => setDbg((d) => `${d} ${s}`.trim().slice(-180));
-  useEffect(() => { mark(`[${phase}]`); }, [phase]);
   const timers = useRef([]);
   const greenAt = useRef(0);
 
@@ -220,7 +238,6 @@ export function TreeSimModal({ state, update, toast, onClose }) {
   const stage = () => { setLit(['pre', 'stage']); setPhase('staged'); setLastRT(null); };
 
   const holdStart = () => {
-    mark(`ts(phase=${phase})`);
     if (phase !== 'staged') return;
     // Tree starts the instant you press — no dead zone. Release on green;
     // releasing early is a red-light foul.
@@ -241,7 +258,6 @@ export function TreeSimModal({ state, update, toast, onClose }) {
   };
 
   const holdEnd = () => {
-    mark(`te(phase=${phase})`);
     if (phase !== 'running') return;
     const now = performance.now();
     const rt = (now - greenAt.current) / 1000;
@@ -256,14 +272,37 @@ export function TreeSimModal({ state, update, toast, onClose }) {
     });
   };
 
-  // iOS home-screen apps can cancel touches (system gestures, long-press
-  // callout). Treat it like a release so a result ALWAYS appears.
-  const holdCancel = () => {
-    mark('tc');
-    if (phase === 'running') holdEnd();
-  };
-
   const reset = () => { clearTimers(); setLit([]); setPhase('idle'); setLastRT(null); };
+
+  // Ghost-click-proof wiring (see useNativeTap): the hold button gets real
+  // non-passive touch handlers; the stage/reset buttons get native taps.
+  // React onMouse* props remain for desktop mouse users.
+  const holdStartRef = useRef(null);
+  const holdEndRef = useRef(null);
+  holdStartRef.current = holdStart;
+  holdEndRef.current = holdEnd;
+  const holdBtnRef = useRef(null);
+  const setHoldBtnRef = (el) => {
+    const old = holdBtnRef.current;
+    if (old) {
+      if (old._hts) old.removeEventListener('touchstart', old._hts);
+      if (old._hte) old.removeEventListener('touchend', old._hte);
+      if (old._htc) old.removeEventListener('touchcancel', old._htc);
+      old._hts = old._hte = old._htc = null;
+    }
+    holdBtnRef.current = el;
+    if (el) {
+      const ts = (e) => { e.preventDefault(); holdStartRef.current(); };
+      const te = (e) => { e.preventDefault(); holdEndRef.current(); };
+      const tc = () => holdEndRef.current();
+      el._hts = ts; el._hte = te; el._htc = tc;
+      el.addEventListener('touchstart', ts, { passive: false });
+      el.addEventListener('touchend', te);
+      el.addEventListener('touchcancel', tc);
+    }
+  };
+  const stageTapRef = useNativeTap(stage);
+  const resetTapRef = useNativeTap(reset);
 
   const addRacer = (n) => {
     const id = uid();
@@ -290,6 +329,7 @@ export function TreeSimModal({ state, update, toast, onClose }) {
     <>
       {phase === 'idle' && (
         <button
+          ref={stageTapRef}
           onClick={stage}
           className="w-full rounded-2xl bg-white/[0.07] py-4 font-display text-[20px] font-bold uppercase tracking-[0.1em] text-white transition hover:bg-white/[0.1] active:scale-[0.99]"
         >
@@ -298,10 +338,8 @@ export function TreeSimModal({ state, update, toast, onClose }) {
       )}
       {(phase === 'staged' || phase === 'running') && (
         <button
+          ref={setHoldBtnRef}
           onMouseDown={holdStart} onMouseUp={holdEnd} onMouseLeave={holdEnd}
-          onTouchStart={(e) => { e.preventDefault(); holdStart(); }}
-          onTouchEnd={(e) => { e.preventDefault(); holdEnd(); }}
-          onTouchCancel={holdCancel}
           onContextMenu={(e) => e.preventDefault()}
           className="w-full select-none rounded-2xl bg-pickle-400 py-4 font-display text-[20px] font-bold uppercase tracking-[0.1em] text-black shadow-glow transition active:bg-pickle-300"
           style={{ touchAction: 'none', WebkitTouchCallout: 'none' }}
@@ -318,12 +356,14 @@ export function TreeSimModal({ state, update, toast, onClose }) {
           )}
           <div className="flex gap-2">
             <button
+              ref={stageTapRef}
               onClick={stage}
               className="flex-1 rounded-2xl bg-white/[0.07] py-3.5 font-display text-lg font-bold uppercase tracking-[0.1em] transition hover:bg-white/[0.1] active:scale-[0.99]"
             >
               Stage again
             </button>
             <button
+              ref={resetTapRef}
               onClick={reset}
               className="rounded-2xl border border-white/15 px-5 font-display text-lg font-bold uppercase tracking-[0.08em] text-white/70 transition hover:bg-white/5"
             >
@@ -425,8 +465,6 @@ export function TreeSimModal({ state, update, toast, onClose }) {
                 ? <span className="font-bold text-red-400">RED LIGHT — {lastRT.rt.toFixed(3)} (foul)</span>
                 : <span className="font-bold text-pickle-400">R/T {lastRT.rt.toFixed(3)}</span>)}
             </div>
-
-            <div className="mt-1 text-center font-mono text-[10px] leading-tight text-white/30">{dbg}</div>
 
             {/* rankings */}
             <div className="mb-1 mt-4 rounded-3xl border border-white/[0.08] bg-[#12141a] p-4">
