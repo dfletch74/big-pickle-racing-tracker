@@ -77,11 +77,15 @@ export default function Runs({ state, update, toast, dist, setDist, onPrint, onA
         ]} />
       </div>
 
-      <div className="flex gap-2">
-        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search track, notes…" className={`${inputCls} flex-1`} />
-        <select value={sort} onChange={(e) => setSort(e.target.value)} className={`${inputCls} w-32 flex-none`}>
-          {SORTS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-        </select>
+      <div className="flex items-end gap-2">
+        <Field label="Search" className="min-w-0 flex-1">
+          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Track, notes, type…" className={inputCls} />
+        </Field>
+        <Field label="Sort by" className="w-32 flex-none">
+          <select value={sort} onChange={(e) => setSort(e.target.value)} className={inputCls}>
+            {SORTS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+          </select>
+        </Field>
       </div>
 
       <div className="flex flex-wrap gap-2">
