@@ -95,6 +95,8 @@ export async function parseImportFile(file, carId, fallbackTrack) {
   const runs = [];
   rows.slice(1).forEach((row, i) => {
     const get = (k) => (colIdx[k] == null ? null : row[colIdx[k]]);
+    // Silently ignore fully-blank rows (trailing empties, cleared example rows).
+    if (row.every((v) => v == null || String(v).trim() === '')) return;
     const date = parseDate(get('date'));
     const distance = parseDistance(get('distance'));
     const eighthETCol = num(get('eighthET'));
