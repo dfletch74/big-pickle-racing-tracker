@@ -204,6 +204,10 @@ export function TreeSimModal({ state, update, toast, onClose }) {
   const [phase, setPhase] = useState('idle'); // idle|staged|running|done
   const [lit, setLit] = useState([]);
   const [lastRT, setLastRT] = useState(null);
+  // TEMP diagnostic: event/phase trace to pin down the home-screen no-result bug
+  const [dbg, setDbg] = useState('');
+  const mark = (s) => setDbg((d) => `${d} ${s}`.trim().slice(-180));
+  useEffect(() => { mark(`[${phase}]`); }, [phase]);
   const timers = useRef([]);
   const greenAt = useRef(0);
 
@@ -216,6 +220,7 @@ export function TreeSimModal({ state, update, toast, onClose }) {
   const stage = () => { setLit(['pre', 'stage']); setPhase('staged'); setLastRT(null); };
 
   const holdStart = () => {
+    mark(`ts(phase=${phase})`);
     if (phase !== 'staged') return;
     // Tree starts the instant you press — no dead zone. Release on green;
     // releasing early is a red-light foul.
@@ -236,6 +241,7 @@ export function TreeSimModal({ state, update, toast, onClose }) {
   };
 
   const holdEnd = () => {
+    mark(`te(phase=${phase})`);
     if (phase !== 'running') return;
     const now = performance.now();
     const rt = (now - greenAt.current) / 1000;
@@ -253,6 +259,7 @@ export function TreeSimModal({ state, update, toast, onClose }) {
   // iOS home-screen apps can cancel touches (system gestures, long-press
   // callout). Treat it like a release so a result ALWAYS appears.
   const holdCancel = () => {
+    mark('tc');
     if (phase === 'running') holdEnd();
   };
 
@@ -418,6 +425,8 @@ export function TreeSimModal({ state, update, toast, onClose }) {
                 ? <span className="font-bold text-red-400">RED LIGHT — {lastRT.rt.toFixed(3)} (foul)</span>
                 : <span className="font-bold text-pickle-400">R/T {lastRT.rt.toFixed(3)}</span>)}
             </div>
+
+            <div className="mt-1 text-center font-mono text-[10px] leading-tight text-white/30">{dbg}</div>
 
             {/* rankings */}
             <div className="mb-1 mt-4 rounded-3xl border border-white/[0.08] bg-[#12141a] p-4">
