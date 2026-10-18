@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Card, SectionTitle, Badge, Btn, Segmented, Field, inputCls, EmptyState } from '../components/ui';
+import { Card, SectionTitle, Badge, Btn, Segmented, Field, inputCls, EmptyState, Icon } from '../components/ui';
 import RunCard from '../components/RunCard';
 import { fmtET, fmtMPH, fmtRT, fmtDate, isNum, runDateTime } from '../lib/format';
 import { runsForCar, filterDistance, latestRun, avg, detectIssues, bestSegments, correctedETOf } from '../lib/stats';
@@ -85,9 +85,9 @@ export default function Runs({ state, update, toast, dist, setDist, onPrint, onA
       </div>
 
       <div className="flex flex-wrap gap-2">
-        <Btn kind="ghost" onClick={() => setMode('compare')}>Compare</Btn>
-        <Btn kind="ghost" onClick={() => setMode('import')}>Import</Btn>
-        <Btn kind="ghost" onClick={doExport}>Export CSV</Btn>
+        <Btn kind="ghost" onClick={() => setMode('compare')}><span className="flex items-center gap-2"><Icon name="chart" className="h-4 w-4" />Compare</span></Btn>
+        <Btn kind="ghost" onClick={() => setMode('import')}><span className="flex items-center gap-2"><Icon name="upload" className="h-4 w-4" />Import</span></Btn>
+        <Btn kind="ghost" onClick={doExport}><span className="flex items-center gap-2"><Icon name="download" className="h-4 w-4" />Export CSV</span></Btn>
       </div>
 
       <div className="text-xs text-white/40">{filtered.length} of {carRuns.length} runs</div>
@@ -126,7 +126,7 @@ function CompareView({ runs, baseline, onBack }) {
 
   return (
     <div className="space-y-3">
-      <button onClick={onBack} className="text-sm text-pickle-400">← Back to runs</button>
+      <button onClick={onBack} className="flex items-center gap-1 text-sm font-medium text-pickle-400 hover:text-pickle-300"><Icon name="chevR" className="h-4 w-4 rotate-180" />Back to runs</button>
       <SectionTitle>Compare runs</SectionTitle>
       <div className="grid gap-2 sm:grid-cols-2">
         <Field label="Run A"><select value={aId} onChange={(e) => setAId(e.target.value)} className={inputCls}>
@@ -239,7 +239,7 @@ function ImportView({ state, update, toast, onBack, onDone }) {
 
   return (
     <div className="space-y-3">
-      <button onClick={onBack} className="text-sm text-pickle-400">← Back to runs</button>
+      <button onClick={onBack} className="flex items-center gap-1 text-sm font-medium text-pickle-400 hover:text-pickle-300"><Icon name="chevR" className="h-4 w-4 rotate-180" />Back to runs</button>
       <SectionTitle>Import spreadsheet</SectionTitle>
       <Card>
         <div className="mb-2 text-sm text-white/70">Drop a CSV or XLSX export here. <b>Required columns:</b> Date, E.T.</div>

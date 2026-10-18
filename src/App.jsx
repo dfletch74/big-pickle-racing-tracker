@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect } from 'react';
 import { useStore, uid } from './lib/store';
-import { Toasts } from './components/ui';
+import { Toasts, Icon } from './components/ui';
 import Dash from './views/Dash';
 import Runs from './views/Runs';
 import AddRun from './views/AddRun';
@@ -9,11 +9,11 @@ import Insight from './views/Insight';
 import { GarageModal, TreeSimModal, SettingsModal, PrintSheet } from './views/Overlays';
 
 const NAV = [
-  { id: 'dash', label: 'DASH', icon: '▦' },
-  { id: 'runs', label: 'RUNS', icon: '≣' },
-  { id: 'add', label: 'ADD', icon: '＋' },
-  { id: 'track', label: 'TRACK', icon: '◎' },
-  { id: 'insight', label: 'INSIGHT', icon: '◈' },
+  { id: 'dash', label: 'DASH', icon: 'gauge' },
+  { id: 'runs', label: 'RUNS', icon: 'list' },
+  { id: 'add', label: 'ADD', icon: 'plus', fab: true },
+  { id: 'track', label: 'TRACK', icon: 'flag' },
+  { id: 'insight', label: 'INSIGHT', icon: 'chart' },
 ];
 
 export default function App() {
@@ -53,63 +53,100 @@ export default function App() {
   return (
     <div className="min-h-screen bg-coal-950 text-white">
       {/* header */}
-      <header className="app-chrome sticky top-0 z-40 border-b border-white/10 bg-coal-950/90 backdrop-blur">
+      <header className="app-chrome asphalt sticky top-0 z-40 border-b border-white/10 bg-coal-950/90 pt-[env(safe-area-inset-top)] backdrop-blur">
         <div className="mx-auto flex max-w-3xl items-center justify-between px-4 py-2.5">
-          <button onClick={() => setOverlay('garage')} className="flex items-center gap-2 rounded-xl px-2 py-1 hover:bg-white/5" title="Garage">
-            <span className="text-xl">🥒</span>
-            <span className="text-left leading-tight">
-              <span className="block text-sm font-black tracking-wide">BIG PICKLE</span>
-              <span className="block text-[10px] text-white/45">{car?.name} · Garage</span>
+          <button
+            onClick={() => setOverlay('garage')}
+            className="flex items-center gap-2.5 rounded-xl px-1 py-1 transition hover:bg-white/5 active:scale-[0.98]"
+            title="Garage"
+          >
+            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-pickle-400 font-display text-[17px] font-extrabold tracking-tight text-black shadow-glow">
+              BP
+            </span>
+            <span className="text-left leading-none">
+              <span className="block font-display text-[22px] font-bold tracking-[0.08em]">
+                BIG PICKLE
+              </span>
+              <span className="mt-0.5 block text-[10px] font-medium uppercase tracking-[0.14em] text-white/45">
+                {car?.name || 'Garage'}
+              </span>
             </span>
           </button>
           <div className="flex gap-1.5">
-            <button onClick={() => setOverlay('tree')} className="rounded-xl border border-white/10 px-3 py-2 text-xs font-bold text-white/80 hover:bg-white/5" title="Tree simulator">
-              🌲 TREE
+            <button
+              onClick={() => setOverlay('tree')}
+              className="flex items-center gap-1.5 rounded-xl border border-white/10 px-3 py-2 font-display text-[15px] font-semibold uppercase tracking-wider text-white/75 transition hover:bg-white/5 hover:text-white active:scale-95"
+              title="Tree simulator"
+            >
+              <Icon name="tree" className="h-4 w-4" />
+              Tree
             </button>
-            <button onClick={() => setOverlay('settings')} className="rounded-xl border border-white/10 px-3 py-2 text-xs font-bold text-white/80 hover:bg-white/5" title="Settings">
-              ⚙
+            <button
+              onClick={() => setOverlay('settings')}
+              className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 text-white/70 transition hover:bg-white/5 hover:text-white active:scale-95"
+              title="Settings"
+              aria-label="Settings"
+            >
+              <Icon name="gear" className="h-5 w-5" />
             </button>
           </div>
         </div>
       </header>
 
       {/* main */}
-      <main className="app-chrome mx-auto max-w-3xl px-4 pb-28 pt-4">
-        {view === 'dash' && (
-          <Dash state={state} dist={dist} setDist={setDist}
-            onAddRun={() => goAdd()} onImport={() => setView('runs')} onSeeRuns={() => setView('runs')} />
-        )}
-        {view === 'runs' && (
-          <Runs state={state} update={update} toast={toast} dist={dist} setDist={setDist}
-            onPrint={setPrintRun} onAddRun={goAdd} />
-        )}
-        {view === 'add' && (
-          <AddRun state={state} update={update} toast={toast} editId={editId}
-            onDone={() => { setEditId(null); setView('runs'); }} />
-        )}
-        {view === 'track' && (
-          <TrackDay state={state} update={update} toast={toast} dist={dist} setDist={setDist} onAddRun={() => goAdd()} />
-        )}
-        {view === 'insight' && (
-          <Insight state={state} toast={toast} dist={dist} setDist={setDist} />
-        )}
+      <main className="app-chrome mx-auto max-w-3xl px-4 pb-32 pt-4">
+        <div key={view} className="animate-fadein">
+          {view === 'dash' && (
+            <Dash state={state} dist={dist} setDist={setDist}
+              onAddRun={() => goAdd()} onImport={() => setView('runs')} onSeeRuns={() => setView('runs')} />
+          )}
+          {view === 'runs' && (
+            <Runs state={state} update={update} toast={toast} dist={dist} setDist={setDist}
+              onPrint={setPrintRun} onAddRun={goAdd} />
+          )}
+          {view === 'add' && (
+            <AddRun state={state} update={update} toast={toast} editId={editId}
+              onDone={() => { setEditId(null); setView('runs'); }} />
+          )}
+          {view === 'track' && (
+            <TrackDay state={state} update={update} toast={toast} dist={dist} setDist={setDist} onAddRun={() => goAdd()} />
+          )}
+          {view === 'insight' && (
+            <Insight state={state} toast={toast} dist={dist} setDist={setDist} />
+          )}
+        </div>
       </main>
 
       {/* bottom nav */}
-      <nav className="app-chrome fixed inset-x-0 bottom-0 z-40 border-t border-white/10 bg-coal-950/95 backdrop-blur">
-        <div className="mx-auto grid max-w-3xl grid-cols-5">
-          {NAV.map((n) => (
-            <button
-              key={n.id}
-              onClick={() => { if (n.id === 'add') goAdd(); else setView(n.id); }}
-              className={`flex flex-col items-center py-2.5 text-[10px] font-bold tracking-wider transition ${
-                view === n.id ? 'text-pickle-400' : 'text-white/45 hover:text-white'
-              }`}
-            >
-              <span className="text-lg leading-none">{n.icon}</span>
-              <span className="mt-1">{n.label}</span>
-            </button>
-          ))}
+      <nav className="app-chrome fixed inset-x-0 bottom-0 z-40 border-t border-white/10 bg-coal-950/95 pb-[env(safe-area-inset-bottom)] backdrop-blur">
+        <div className="mx-auto grid max-w-3xl grid-cols-5 items-end px-2">
+          {NAV.map((n) =>
+            n.fab ? (
+              <button
+                key={n.id}
+                onClick={() => goAdd()}
+                aria-label="Log a run"
+                className="relative mx-auto -mt-7 flex h-16 w-16 items-center justify-center rounded-full bg-pickle-400 text-black shadow-glow transition hover:bg-pickle-300 active:scale-95"
+              >
+                <Icon name="plus" className="h-7 w-7" strokeWidth={2.4} />
+                <span className="sr-only">{n.label}</span>
+              </button>
+            ) : (
+              <button
+                key={n.id}
+                onClick={() => setView(n.id)}
+                className={`relative flex flex-col items-center py-2.5 font-display text-[15px] font-semibold uppercase tracking-[0.12em] transition ${
+                  view === n.id ? 'text-pickle-400' : 'text-white/40 hover:text-white/75'
+                }`}
+              >
+                {view === n.id && (
+                  <span className="absolute -top-px h-0.5 w-10 rounded-full bg-pickle-400 shadow-glow" />
+                )}
+                <Icon name={n.icon} className="h-[22px] w-[22px]" />
+                <span className="mt-0.5">{n.label}</span>
+              </button>
+            ),
+          )}
         </div>
       </nav>
 

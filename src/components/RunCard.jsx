@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Card, Badge, Btn } from './ui';
+import { Card, Badge, Btn, Icon } from './ui';
 import { fmtET, fmtMPH, fmtRT, fmtTemp, fmtRH, fmtDA, fmtDate, isNum } from '../lib/format';
 import { detectIssues, segmentSplits, bestSegments, correctedETOf } from '../lib/stats';
 
@@ -25,19 +25,19 @@ export default function RunCard({ run, ctx, baseline, onEdit, onDelete, onPrint,
           {issues.map((i) => (
             <Badge key={i.key} tone={i.key === 'red' ? 'red' : 'amber'}>{i.label}</Badge>
           ))}
-          <span className="ml-auto text-xs text-white/40">{open ? '▲' : '▼'}</span>
+          <span className="ml-auto text-white/35"><Icon name="chevD" className={`h-4 w-4 transition-transform ${open ? 'rotate-180' : ''}`} /></span>
         </div>
         <div className="text-xs text-white/45">{fmtDate(run.date)}{run.time ? ` · ${run.time}` : ''}</div>
         <div className="mt-2 grid grid-cols-4 gap-2 font-mono text-sm">
-          <div><div className="text-[10px] text-white/40">R/T</div><div className={run.rt < 0 ? 'text-red-400' : ''}>{fmtRT(run.rt)}</div></div>
-          <div><div className="text-[10px] text-white/40">60FT</div><div>{isNum(run.sixty) ? run.sixty.toFixed(3) : '—'}</div></div>
-          <div><div className="text-[10px] text-white/40">ET</div><div className="font-bold text-pickle-400">{fmtET(run.et)}</div></div>
-          <div><div className="text-[10px] text-white/40">MPH</div><div>{fmtMPH(run.mph)}</div></div>
+          <div><div className="text-[10px] uppercase tracking-wider text-white/40">R/T</div><div className={run.rt < 0 ? 'text-red-400' : ''}>{fmtRT(run.rt)}</div></div>
+          <div><div className="text-[10px] uppercase tracking-wider text-white/40">60FT</div><div>{isNum(run.sixty) ? run.sixty.toFixed(3) : '—'}</div></div>
+          <div><div className="text-[10px] uppercase tracking-wider text-white/40">ET</div><div className="text-base font-bold text-pickle-400">{fmtET(run.et)}</div></div>
+          <div><div className="text-[10px] uppercase tracking-wider text-white/40">MPH</div><div>{fmtMPH(run.mph)}</div></div>
         </div>
         {issues.length > 0 && (
-          <div className="mt-2 space-y-0.5">
+          <div className="mt-2 space-y-1">
             {issues.map((i) => (
-              <div key={i.key} className="text-[11px] text-amber-300/80">⚠ {i.label} — {i.delta}</div>
+              <div key={i.key} className="flex items-center gap-1.5 text-[11px] text-amber-300/90"><Icon name="alert" className="h-3.5 w-3.5 shrink-0" />{i.label} — {i.delta}</div>
             ))}
           </div>
         )}

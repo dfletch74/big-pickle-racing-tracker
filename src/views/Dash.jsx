@@ -80,8 +80,8 @@ export default function Dash({ state, dist, setDist, onAddRun, onImport, onSeeRu
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <div className="text-lg font-black tracking-tight">{car?.name || 'Garage'}</div>
-          <div className="text-xs text-white/45">{[car?.year, car?.make, car?.model].filter(Boolean).join(' ')}</div>
+          <div className="font-display text-[26px] font-bold uppercase leading-none tracking-wide">{car?.name || 'Garage'}</div>
+          <div className="mt-1 text-xs font-medium uppercase tracking-[0.14em] text-white/40">{[car?.year, car?.make, car?.model].filter(Boolean).join(' · ')}</div>
         </div>
         <Segmented
           value={dist}
