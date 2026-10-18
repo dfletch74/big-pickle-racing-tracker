@@ -489,7 +489,19 @@ export function TreeSimModal({ state, update, toast, onClose }) {
 
 /* ---------------- Settings ---------------- */
 
+function bundleHash() {
+  try {
+    const src = [...document.scripts].map((x) => x.src).find((u) => /index-[A-Za-z0-9_-]+\.js/.test(u)) || '';
+    const m = src.match(/index-([A-Za-z0-9_-]+)\.js/);
+    return m ? m[1] : 'dev';
+  } catch {
+    return 'dev';
+  }
+}
+
 export function SettingsModal({ state, update, reset, toast, onClose }) {
+  const [checking, setChecking] = useState(false);
+  const current = bundleHash();
   const loadDemo = () => {
     if (!window.confirm('Load demo data? This REPLACES everything currently in the app.')) return;
     reset(makeDemoState());
@@ -513,6 +525,30 @@ export function SettingsModal({ state, update, reset, toast, onClose }) {
     toast(`Exported ${carRuns.length} runs (${car?.name || 'car'}) to CSV.`);
   };
 
+  // iOS home-screen apps cache aggressively — this lets the user pull a new
+  // version on demand without deleting the icon (data is preserved).
+  const checkForUpdate = async () => {
+    setChecking(true);
+    try {
+      const base = import.meta.env.BASE_URL;
+      const res = await fetch(`${base}index.html?ts=${Date.now()}`, { cache: 'no-store' });
+      const html = await res.text();
+      const m = html.match(/assets\/index-([A-Za-z0-9_-]+)\.js/);
+      if (m && m[1] !== current) {
+        if (window.confirm(`Version ${m[1].slice(0, 7)} is available (you have ${current.slice(0, 7)}). Reload now to update?`)) {
+          window.location.href = `${base}?v=${Date.now()}`;
+        }
+      } else if (m) {
+        toast('You are on the latest version.');
+      } else {
+        toast('Could not read the latest version.', 'error');
+      }
+    } catch (e) {
+      toast('Update check failed — are you online?', 'error');
+    }
+    setChecking(false);
+  };
+
   return (
     <Modal title="Settings" onClose={onClose}>
       <SectionTitle>Data</SectionTitle>
@@ -531,6 +567,12 @@ export function SettingsModal({ state, update, reset, toast, onClose }) {
         Local-first: everything lives in this browser's localStorage. No account, no server, no tracking.
         Density altitude uses the standard humidity-corrected formula; ET/MPH weather correction is a simplified
         air-density-ratio model (documented in src/lib/physics.js) — directionally correct: thinner air = slower.
+      </div>
+      <div className="mt-3 flex items-center justify-between rounded-xl border border-white/[0.07] bg-white/[0.02] px-3 py-2.5">
+        <span className="font-mono text-[11px] text-white/40">Build {current.slice(0, 7)}</span>
+        <Btn kind="ghost" onClick={checkForUpdate} disabled={checking} className="!py-1.5 text-xs">
+          {checking ? 'Checking…' : 'Check for updates'}
+        </Btn>
       </div>
     </Modal>
   );
