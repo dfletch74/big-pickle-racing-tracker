@@ -108,14 +108,14 @@ function TreeBulb({ on, color, className = 'h-16 w-16' }) {
   );
 }
 
-function TreeSeg({ options, value, onChange, labelClass = '' }) {
+function TreeSeg({ options, value, onChange, labelClass = '', compact = false }) {
   return (
     <div className="grid grid-cols-2 gap-2">
       {options.map((o) => (
         <button
           key={o.value}
           onClick={() => onChange(o.value)}
-          className={`rounded-2xl py-3.5 text-[17px] font-bold transition active:scale-[0.98] ${labelClass} ${
+          className={`rounded-2xl font-bold transition active:scale-[0.98] ${compact ? 'py-2.5 text-[15px]' : 'py-3.5 text-[17px]'} ${labelClass} ${
             value === o.value ? 'bg-pickle-400 text-black shadow-glow' : 'bg-white/[0.06] text-white/45 hover:text-white'
           }`}
         >
@@ -273,16 +273,43 @@ export function TreeSimModal({ state, update, toast, onClose }) {
 
   const ranked = [...state.racers].map((r) => ({ r, s: stats(r) })).sort((a, b) => (a.s.avg ?? 9) - (b.s.avg ?? 9));
 
-  const hint = (
-    <div className="mt-5 text-center text-[17px] font-medium text-white/55">
-      {phase === 'idle' && 'Tap Stage to begin'}
-      {phase === 'staged' && 'Press and HOLD — release on green'}
-      {phase === 'holding' && 'Get ready…'}
-      {phase === 'running' && <span className="font-bold text-pickle-400">RELEASE ON GREEN!</span>}
-      {phase === 'done' && lastRT && (lastRT.red
-        ? <span className="font-bold text-red-400">RED LIGHT — {lastRT.rt.toFixed(3)} (foul)</span>
-        : <span className="font-bold text-pickle-400">R/T {lastRT.rt.toFixed(3)}</span>)}
-    </div>
+  const actionBar = (
+    <>
+      {phase === 'idle' && (
+        <button
+          onClick={stage}
+          className="w-full rounded-2xl bg-white/[0.07] py-4 font-display text-[20px] font-bold uppercase tracking-[0.1em] text-white transition hover:bg-white/[0.1] active:scale-[0.99]"
+        >
+          Tap to stage
+        </button>
+      )}
+      {(phase === 'staged' || phase === 'holding' || phase === 'running') && (
+        <button
+          onMouseDown={holdStart} onMouseUp={holdEnd} onMouseLeave={holdEnd}
+          onTouchStart={(e) => { e.preventDefault(); holdStart(); }} onTouchEnd={(e) => { e.preventDefault(); holdEnd(); }}
+          className="w-full select-none rounded-2xl bg-pickle-400 py-4 font-display text-[20px] font-bold uppercase tracking-[0.1em] text-black shadow-glow transition active:bg-pickle-300"
+          style={{ touchAction: 'none' }}
+        >
+          Hold — launch
+        </button>
+      )}
+      {phase === 'done' && (
+        <div className="flex gap-2">
+          <button
+            onClick={stage}
+            className="flex-1 rounded-2xl bg-white/[0.07] py-3.5 font-display text-lg font-bold uppercase tracking-[0.1em] transition hover:bg-white/[0.1] active:scale-[0.99]"
+          >
+            Stage again
+          </button>
+          <button
+            onClick={reset}
+            className="rounded-2xl border border-white/15 px-5 font-display text-lg font-bold uppercase tracking-[0.08em] text-white/70 transition hover:bg-white/5"
+          >
+            Reset
+          </button>
+        </div>
+      )}
+    </>
   );
 
   return (
@@ -290,160 +317,142 @@ export function TreeSimModal({ state, update, toast, onClose }) {
       <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/75 sm:items-center" onClick={onClose}>
         <div
           onClick={(e) => e.stopPropagation()}
-          className="max-h-[94vh] w-full overflow-y-auto rounded-t-3xl border border-white/10 bg-coal-950 p-5 sm:max-w-md sm:rounded-3xl"
+          className="flex max-h-[94dvh] w-full flex-col overflow-hidden rounded-t-3xl border border-white/10 bg-coal-950 sm:max-w-md sm:rounded-3xl"
         >
-          {/* header */}
-          <div className="mb-4 flex items-center gap-2.5">
-            <Icon name="timer" className="h-6 w-6 shrink-0 text-pickle-400" />
-            <h2 className="font-display text-[30px] font-bold uppercase leading-none tracking-[0.06em]">Tree</h2>
+          {/* header — fixed */}
+          <div className="flex shrink-0 items-center gap-2.5 px-5 pt-4">
+            <Icon name="timer" className="h-5 w-5 shrink-0 text-pickle-400" />
+            <h2 className="font-display text-[26px] font-bold uppercase leading-none tracking-[0.06em]">Tree</h2>
             <button
               onClick={() => setShowPicker(true)}
-              className="ml-auto flex max-w-[150px] items-center gap-1.5 rounded-full border border-pickle-500/50 px-3.5 py-1.5 text-sm font-semibold text-pickle-300 transition hover:bg-pickle-500/10 active:scale-95"
+              className="ml-auto flex max-w-[140px] items-center gap-1.5 rounded-full border border-pickle-500/50 px-3 py-1.5 text-[13px] font-semibold text-pickle-300 transition hover:bg-pickle-500/10 active:scale-95"
             >
               <span className="truncate">{racer?.name || 'Pick racer'}</span>
-              <Icon name="chevD" className="h-4 w-4 shrink-0" />
+              <Icon name="chevD" className="h-3.5 w-3.5 shrink-0" />
             </button>
             <button
               onClick={onClose}
               aria-label="Close"
-              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-white/60 transition hover:bg-white/10 hover:text-white"
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl text-white/60 transition hover:bg-white/10 hover:text-white"
             >
               <Icon name="x" className="h-5 w-5" />
             </button>
           </div>
 
-          {/* tree + mode */}
-          <div className="space-y-2">
-            <TreeSeg
-              options={[{ value: '400', label: '.400' }, { value: '500', label: '.500' }]}
-              value={tree} onChange={setTree} labelClass="font-mono"
-            />
-            <TreeSeg
-              options={[{ value: 'sportsman', label: 'SPORTSMAN' }, { value: 'pro', label: 'PRO' }]}
-              value={mode} onChange={setMode} labelClass="font-display tracking-[0.08em]"
-            />
-          </div>
-
-          <button onClick={() => setShowHelp((s) => !s)} className="mx-auto flex items-center gap-2 py-3 text-[15px] text-white/55 transition hover:text-white">
-            <Icon name="info" className="h-[18px] w-[18px]" />
-            How each tree works
-            <Icon name="chevD" className={`h-4 w-4 transition-transform ${showHelp ? 'rotate-180' : ''}`} />
-          </button>
-          {showHelp && (
-            <div className="mx-auto mb-1 max-w-sm rounded-2xl bg-white/[0.04] p-4 text-[13px] leading-relaxed text-white/60">
-              <p><b className="text-white/85">Sportsman (.500):</b> the ambers light one at a time, 0.5s apart — leave on the last amber.</p>
-              <p className="mt-2"><b className="text-white/85">Pro (.400):</b> all three ambers flash together, then green 0.4s later — go when you see amber.</p>
-              <p className="mt-2">Release the instant you see green. Red means you left early — foul.</p>
-            </div>
-          )}
-
-          {/* the tree */}
-          <div className="mx-auto mt-2 w-full max-w-[290px] rounded-[26px] border border-white/[0.08] bg-[#12141a] px-8 py-6">
-            <div className="flex items-start justify-center gap-10">
-              <div className="flex flex-col items-center gap-2">
-                <TreeBulb on={lit.includes('pre')} color="#3b82f6" className="h-10 w-10" />
-                <span className="font-display text-[13px] font-semibold uppercase tracking-[0.22em] text-white/45">Pre</span>
-              </div>
-              <div className="flex flex-col items-center gap-2">
-                <TreeBulb on={lit.includes('stage')} color="#3b82f6" className="h-10 w-10" />
-                <span className="font-display text-[13px] font-semibold uppercase tracking-[0.22em] text-white/45">Stage</span>
-              </div>
-            </div>
-            <div className="my-5 h-px bg-white/[0.07]" />
-            <div className="space-y-5">
-              {[
-                ['a1', 'Amber', '#fbbf24'],
-                ['a2', 'Amber', '#fbbf24'],
-                ['a3', 'Amber', '#fbbf24'],
-                ['green', 'Go', '#22c55e'],
-                ['red', 'Foul', '#ef4444'],
-              ].map(([id, label, color]) => (
-                <div key={id} className="flex items-center gap-5">
-                  <TreeBulb on={lit.includes(id)} color={color} className="h-16 w-16" />
-                  <span className="font-display text-[15px] font-semibold uppercase tracking-[0.26em] text-white/45">{label}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {hint}
-
-          <div className="mt-3">
-            {phase === 'idle' && (
-              <button
-                onClick={stage}
-                className="w-full rounded-2xl bg-white/[0.07] py-5 font-display text-[22px] font-bold uppercase tracking-[0.1em] text-white transition hover:bg-white/[0.1] active:scale-[0.99]"
-              >
-                Tap to stage
-              </button>
-            )}
-            {(phase === 'staged' || phase === 'holding' || phase === 'running') && (
-              <button
-                onMouseDown={holdStart} onMouseUp={holdEnd} onMouseLeave={holdEnd}
-                onTouchStart={(e) => { e.preventDefault(); holdStart(); }} onTouchEnd={(e) => { e.preventDefault(); holdEnd(); }}
-                className="w-full select-none rounded-2xl bg-pickle-400 py-5 font-display text-[22px] font-bold uppercase tracking-[0.1em] text-black shadow-glow transition active:bg-pickle-300"
-              >
-                Hold — launch
-              </button>
-            )}
-            {phase === 'done' && (
-              <div className="flex gap-2">
-                <button
-                  onClick={stage}
-                  className="flex-1 rounded-2xl bg-white/[0.07] py-4 font-display text-xl font-bold uppercase tracking-[0.1em] transition hover:bg-white/[0.1] active:scale-[0.99]"
-                >
-                  Stage again
-                </button>
-                <button
-                  onClick={reset}
-                  className="rounded-2xl border border-white/15 px-5 font-display text-xl font-bold uppercase tracking-[0.08em] text-white/70 transition hover:bg-white/5"
-                >
-                  Reset
-                </button>
-              </div>
-            )}
-          </div>
-
-          {/* rankings */}
-          <div className="mt-6 rounded-3xl border border-white/[0.08] bg-[#12141a] p-4">
-            <div className="mb-3 flex items-center gap-2">
-              <Icon name="trophy" className="h-5 w-5 text-pickle-400" />
-              <h3 className="font-display text-[22px] font-bold uppercase tracking-[0.06em]">Racer Rankings</h3>
-            </div>
+          {/* scrollable middle */}
+          <div className="min-h-0 flex-1 overflow-y-auto px-5 py-3">
             <div className="space-y-2">
-              {ranked.map(({ r, s }, i) => {
-                const top = i === 0 && s.n > 0;
-                return (
-                  <div
-                    key={r.id}
-                    className={`rounded-2xl border p-3.5 ${top ? 'border-pickle-500/50 bg-pickle-500/[0.06]' : 'border-white/[0.06] bg-white/[0.02]'}`}
-                  >
-                    <div className="mb-2 flex items-center gap-1.5">
-                      {top && <Icon name="crown" className="h-4 w-4 shrink-0 text-pickle-400" />}
-                      <span className={`font-bold ${top ? 'text-pickle-300' : ''}`}>{r.name}</span>
-                      {top && <span className="text-xs text-white/40">· Top racer</span>}
-                      <span className="ml-auto text-xs text-white/40">{s.n} attempt{s.n === 1 ? '' : 's'}</span>
-                    </div>
-                    <div className="grid grid-cols-4 gap-2 text-right font-mono">
-                      {[
-                        ['AVG', s.avg, s.avg != null],
-                        ['BEST', s.best, s.best != null],
-                        ['WORST', s.worst, s.worst != null],
-                        ['RL', s.rl, true],
-                      ].map(([label, v, has]) => (
-                        <div key={label}>
-                          <div className="text-[10px] uppercase tracking-wider text-white/40">{label}</div>
-                          <div className={`text-sm font-bold ${label === 'AVG' && has ? 'text-pickle-300' : label === 'RL' && v > 0 ? 'text-red-400' : ''}`}>
-                            {label === 'RL' ? v : has ? v.toFixed(3) : '—'}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                );
-              })}
-              {!ranked.length && <div className="py-2 text-center text-sm text-white/40">No racers yet.</div>}
+              <TreeSeg
+                options={[{ value: '400', label: '.400' }, { value: '500', label: '.500' }]}
+                value={tree} onChange={setTree} labelClass="font-mono" compact
+              />
+              <TreeSeg
+                options={[{ value: 'sportsman', label: 'SPORTSMAN' }, { value: 'pro', label: 'PRO' }]}
+                value={mode} onChange={setMode} labelClass="font-display tracking-[0.08em]" compact
+              />
             </div>
+
+            <button onClick={() => setShowHelp((s) => !s)} className="mx-auto flex items-center gap-1.5 py-2.5 text-sm text-white/55 transition hover:text-white">
+              <Icon name="info" className="h-4 w-4" />
+              How each tree works
+              <Icon name="chevD" className={`h-3.5 w-3.5 transition-transform ${showHelp ? 'rotate-180' : ''}`} />
+            </button>
+            {showHelp && (
+              <div className="mx-auto mb-1 max-w-sm rounded-2xl bg-white/[0.04] p-3.5 text-[13px] leading-relaxed text-white/60">
+                <p><b className="text-white/85">Sportsman (.500):</b> the ambers light one at a time, 0.5s apart — leave on the last amber.</p>
+                <p className="mt-1.5"><b className="text-white/85">Pro (.400):</b> all three ambers flash together, then green 0.4s later — go when you see amber.</p>
+                <p className="mt-1.5">Release the instant you see green. Red means you left early — foul.</p>
+              </div>
+            )}
+
+            {/* the tree — compact so bulbs + action bar share one screen */}
+            <div className="mx-auto mt-1 w-full max-w-[250px] rounded-[22px] border border-white/[0.08] bg-[#12141a] px-6 py-4">
+              <div className="flex items-start justify-center gap-8">
+                <div className="flex flex-col items-center gap-1.5">
+                  <TreeBulb on={lit.includes('pre')} color="#3b82f6" className="h-8 w-8 sm:h-9 sm:w-9" />
+                  <span className="font-display text-[11px] font-semibold uppercase tracking-[0.2em] text-white/45">Pre</span>
+                </div>
+                <div className="flex flex-col items-center gap-1.5">
+                  <TreeBulb on={lit.includes('stage')} color="#3b82f6" className="h-8 w-8 sm:h-9 sm:w-9" />
+                  <span className="font-display text-[11px] font-semibold uppercase tracking-[0.2em] text-white/45">Stage</span>
+                </div>
+              </div>
+              <div className="my-3 h-px bg-white/[0.07]" />
+              <div className="space-y-3">
+                {[
+                  ['a1', 'Amber', '#fbbf24'],
+                  ['a2', 'Amber', '#fbbf24'],
+                  ['a3', 'Amber', '#fbbf24'],
+                  ['green', 'Go', '#22c55e'],
+                  ['red', 'Foul', '#ef4444'],
+                ].map(([id, label, color]) => (
+                  <div key={id} className="flex items-center gap-4">
+                    <TreeBulb on={lit.includes(id)} color={color} className="h-11 w-11 sm:h-14 sm:w-14" />
+                    <span className="font-display text-[13px] font-semibold uppercase tracking-[0.24em] text-white/45">{label}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="mt-3 text-center text-[15px] font-medium text-white/55">
+              {phase === 'idle' && 'Tap Stage to begin'}
+              {phase === 'staged' && 'Press and HOLD — release on green'}
+              {phase === 'holding' && 'Get ready…'}
+              {phase === 'running' && <span className="font-bold text-pickle-400">RELEASE ON GREEN!</span>}
+              {phase === 'done' && lastRT && (lastRT.red
+                ? <span className="font-bold text-red-400">RED LIGHT — {lastRT.rt.toFixed(3)} (foul)</span>
+                : <span className="font-bold text-pickle-400">R/T {lastRT.rt.toFixed(3)}</span>)}
+            </div>
+
+            {/* rankings */}
+            <div className="mb-1 mt-4 rounded-3xl border border-white/[0.08] bg-[#12141a] p-4">
+                <div className="mb-2.5 flex items-center gap-2">
+                  <Icon name="trophy" className="h-5 w-5 text-pickle-400" />
+                <h3 className="font-display text-[20px] font-bold uppercase tracking-[0.06em]">Racer Rankings</h3>
+              </div>
+              <div className="space-y-2">
+                {ranked.map(({ r, s }, i) => {
+                  const top = i === 0 && s.n > 0;
+                  return (
+                    <div
+                      key={r.id}
+                      className={`rounded-2xl border p-3 ${top ? 'border-pickle-500/50 bg-pickle-500/[0.06]' : 'border-white/[0.06] bg-white/[0.02]'}`}
+                    >
+                      <div className="mb-1.5 flex items-center gap-1.5">
+                        {top && <Icon name="crown" className="h-3.5 w-3.5 shrink-0 text-pickle-400" />}
+                        <span className={`truncate text-sm font-bold ${top ? 'text-pickle-300' : ''}`}>{r.name}</span>
+                        {top && <span className="shrink-0 text-[11px] text-white/40">· Top</span>}
+                        <span className="ml-auto shrink-0 text-[11px] text-white/40">{s.n} att.</span>
+                      </div>
+                      <div className="grid grid-cols-4 gap-2 text-right font-mono">
+                        {[
+                          ['AVG', s.avg, s.avg != null],
+                          ['BEST', s.best, s.best != null],
+                          ['WORST', s.worst, s.worst != null],
+                          ['RL', s.rl, true],
+                        ].map(([label, v, has]) => (
+                          <div key={label}>
+                            <div className="text-[9px] uppercase tracking-wider text-white/40">{label}</div>
+                            <div className={`text-[13px] font-bold ${label === 'AVG' && has ? 'text-pickle-300' : label === 'RL' && v > 0 ? 'text-red-400' : ''}`}>
+                              {label === 'RL' ? v : has ? v.toFixed(3) : '—'}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+                {!ranked.length && <div className="py-2 text-center text-sm text-white/40">No racers yet.</div>}
+              </div>
+            </div>
+          </div>
+
+          {/* sticky action bar — always visible during play */}
+          <div
+            className="shrink-0 border-t border-white/10 bg-coal-950/95 px-5 pt-3 backdrop-blur"
+            style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}
+          >
+            {actionBar}
           </div>
         </div>
       </div>
@@ -460,6 +469,7 @@ export function TreeSimModal({ state, update, toast, onClose }) {
     </>
   );
 }
+
 
 
 /* ---------------- Settings ---------------- */
