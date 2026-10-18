@@ -15,9 +15,11 @@ import { isNum } from './format';
  */
 const COLUMNS = {
   date: ['date'],
+  time: ['time'],
   et: ['et'],
   distance: ['distance', 'dist', 'tracklength'],
   track: ['track'],
+  runType: ['runtype'],
   sixty: ['60ft'],
   threeThirty: ['330ft'],
   eighthET: ['18et'],
@@ -30,6 +32,13 @@ const COLUMNS = {
   altitudeFt: ['altitude', 'altitudeft', 'elevation', 'elevationft', 'trackaltitude', 'trackelevation'],
   daFt: ['daft', 'densityaltitude', 'densityalt', 'da'],
   jet: ['jet'],
+  lPsi: ['lpsi', 'leftpsi'],
+  rPsi: ['rpsi', 'rightpsi'],
+  lBar: ['lbar', 'leftbar'],
+  rBar: ['rbar', 'rightbar'],
+  comp: ['comp', 'compress', 'compression'],
+  rebound: ['rebound', 'reb'],
+  revLim: ['revlim', 'rev', 'revlimit', 'revlimiter'],
   notes: ['notes'],
 };
 
@@ -102,17 +111,31 @@ export async function parseImportFile(file, carId, fallbackTrack) {
     const distance = parseDistance(get('distance'));
     const eighthETCol = num(get('eighthET'));
     const eighthMPHCol = num(get('eighthMPH'));
-    const mphCol = num(get('mph'));
+    let mphCol = num(get('mph'));
     // Some exports leave E.T. blank for 1/8-mile runs and put the time in the
     // 1/8 ET split column — fall back to it rather than dropping the run.
     let et = num(get('et'));
     if (!isNum(et) && distance === '1/8' && isNum(eighthETCol)) et = eighthETCol;
+    if (!isNum(mphCol) && distance === '1/8' && isNum(eighthMPHCol)) mphCol = eighthMPHCol;
     if (!date || !isNum(et)) {
       errors.push(`Row ${i + 2}: skipped (needs a valid Date and E.T.).`);
       return;
     }
+    // Time column may come through as a Date (SheetJS) or a "HH:MM" string.
+    const timeRaw = get('time');
+    let time = '12:00';
+    if (timeRaw instanceof Date && !Number.isNaN(timeRaw.getTime())) {
+      time = `${String(timeRaw.getHours()).padStart(2, '0')}:${String(timeRaw.getMinutes()).padStart(2, '0')}`;
+    } else if (typeof timeRaw === 'string' && /^\d{1,2}:\d{2}/.test(timeRaw.trim())) {
+      const [h, m] = timeRaw.trim().split(':');
+      time = `${h.padStart(2, '0')}:${m}`;
+    }
+    const runTypeRaw = String(get('runType') ?? '').trim().toUpperCase();
+    const runType = ['T/T', 'QUALIFYING', 'ELIMINATIONS'].includes(runTypeRaw) ? runTypeRaw : 'T/T';
     const tempF = num(get('tempF'));
-    const humidity = num(get('humidity'));
+    let humidity = num(get('humidity'));
+    // Some sheets record humidity as a fraction (0.58 = 58%).
+    if (isNum(humidity) && humidity > 0 && humidity < 1) humidity = Math.round(humidity * 100);
     const altitudeFt = num(get('altitudeFt'));
     let daFt = num(get('daFt'));
     if (!isNum(daFt) && isNum(tempF) && isNum(altitudeFt)) {
@@ -124,11 +147,11 @@ export async function parseImportFile(file, carId, fallbackTrack) {
       id: uid(),
       carId,
       date,
-      time: '12:00',
+      time,
       track: String(get('track') ?? fallbackTrack ?? '').trim() || 'Unknown track',
       trackId: null,
       distance,
-      runType: 'T/T',
+      runType,
       rt: num(get('rt')),
       sixty: num(get('sixty')),
       threeThirty: num(get('threeThirty')),
@@ -144,8 +167,13 @@ export async function parseImportFile(file, carId, fallbackTrack) {
       altitudeFt,
       daFt,
       jet: num(get('jet')),
-      lPsi: null, rPsi: null, lBar: null, rBar: null,
-      comp: null, rebound: null, revLim: null,
+      lPsi: num(get('lPsi')),
+      rPsi: num(get('rPsi')),
+      lBar: num(get('lBar')),
+      rBar: num(get('rBar')),
+      comp: num(get('comp')),
+      rebound: num(get('rebound')),
+      revLim: num(get('revLim')),
       wl: null,
       notes: String(get('notes') ?? '').trim(),
       createdAt: Date.now(),
