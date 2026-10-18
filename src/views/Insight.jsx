@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Card, SectionTitle, Btn, Field, inputCls, Segmented, Badge, EmptyState } from '../components/ui';
 import { fmtET, fmtTemp, fmtDA, fmtDate, isNum } from '../lib/format';
-import { runsForCar, filterDistance, latestRun, findSimilar, dialIn, rankSetups, crewChief, similarityPct } from '../lib/stats';
+import { runsForCar, filterDistance, latestRun, findSimilar, dialIn, rankSetups, crewChief, similarityPct, predictET } from '../lib/stats';
 import { fetchTrackWeather } from '../lib/weather';
 
 export default function Insight({ state, toast, dist, setDist }) {
@@ -46,9 +46,25 @@ export default function Insight({ state, toast, dist, setDist }) {
     [runs, target.daFt, target.tempF, dist],
   );
   const dial = useMemo(() => dialIn(runs, target), [runs, target.daFt, target.tempF, dist]);
+  // Fallback: no runs inside the similar-air band — derive from whatever exists,
+  // with an honest basis note (same tiers as the Track tab predictor).
+  const dialFallback = useMemo(
+    () => (dial.n === 0 && target.daFt != null ? predictET(runs, target.daFt) : null),
+    [dial.n, runs, target.daFt],
+  );
+  const dialShow = dial.n > 0 ? { ...dial, kind: 'similar' } : dialFallback ? {
+    n: 0,
+    kind: 'derived',
+    predicted: dialFallback.et,
+    dial: Math.ceil((dialFallback.et + 0.015) * 100) / 100,
+    confidence: dialFallback.confidence.toUpperCase(),
+    basis: dialFallback.basis,
+    detail: dialFallback.detail,
+  } : null;
   const ranked = useMemo(() => rankSetups(runs, baseline), [runs, baseline]);
   const chief = useMemo(() => crewChief(runs, baseline, null), [runs, baseline]);
   const top = ranked[0];
+  const nAir = useMemo(() => runs.filter((r) => isNum(r.et) && isNum(r.daFt)).length, [runs]);
 
   const similarSorted = useMemo(
     () => [...similar].map((r) => ({ r, pct: similarityPct(r, target) })).sort((a, b) => b.pct - a.pct).slice(0, 8),
@@ -59,7 +75,7 @@ export default function Insight({ state, toast, dist, setDist }) {
     return <EmptyState title="No data yet" body="Log some runs with weather data to unlock dial-in predictions and setup advice." action={null} />;
   }
 
-  const confTone = dial.confidence === 'HIGH' ? 'green' : dial.confidence === 'MEDIUM' ? 'blue' : 'amber';
+  const confTone = !dialShow ? 'amber' : dialShow.confidence === 'HIGH' ? 'green' : dialShow.confidence === 'MEDIUM' ? 'blue' : 'amber';
 
   return (
     <div className="space-y-4">
@@ -87,16 +103,20 @@ export default function Insight({ state, toast, dist, setDist }) {
       <Card>
         <div className="mb-2 flex items-center justify-between">
           <SectionTitle>Dial-in predictor</SectionTitle>
-          {dial.n > 0 && <Badge tone={confTone}>{dial.confidence} CONFIDENCE</Badge>}
+          {dialShow && <Badge tone={confTone}>{dialShow.confidence} CONFIDENCE</Badge>}
         </div>
-        {dial.n === 0 ? (
-          <div className="text-sm text-white/50">{target.daFt == null ? 'Enter a density altitude above to get a prediction.' : dial.basis}</div>
+        {dialShow == null ? (
+          <div className="text-sm text-white/50">{target.daFt == null ? 'Enter a density altitude above to get a prediction.' : 'Log a run to get a prediction.'}</div>
         ) : (
           <div>
-            <div className="font-mono text-2xl font-black text-pickle-400">{dial.predicted.toFixed(3)}s</div>
-            <div className="mt-1 text-sm">Suggested dial: <b className="font-mono">{dial.dial.toFixed(2)}</b></div>
-            <div className="text-xs text-white/50">Expected range {dial.lo.toFixed(3)} – {dial.hi.toFixed(3)}s</div>
-            <div className="mt-2 text-[11px] text-white/40">{dial.basis}</div>
+            <div className="font-mono text-2xl font-black text-pickle-400">{dialShow.predicted.toFixed(3)}s</div>
+            <div className="mt-1 text-sm">Suggested dial: <b className="font-mono">{dialShow.dial.toFixed(2)}</b></div>
+            {dialShow.kind === 'similar' ? (
+              <div className="text-xs text-white/50">Expected range {dialShow.lo.toFixed(3)} – {dialShow.hi.toFixed(3)}s</div>
+            ) : (
+              <div className="text-xs text-white/50">{dialShow.detail}</div>
+            )}
+            <div className="mt-2 text-[11px] text-white/40">{dialShow.basis}</div>
           </div>
         )}
       </Card>
@@ -105,7 +125,13 @@ export default function Insight({ state, toast, dist, setDist }) {
       <Card>
         <SectionTitle>Ideal setup</SectionTitle>
         <div className="mb-2 text-[11px] text-white/40">Ranked by mean weather-corrected ET (baseline {baseline.toLocaleString()} ft DA).</div>
-        {ranked.length === 0 && <div className="text-sm text-white/50">Log runs with setup + weather data to rank configurations.</div>}
+        {ranked.length === 0 && (
+          <div className="text-sm text-white/50">
+            {nAir === 0
+              ? `None of your ${runs.length} ${dist}-mile runs have air data yet — add Temp + Altitude when logging (or re-import your spreadsheet) to unlock setup ranking.`
+              : `${nAir} run${nAir === 1 ? '' : 's'} have air data but none record setup fields (Jet, tire PSI, …) — add them on the run form to rank configurations.`}
+          </div>
+        )}
         {ranked.slice(0, 5).map((g, i) => (
           <div key={i} className="border-t border-white/5 py-2 first:border-0">
             <div className="flex items-center justify-between">

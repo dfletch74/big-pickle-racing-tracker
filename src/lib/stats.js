@@ -178,6 +178,7 @@ export function dialIn(runs, target) {
 }
 
 const SETUP_FIELDS = ['jet', 'lPsi', 'rPsi', 'lBar', 'rBar', 'comp', 'rebound', 'revLim'];
+export const hasSetupFields = (r) => SETUP_FIELDS.some((f) => isNum(r[f]));
 const setupKey = (r) => SETUP_FIELDS.map((f) => (isNum(r[f]) ? r[f] : '–')).join('|');
 
 /**
@@ -189,7 +190,7 @@ export function rankSetups(runs, baseline) {
   const groups = new Map();
   for (const r of runs) {
     if (!isNum(r.et) || !isNum(r.daFt)) continue;
-    if (!SETUP_FIELDS.some((f) => isNum(r[f]))) continue;
+    if (!hasSetupFields(r)) continue;
     const key = setupKey(r);
     if (!groups.has(key)) {
       groups.set(key, {
