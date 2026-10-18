@@ -1,137 +1,102 @@
-import { useMemo, useId } from 'react';
+import { useMemo } from 'react';
 import { isNum, fmtDate } from '../lib/format';
 
 const TRACK_COLORS = ['#a3e635', '#38bdf8', '#f472b6', '#fbbf24', '#c084fc', '#fb7185'];
 
 /**
- * Hand-rolled SVG line chart: ET or MPH over time, one series per track,
- * with a soft area gradient under each line and a callout on the best point.
- * `better`: 'low' marks the minimum as best (ET), 'high' marks the maximum (MPH).
+ * Season-style chart: one dot per run in date order, dashed connector,
+ * y gridlines dashed, solid axes, ~5 date ticks. `invert` puts higher
+ * numbers at the top (used for ET: slower = higher = top).
  */
-export function LineChart({ runs, valueKey, better = 'low', formatY, height = 210 }) {
-  const gid = useId().replace(/[^a-zA-Z0-9]/g, '');
-  const { series, minX, maxX, loY, hiY } = useMemo(() => {
-    const pts = runs.filter((r) => isNum(r[valueKey]) && r.date);
-    const byTrack = new Map();
-    for (const r of pts) {
-      const t = byTrack.get(r.track) || [];
-      t.push({ x: new Date(`${r.date}T12:00:00`).getTime(), y: r[valueKey], run: r });
-      byTrack.set(r.track, t);
-    }
-    const all = pts.map((r) => r[valueKey]);
-    const xs = [...byTrack.values()].flat().map((p) => p.x);
-    const rawMin = Math.min(...all);
-    const rawMax = Math.max(...all);
-    const pad = (rawMax - rawMin || Math.abs(rawMin) * 0.05 || 1) * 0.12;
+export function LineChart({ runs, valueKey, invert = false, formatY, height = 240, distLabel }) {
+  const { pts, minX, maxX, loY, hiY, tracks } = useMemo(() => {
+    const list = runs
+      .filter((r) => isNum(r[valueKey]) && r.date)
+      .map((r) => ({ x: new Date(`${r.date}T12:00:00`).getTime(), y: r[valueKey], run: r }))
+      .sort((a, b) => a.x - b.x);
+    if (!list.length) return { pts: [], tracks: [] };
+    const ys = list.map((p) => p.y);
+    const rawMin = Math.min(...ys);
+    const rawMax = Math.max(...ys);
+    const padY = (rawMax - rawMin || Math.abs(rawMin) * 0.05 || 1) * 0.15;
     return {
-      series: [...byTrack.entries()].map(([track, p], i) => ({
-        track,
-        color: TRACK_COLORS[i % TRACK_COLORS.length],
-        pts: p.sort((a, b) => a.x - b.x),
-      })),
-      minX: Math.min(...xs),
-      maxX: Math.max(...xs),
-      loY: rawMin - pad,
-      hiY: rawMax + pad,
+      pts: list,
+      minX: Math.min(...list.map((p) => p.x)),
+      maxX: Math.max(...list.map((p) => p.x)),
+      loY: rawMin - padY,
+      hiY: rawMax + padY,
+      tracks: [...new Set(list.map((p) => p.run.track))],
     };
   }, [runs, valueKey]);
 
-  if (!series.length) {
+  if (!pts.length) {
     return <div className="py-10 text-center text-sm text-white/40">No data yet — log a run to light up the chart.</div>;
   }
 
+  const colorOf = (track) => TRACK_COLORS[tracks.indexOf(track) % TRACK_COLORS.length];
+
   const W = 360;
   const H = height;
-  const pad = { l: 46, r: 10, t: 16, b: 24 };
+  const pad = { l: 44, r: 8, t: 12, b: 28 };
   const spanX = maxX - minX || 1;
   const spanY = hiY - loY || 1;
   const X = (x) => pad.l + ((x - minX) / spanX) * (W - pad.l - pad.r);
-  const Y = (y) => pad.t + (1 - (y - loY) / spanY) * (H - pad.t - pad.b);
+  const Y = invert
+    ? (y) => pad.t + ((y - loY) / spanY) * (H - pad.t - pad.b)
+    : (y) => pad.t + (1 - (y - loY) / spanY) * (H - pad.t - pad.b);
   const baseY = H - pad.b;
 
-  const ticks = [0, 0.5, 1].map((f) => loY + f * spanY);
+  const yTicks = [0, 1 / 3, 2 / 3, 1].map((f) => loY + f * spanY);
+  const xTicks = [0, 0.25, 0.5, 0.75, 1].map((f) => minX + f * spanX);
+  const fmtX = (t) => {
+    const d = new Date(t);
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    return `${mm}/${dd}/${String(d.getFullYear()).slice(2)}`;
+  };
 
-  // best point across all series (for the callout)
-  let bestPt = null;
-  for (const s of series) {
-    for (const p of s.pts) {
-      if (!bestPt || (better === 'low' ? p.y < bestPt.y : p.y > bestPt.y)) {
-        bestPt = { ...p, color: s.color, track: s.track };
-      }
-    }
-  }
+  const line = pts.map((p) => `${X(p.x).toFixed(1)},${Y(p.y).toFixed(1)}`).join(' ');
 
   return (
     <div>
       <svg viewBox={`0 0 ${W} ${H}`} className="w-full">
-        <defs>
-          {series.map((s, i) => (
-            <linearGradient key={i} id={`${gid}-g${i}`} x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor={s.color} stopOpacity="0.30" />
-              <stop offset="100%" stopColor={s.color} stopOpacity="0" />
-            </linearGradient>
-          ))}
-        </defs>
-        {ticks.map((t, i) => (
+        {yTicks.map((t, i) => (
           <g key={i}>
-            <line x1={pad.l} x2={W - pad.r} y1={Y(t)} y2={Y(t)} stroke="#ffffff" strokeOpacity="0.07" />
-            <text x={pad.l - 8} y={Y(t) + 3.5} textAnchor="end" fontSize="10" fill="#ffffff" opacity="0.45" fontFamily="'JetBrains Mono', monospace">
+            <line x1={pad.l} x2={W - pad.r} y1={Y(t)} y2={Y(t)} stroke="#ffffff" strokeOpacity="0.14" strokeDasharray="4 4" />
+            <text x={pad.l - 8} y={Y(t) + 4} textAnchor="end" fontSize="11" fill="#9aa0aa" fontFamily="'JetBrains Mono', monospace">
               {formatY(t)}
             </text>
           </g>
         ))}
-        {series.map((s, i) => {
-          const line = s.pts.map((p) => `${X(p.x).toFixed(1)},${Y(p.y).toFixed(1)}`).join(' ');
-          const area = `${X(s.pts[0].x).toFixed(1)},${baseY} ${line} ${X(s.pts[s.pts.length - 1].x).toFixed(1)},${baseY}`;
-          return (
-            <g key={s.track}>
-              <polygon points={area} fill={`url(#${gid}-g${i})`} />
-              <polyline
-                points={line}
-                fill="none"
-                stroke={s.color}
-                strokeWidth="2.5"
-                strokeLinejoin="round"
-                strokeLinecap="round"
-              />
-              {s.pts.map((p, j) => (
-                <circle key={j} cx={X(p.x)} cy={Y(p.y)} r="3.25" fill="#0a0d0a" stroke={s.color} strokeWidth="2">
-                  <title>{`${s.track} · ${fmtDate(p.run.date)} · ${formatY(p.y)}`}</title>
-                </circle>
-              ))}
-            </g>
-          );
-        })}
-        {bestPt && (
-          <g>
-            <circle cx={X(bestPt.x)} cy={Y(bestPt.y)} r="7" fill="none" stroke={bestPt.color} strokeWidth="1.5" opacity="0.7" />
-            <text
-              x={Math.min(Math.max(X(bestPt.x), pad.l + 30), W - pad.r - 30)}
-              y={Y(bestPt.y) - 12}
-              textAnchor="middle"
-              fontSize="11"
-              fontWeight="700"
-              fill={bestPt.color}
-              fontFamily="'JetBrains Mono', monospace"
-            >
-              ★ {formatY(bestPt.y)}
-            </text>
-          </g>
-        )}
-        <text x={pad.l} y={H - 7} fontSize="10" fill="#ffffff" opacity="0.4" fontFamily="'JetBrains Mono', monospace">
-          {fmtDate(new Date(minX).toISOString().slice(0, 10))}
-        </text>
-        <text x={W - pad.r} y={H - 7} fontSize="10" fill="#ffffff" opacity="0.4" textAnchor="end" fontFamily="'JetBrains Mono', monospace">
-          {fmtDate(new Date(maxX).toISOString().slice(0, 10))}
-        </text>
-      </svg>
-      <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1">
-        {series.map((s) => (
-          <span key={s.track} className="flex items-center gap-1.5 text-[11px] font-medium text-white/60">
-            <span className="inline-block h-2 w-2 rounded-full" style={{ background: s.color }} />
-            {s.track}
-          </span>
+        <line x1={pad.l} x2={pad.l} y1={pad.t - 4} y2={baseY} stroke="#3a3f47" strokeWidth="1.5" />
+        <line x1={pad.l} x2={W - pad.r} y1={baseY} y2={baseY} stroke="#3a3f47" strokeWidth="1.5" />
+        {xTicks.map((t, i) => (
+          <text key={i} x={X(t)} y={baseY + 19} textAnchor="middle" fontSize="10.5" fill="#9aa0aa" fontFamily="'JetBrains Mono', monospace">
+            {fmtX(t)}
+          </text>
         ))}
+        <polyline points={line} fill="none" stroke="#ffffff" strokeOpacity="0.35" strokeWidth="1.5" strokeDasharray="5 4" />
+        {pts.map((p, i) => (
+          <circle key={i} cx={X(p.x)} cy={Y(p.y)} r="5" fill={colorOf(p.run.track)}>
+            <title>{`${p.run.track} · ${fmtDate(p.run.date)} · ${p.run.distance} · ${formatY(p.y)}`}</title>
+          </circle>
+        ))}
+      </svg>
+      <div className="mt-3 space-y-2">
+        <div className="flex items-center gap-2.5 text-[13px] text-white/55">
+          <svg width="30" height="8" aria-hidden>
+            <line x1="0" x2="30" y1="4" y2="4" stroke="#ffffff" strokeOpacity="0.45" strokeWidth="1.5" strokeDasharray="5 4" />
+          </svg>
+          {distLabel} each run
+        </div>
+        <div className="flex flex-wrap gap-x-5 gap-y-1.5">
+          {tracks.map((t) => (
+            <span key={t} className="flex items-center gap-2 text-[13px] text-white/55">
+              <span className="inline-block h-3 w-3 rounded-full" style={{ background: colorOf(t) }} />
+              {t}
+            </span>
+          ))}
+        </div>
       </div>
     </div>
   );

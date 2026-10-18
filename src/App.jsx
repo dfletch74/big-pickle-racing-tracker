@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import { useStore, uid } from './lib/store';
 import { Toasts, Icon } from './components/ui';
+import { LOGO_DATA_URI } from './components/logo';
 import Dash from './views/Dash';
 import Runs from './views/Runs';
 import AddRun from './views/AddRun';
@@ -57,18 +58,16 @@ export default function App() {
         <div className="mx-auto flex max-w-3xl items-center justify-between px-4 py-2.5">
           <button
             onClick={() => setOverlay('garage')}
-            className="flex items-center gap-2.5 rounded-xl px-1 py-1 transition hover:bg-white/5 active:scale-[0.98]"
+            className="flex items-center gap-3 rounded-xl px-1 py-1 transition hover:bg-white/5 active:scale-[0.98]"
             title="Garage"
           >
-            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-pickle-400 font-display text-[17px] font-extrabold tracking-tight text-black shadow-glow">
-              BP
-            </span>
+            <img src={LOGO_DATA_URI} alt="Big Pickle Racing" className="h-12 w-auto" />
             <span className="text-left leading-none">
-              <span className="block font-display text-[22px] font-bold tracking-[0.08em]">
-                BIG PICKLE
-              </span>
-              <span className="mt-0.5 block text-[10px] font-medium uppercase tracking-[0.14em] text-white/45">
+              <span className="mt-1 block text-[10px] font-medium uppercase tracking-[0.16em] text-white/45">
                 {car?.name || 'Garage'}
+              </span>
+              <span className="mt-0.5 block text-[10px] font-medium uppercase tracking-[0.16em] text-white/25">
+                {[car?.year, car?.make, car?.model].filter(Boolean).join(' · ')}
               </span>
             </span>
           </button>
@@ -97,8 +96,7 @@ export default function App() {
       <main className="app-chrome mx-auto max-w-3xl px-4 pb-32 pt-4">
         <div key={view} className="animate-fadein">
           {view === 'dash' && (
-            <Dash state={state} dist={dist} setDist={setDist}
-              onAddRun={() => goAdd()} onImport={() => setView('runs')} onSeeRuns={() => setView('runs')} />
+            <Dash state={state} onAddRun={() => goAdd()} onImport={() => setView('runs')} onSeeRuns={() => setView('runs')} />
           )}
           {view === 'runs' && (
             <Runs state={state} update={update} toast={toast} dist={dist} setDist={setDist}
