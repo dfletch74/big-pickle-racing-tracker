@@ -5,11 +5,12 @@ const TRACK_COLORS = ['#a3e635', '#38bdf8', '#f472b6', '#fbbf24', '#c084fc', '#f
 
 /**
  * Hand-rolled SVG line chart: ET or MPH over time, one series per track,
- * with a soft area gradient under each line.
+ * with a soft area gradient under each line and a callout on the best point.
+ * `better`: 'low' marks the minimum as best (ET), 'high' marks the maximum (MPH).
  */
-export function LineChart({ runs, valueKey, formatY, height = 190 }) {
+export function LineChart({ runs, valueKey, better = 'low', formatY, height = 210 }) {
   const gid = useId().replace(/[^a-zA-Z0-9]/g, '');
-  const { series, minX, maxX, minY, maxY } = useMemo(() => {
+  const { series, minX, maxX, loY, hiY } = useMemo(() => {
     const pts = runs.filter((r) => isNum(r[valueKey]) && r.date);
     const byTrack = new Map();
     for (const r of pts) {
@@ -19,6 +20,9 @@ export function LineChart({ runs, valueKey, formatY, height = 190 }) {
     }
     const all = pts.map((r) => r[valueKey]);
     const xs = [...byTrack.values()].flat().map((p) => p.x);
+    const rawMin = Math.min(...all);
+    const rawMax = Math.max(...all);
+    const pad = (rawMax - rawMin || Math.abs(rawMin) * 0.05 || 1) * 0.12;
     return {
       series: [...byTrack.entries()].map(([track, p], i) => ({
         track,
@@ -27,8 +31,8 @@ export function LineChart({ runs, valueKey, formatY, height = 190 }) {
       })),
       minX: Math.min(...xs),
       maxX: Math.max(...xs),
-      minY: Math.min(...all),
-      maxY: Math.max(...all),
+      loY: rawMin - pad,
+      hiY: rawMax + pad,
     };
   }, [runs, valueKey]);
 
@@ -38,14 +42,24 @@ export function LineChart({ runs, valueKey, formatY, height = 190 }) {
 
   const W = 360;
   const H = height;
-  const pad = { l: 46, r: 10, t: 12, b: 24 };
+  const pad = { l: 46, r: 10, t: 16, b: 24 };
   const spanX = maxX - minX || 1;
-  const spanY = maxY - minY || 1;
+  const spanY = hiY - loY || 1;
   const X = (x) => pad.l + ((x - minX) / spanX) * (W - pad.l - pad.r);
-  const Y = (y) => pad.t + (1 - (y - minY) / spanY) * (H - pad.t - pad.b);
+  const Y = (y) => pad.t + (1 - (y - loY) / spanY) * (H - pad.t - pad.b);
   const baseY = H - pad.b;
 
-  const ticks = [0, 0.5, 1].map((f) => minY + f * spanY);
+  const ticks = [0, 0.5, 1].map((f) => loY + f * spanY);
+
+  // best point across all series (for the callout)
+  let bestPt = null;
+  for (const s of series) {
+    for (const p of s.pts) {
+      if (!bestPt || (better === 'low' ? p.y < bestPt.y : p.y > bestPt.y)) {
+        bestPt = { ...p, color: s.color, track: s.track };
+      }
+    }
+  }
 
   return (
     <div>
@@ -53,7 +67,7 @@ export function LineChart({ runs, valueKey, formatY, height = 190 }) {
         <defs>
           {series.map((s, i) => (
             <linearGradient key={i} id={`${gid}-g${i}`} x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor={s.color} stopOpacity="0.28" />
+              <stop offset="0%" stopColor={s.color} stopOpacity="0.30" />
               <stop offset="100%" stopColor={s.color} stopOpacity="0" />
             </linearGradient>
           ))}
@@ -76,7 +90,7 @@ export function LineChart({ runs, valueKey, formatY, height = 190 }) {
                 points={line}
                 fill="none"
                 stroke={s.color}
-                strokeWidth="2.25"
+                strokeWidth="2.5"
                 strokeLinejoin="round"
                 strokeLinecap="round"
               />
@@ -88,6 +102,22 @@ export function LineChart({ runs, valueKey, formatY, height = 190 }) {
             </g>
           );
         })}
+        {bestPt && (
+          <g>
+            <circle cx={X(bestPt.x)} cy={Y(bestPt.y)} r="7" fill="none" stroke={bestPt.color} strokeWidth="1.5" opacity="0.7" />
+            <text
+              x={Math.min(Math.max(X(bestPt.x), pad.l + 30), W - pad.r - 30)}
+              y={Y(bestPt.y) - 12}
+              textAnchor="middle"
+              fontSize="11"
+              fontWeight="700"
+              fill={bestPt.color}
+              fontFamily="'JetBrains Mono', monospace"
+            >
+              ★ {formatY(bestPt.y)}
+            </text>
+          </g>
+        )}
         <text x={pad.l} y={H - 7} fontSize="10" fill="#ffffff" opacity="0.4" fontFamily="'JetBrains Mono', monospace">
           {fmtDate(new Date(minX).toISOString().slice(0, 10))}
         </text>
