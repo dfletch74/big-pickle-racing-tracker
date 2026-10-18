@@ -96,11 +96,19 @@ export default function TrackDay({ state, update, toast, dist, setDist, onAddRun
           <Btn kind="ghost" onClick={loadWx} disabled={wxBusy} className="!py-1.5 text-xs">{wxBusy ? '…' : 'Refresh'}</Btn>
         </div>
         {wxErr && <div className="mb-2 text-xs text-amber-300">Live weather unavailable ({wxErr}).</div>}
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-3 gap-2">
           <Field label="Temp °F"><input type="number" value={manual.tempF} onChange={(e) => setManual({ ...manual, tempF: e.target.value })} className={inputCls} /></Field>
           <Field label="Humidity %"><input type="number" value={manual.humidity} onChange={(e) => setManual({ ...manual, humidity: e.target.value })} className={inputCls} /></Field>
+          <Field label="Est. DA">
+            <div className={`flex h-[42px] items-center rounded-xl border border-white/10 bg-white/[0.03] px-3 font-mono text-sm font-bold ${manualDA != null ? 'text-pickle-400' : 'text-white/25'}`}>
+              {manualDA != null ? fmtDA(manualDA) : '—'}
+            </div>
+          </Field>
         </div>
-        <div className="mt-1 text-[11px] text-white/40">Manual entries override live weather for the predictor below.</div>
+        <div className="mt-1 text-[11px] text-white/40">
+          Manual entries override live weather for the predictor below.
+          {manualTemp != null && manualDA == null && ' Add the track\'s elevation (Tracks → Manage → Edit) to enable the DA estimate.'}
+        </div>
         {live && (
           <div className="grid grid-cols-3 gap-2 text-center">
             <div><div className="font-mono text-xl font-bold">{fmtTemp(live.tempF)}</div><div className="text-[10px] text-white/45">TEMP</div></div>
