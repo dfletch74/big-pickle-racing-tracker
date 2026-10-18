@@ -355,11 +355,11 @@ function Split({ label, value, rank, accent }) {
 
 function PBRow({ label, run, text }) {
   return (
-    <div className="flex items-center justify-between border-t border-white/5 py-2 text-sm first:border-0">
-      <span className="text-white/60">{label}</span>
-      <span className="font-mono">
-        <b>{text}</b>
-        {run && <span className="ml-2 text-[11px] text-white/40">{run.track} · {fmtDate(run.date)}</span>}
+    <div className="grid grid-cols-[76px_88px_minmax(0,1fr)] items-baseline gap-x-3 border-t border-white/5 py-2 text-sm first:border-0">
+      <span className="truncate text-[13px] font-medium text-white/55">{label}</span>
+      <span className="text-right font-mono text-[15px] font-bold tabular-nums text-white">{text}</span>
+      <span className="truncate text-right text-[11px] text-white/35">
+        {run ? `${run.track} · ${fmtDate(run.date)}` : ''}
       </span>
     </div>
   );
@@ -425,9 +425,10 @@ function PbByTrack({ runs, scopeLabel }) {
         const best = tr.reduce((a, b) => (lower ? (b[key] < a[key] ? b : a) : (b[key] > a[key] ? b : a)));
         const val = tab === 'et' ? fmtET(best.et) : tab === 'mph' ? fmtMPH(best.mph) : fmtRT(best.rt);
         return (
-          <div key={t} className="flex items-center justify-between border-t border-white/5 py-2 text-sm first:border-0">
-            <span className="font-medium text-white/75">{t}</span>
-            <span className="font-mono"><b className="text-pickle-400">{val}</b> <span className="ml-2 text-[11px] text-white/40">{fmtDate(best.date)}</span></span>
+          <div key={t} className="grid grid-cols-[minmax(0,1fr)_88px_auto] items-baseline gap-x-3 border-t border-white/5 py-2 text-sm first:border-0">
+            <span className="truncate font-medium text-white/75">{t}</span>
+            <span className="text-right font-mono text-[15px] font-bold tabular-nums text-white">{val}</span>
+            <span className="text-right text-[11px] tabular-nums text-white/35">{fmtDate(best.date)}</span>
           </div>
         );
       })}
