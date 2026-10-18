@@ -11,34 +11,20 @@ export default function Dash({ state, onAddRun, onImport, onSeeRuns }) {
   const car = state.cars.find((c) => c.id === state.activeCarId);
   const allRuns = useMemo(() => runsForCar(state, state.activeCarId), [state]);
 
-  // Dashboard-local distance scope, defaulting to All.
-  const [dist, setDist] = useState('all');
-
-  // Distance scope: 'all' | '1/4' | '1/8' — everything below follows it.
-  const distRuns = useMemo(() => filterDistance(allRuns, dist), [allRuns, dist]);
-
-  // Year scope: 'all' or a year with runs. Defaults to the current year.
-  const years = useMemo(
-    () => [...new Set(distRuns.map((r) => (r.date || '').slice(0, 4)).filter(Boolean))].sort().reverse(),
-    [distRuns],
-  );
   const curYear = String(new Date().getFullYear());
-  const [yearSel, setYearSel] = useState(null); // null = auto (current year)
-  const year = yearSel ?? (years.includes(curYear) ? curYear : 'all');
 
-  const runs = useMemo(
-    () => (year === 'all' ? distRuns : distRuns.filter((r) => (r.date || '').startsWith(year))),
-    [distRuns, year],
-  );
+  // Time scope: 'all' (every logged run) or the current year. Distance: '1/4' | '1/8'.
+  // Everything on the dashboard follows both selectors.
+  const [timeScope, setTimeScope] = useState('year');
+  const [dist, setDist] = useState('1/4');
 
-  // Dominant distance in scope — keeps ET-based stats apples-to-apples when dist === 'all'.
-  const domDist = useMemo(() => {
-    if (dist !== 'all') return dist;
-    const q = runs.filter((r) => r.distance === '1/4').length;
-    const e = runs.filter((r) => r.distance === '1/8').length;
-    return e > q ? '1/8' : '1/4';
-  }, [runs, dist]);
-  const domRuns = useMemo(() => runs.filter((r) => r.distance === domDist), [runs, domDist]);
+  const runs = useMemo(() => {
+    const scoped = filterDistance(allRuns, dist);
+    return timeScope === 'all' ? scoped : scoped.filter((r) => (r.date || '').startsWith(curYear));
+  }, [allRuns, dist, timeScope, curYear]);
+
+  const scopeLabel = `${dist} mi · ${timeScope === 'all' ? 'All runs' : curYear}`;
+  const distLabel = `${dist} mi`;
 
   const pb = useMemo(() => personalBests(runs), [runs]);
   const last = useMemo(() => latestRun(runs), [runs]);
@@ -48,44 +34,43 @@ export default function Dash({ state, onAddRun, onImport, onSeeRuns }) {
   const elimWL = useMemo(() => {
     let w = 0, l = 0;
     for (const ev of state.events || []) {
-      if (year !== 'all' && !(ev.date || '').startsWith(year)) continue;
-      if (dist !== 'all' && ev.distance !== dist) continue;
+      if (timeScope === 'year' && !(ev.date || '').startsWith(curYear)) continue;
+      if (ev.distance !== dist) continue;
       for (const r of ev.rounds || []) {
         if (r.result === 'W') w++;
         else if (r.result === 'L') l++;
       }
     }
     return { w, l, rate: w + l ? Math.round((w / (w + l)) * 100) : null };
-  }, [state.events, year, dist]);
+  }, [state.events, timeScope, curYear, dist]);
   const showWinRate = elimWL.w + elimWL.l > 0;
 
-  // Consistency: season (scoped) or last 5 runs, on the dominant distance.
+  // Consistency: season (scoped) or last 5 runs.
   const [conMode, setConMode] = useState('season'); // season | last5
   const conRuns = useMemo(() => {
-    if (conMode !== 'last5') return domRuns;
-    return [...domRuns]
+    if (conMode !== 'last5') return runs;
+    return [...runs]
       .sort((a, b) => (b.date || '').localeCompare(a.date || '') || b.createdAt - a.createdAt)
       .slice(0, 5);
-  }, [domRuns, conMode]);
+  }, [runs, conMode]);
   const con = useMemo(() => consistency(conRuns), [conRuns]);
 
-  // ET improvement: avg of first 3 vs avg of last 3 (dominant distance).
+  // ET improvement: avg of first 3 vs avg of last 3.
   const etImprovement = useMemo(() => {
-    const s = domRuns.filter((r) => isNum(r.et)).sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+    const s = runs.filter((r) => isNum(r.et)).sort((a, b) => (a.date || '').localeCompare(b.date || ''));
     if (s.length < 5) return null;
     const first = avg(s.slice(0, 3).map((r) => r.et));
     const lastAvg = avg(s.slice(-3).map((r) => r.et));
     const d = first - lastAvg; // positive = faster now
     if (Math.abs(d) < 0.001) return null;
     return d > 0 ? { text: `−${d.toFixed(3)}s improvement`, good: true } : { text: `+${Math.abs(d).toFixed(3)}s slower`, good: false };
-  }, [domRuns]);
+  }, [runs]);
 
   const bestETOf = (d) => {
     const p = runs.filter((r) => r.distance === d && isNum(r.et));
     return p.length ? p.reduce((a, b) => (b.et < a.et ? b : a)) : null;
   };
-  const heroQuarter = bestETOf('1/4');
-  const heroEighth = bestETOf('1/8');
+  const heroBest = bestETOf(dist);
 
   const sessions = useMemo(() => {
     const byDay = new Map();
@@ -127,14 +112,12 @@ export default function Dash({ state, onAddRun, onImport, onSeeRuns }) {
   }
 
   const lastRanks = last ? {
-    et: rankOf(domRuns, last, 'et', true),
-    mph: rankOf(domRuns, last, 'mph', false),
-    sixty: rankOf(domRuns, last, 'sixty', true),
-    rt: rankOf(domRuns.filter((r) => isNum(r.rt) && r.rt >= 0), last, 'rt', true),
+    et: rankOf(runs, last, 'et', true),
+    mph: rankOf(runs, last, 'mph', false),
+    sixty: rankOf(runs, last, 'sixty', true),
+    rt: rankOf(runs.filter((r) => isNum(r.rt) && r.rt >= 0), last, 'rt', true),
   } : null;
 
-  const scopeLabel = `${dist === 'all' ? 'All distances' : dist + ' mi'} · ${year === 'all' ? 'All years' : year}`;
-  const distLabel = dist === 'all' ? 'All runs' : `${dist} mi`;
 
   return (
     <div className="space-y-4">
@@ -148,15 +131,30 @@ export default function Dash({ state, onAddRun, onImport, onSeeRuns }) {
             {[car?.year, car?.make, car?.model].filter(Boolean).join(' · ')}
           </div>
         </div>
-        <Segmented
-          value={dist}
-          onChange={setDist}
-          options={[
-            { value: 'all', label: 'All' },
-            { value: '1/4', label: '1/4 mi' },
-            { value: '1/8', label: '1/8 mi' },
-          ]}
-        />
+        <div className="flex flex-wrap items-end gap-3">
+          <div>
+            <div className="mb-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-white/40">Time</div>
+            <Segmented
+              value={timeScope}
+              onChange={setTimeScope}
+              options={[
+                { value: 'all', label: 'All' },
+                { value: 'year', label: curYear },
+              ]}
+            />
+          </div>
+          <div>
+            <div className="mb-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-white/40">Distance</div>
+            <Segmented
+              value={dist}
+              onChange={setDist}
+              options={[
+                { value: '1/4', label: '1/4 mi' },
+                { value: '1/8', label: '1/8 mi' },
+              ]}
+            />
+          </div>
+        </div>
       </div>
 
       {runs.length === 0 ? (
@@ -164,7 +162,7 @@ export default function Dash({ state, onAddRun, onImport, onSeeRuns }) {
           title="No runs in view"
           body={`Nothing logged for ${scopeLabel.toLowerCase()} yet.`}
           action={<div className="flex justify-center gap-2">
-            <Btn kind="ghost" onClick={() => { setYearSel('all'); setDist('all'); }}>Clear filters</Btn>
+            <Btn kind="ghost" onClick={() => { setTimeScope('year'); setDist('1/4'); }}>Clear filters</Btn>
           </div>}
         />
       ) : (
@@ -176,14 +174,7 @@ export default function Dash({ state, onAddRun, onImport, onSeeRuns }) {
               <div className="font-display text-[15px] font-semibold uppercase tracking-[0.2em] text-white/50">
                 Best ET · {scopeLabel}
               </div>
-              {dist === 'all' && heroQuarter && heroEighth ? (
-                <div className="mt-2 grid grid-cols-2 gap-3">
-                  <HeroET label="1/4 mile" run={heroQuarter} />
-                  <HeroET label="1/8 mile" run={heroEighth} />
-                </div>
-              ) : (
-                <HeroET label={dist === 'all' ? domDist + ' mile' : null} run={dist === 'all' ? (domDist === '1/4' ? heroQuarter : heroEighth) : bestETOf(dist)} big />
-              )}
+              <HeroET label={`${dist} mile`} run={heroBest} big />
             </div>
           </Card>
 
@@ -206,7 +197,7 @@ export default function Dash({ state, onAddRun, onImport, onSeeRuns }) {
           <Card>
             <div className="mb-2.5 flex items-center justify-between gap-2">
               <h2 className="font-display text-[17px] font-bold uppercase tracking-[0.14em] text-white/55">
-                Consistency · {year === 'all' ? 'All years' : year}
+                Consistency · {timeScope === 'all' ? 'All runs' : curYear} · {dist} mi
               </h2>
               <Segmented
                 value={conMode}
@@ -229,7 +220,7 @@ export default function Dash({ state, onAddRun, onImport, onSeeRuns }) {
                   </div>
                 </div>
                 <div className="mt-2 text-[11px] text-white/40">
-                  {conMode === 'last5' ? 'Last 5 runs' : `${year === 'all' ? 'All years' : year} season`} · {domDist} mi · avg ET {con.avgET.toFixed(3)}s over {con.n} runs.
+                  {conMode === 'last5' ? 'Last 5 runs' : `${timeScope === 'all' ? 'All runs' : curYear} season`} · {dist} mi · avg ET {con.avgET.toFixed(3)}s over {con.n} runs.
                 </div>
               </>
             ) : (
@@ -254,9 +245,8 @@ export default function Dash({ state, onAddRun, onImport, onSeeRuns }) {
           {/* season performance */}
           <PerfCard
             title="Season Performance"
-            subtitle={`ET over time — ${domRuns.filter((r) => isNum(r.et)).length} runs`}
+            subtitle={`ET over time — ${runs.filter((r) => isNum(r.et)).length} runs`}
             improvement={etImprovement}
-            years={years} year={year} onYear={setYearSel}
           >
             <LineChart runs={runs} valueKey="et" invert formatY={(v) => v.toFixed(1)} distLabel={distLabel} />
           </PerfCard>
@@ -264,8 +254,7 @@ export default function Dash({ state, onAddRun, onImport, onSeeRuns }) {
           {/* speed progression */}
           <PerfCard
             title="Speed Progression"
-            subtitle={`MPH over time — ${domRuns.filter((r) => isNum(r.mph)).length} runs`}
-            years={years} year={year} onYear={setYearSel}
+            subtitle={`MPH over time — ${runs.filter((r) => isNum(r.mph)).length} runs`}
           >
             <LineChart runs={runs} valueKey="mph" formatY={(v) => v.toFixed(0)} distLabel={distLabel} />
           </PerfCard>
@@ -379,7 +368,7 @@ function PBRow({ label, run, text }) {
 }
 
 /** Chart card matching the reference: title + improvement, subtitle, year chips, chart, legend. */
-function PerfCard({ title, subtitle, improvement, years, year, onYear, children }) {
+function PerfCard({ title, subtitle, improvement, children }) {
   return (
     <Card className="!border-white/[0.07] !bg-[#12141a]">
       <div className="mb-1 flex items-start justify-between gap-2">
@@ -393,29 +382,8 @@ function PerfCard({ title, subtitle, improvement, years, year, onYear, children 
         )}
       </div>
       <div className="mb-3 text-[15px] text-white/40">{subtitle}</div>
-      <div className="mb-4">
-        <YearChips years={years} value={year} onChange={onYear} />
-      </div>
       {children}
     </Card>
-  );
-}
-
-function YearChips({ years, value, onChange }) {
-  return (
-    <div className="flex flex-wrap gap-2">
-      {['all', ...years].map((y) => (
-        <button
-          key={y}
-          onClick={() => onChange(y === 'all' ? 'all' : y)}
-          className={`rounded-xl px-4 py-2 font-mono text-sm font-semibold transition active:scale-95 ${
-            value === y ? 'bg-pickle-400 text-black shadow-glow' : 'bg-white/[0.07] text-white/50 hover:bg-white/[0.12] hover:text-white'
-          }`}
-        >
-          {y === 'all' ? 'All' : y}
-        </button>
-      ))}
-    </div>
   );
 }
 
