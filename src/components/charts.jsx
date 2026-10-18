@@ -4,16 +4,17 @@ import { isNum, fmtDate } from '../lib/format';
 const TRACK_COLORS = ['#a3e635', '#38bdf8', '#f472b6', '#fbbf24', '#c084fc', '#fb7185'];
 
 /**
- * Season-style chart: one dot per run in date order, dashed connector,
- * y gridlines dashed, solid axes, ~5 date ticks. `invert` puts higher
- * numbers at the top (used for ET: slower = higher = top).
+ * Season-style chart: one dot per run in RUN ORDER (evenly spaced — no
+ * timeline gaps), dashed connector, dashed y gridlines, solid axes,
+ * date labels sampled across the runs. `invert` puts higher numbers at
+ * the top (used for ET: slower = higher = top).
  */
 export function LineChart({ runs, valueKey, invert = false, formatY, height = 240, distLabel }) {
-  const { pts, minX, maxX, loY, hiY, tracks } = useMemo(() => {
+  const { pts, loY, hiY, tracks } = useMemo(() => {
     const list = runs
       .filter((r) => isNum(r[valueKey]) && r.date)
       .map((r) => ({ x: new Date(`${r.date}T12:00:00`).getTime(), y: r[valueKey], run: r }))
-      .sort((a, b) => a.x - b.x);
+      .sort((a, b) => a.x - b.x || a.run.createdAt - b.run.createdAt);
     if (!list.length) return { pts: [], tracks: [] };
     const ys = list.map((p) => p.y);
     const rawMin = Math.min(...ys);
@@ -21,8 +22,6 @@ export function LineChart({ runs, valueKey, invert = false, formatY, height = 24
     const padY = (rawMax - rawMin || Math.abs(rawMin) * 0.05 || 1) * 0.15;
     return {
       pts: list,
-      minX: Math.min(...list.map((p) => p.x)),
-      maxX: Math.max(...list.map((p) => p.x)),
       loY: rawMin - padY,
       hiY: rawMax + padY,
       tracks: [...new Set(list.map((p) => p.run.track))],
@@ -38,16 +37,18 @@ export function LineChart({ runs, valueKey, invert = false, formatY, height = 24
   const W = 360;
   const H = height;
   const pad = { l: 44, r: 8, t: 12, b: 28 };
-  const spanX = maxX - minX || 1;
+  const n = pts.length;
   const spanY = hiY - loY || 1;
-  const X = (x) => pad.l + ((x - minX) / spanX) * (W - pad.l - pad.r);
+  // run-order x: evenly spaced, immune to date gaps
+  const X = (i) => pad.l + (n === 1 ? 0.5 : i / (n - 1)) * (W - pad.l - pad.r);
   const Y = invert
     ? (y) => pad.t + ((y - loY) / spanY) * (H - pad.t - pad.b)
     : (y) => pad.t + (1 - (y - loY) / spanY) * (H - pad.t - pad.b);
   const baseY = H - pad.b;
 
   const yTicks = [0, 1 / 3, 2 / 3, 1].map((f) => loY + f * spanY);
-  const xTicks = [0, 0.25, 0.5, 0.75, 1].map((f) => minX + f * spanX);
+  // sample ~5 run dates for x labels
+  const xIdx = [...new Set([0, 0.25, 0.5, 0.75, 1].map((f) => Math.round(f * (n - 1))))];
   const fmtX = (t) => {
     const d = new Date(t);
     const mm = String(d.getMonth() + 1).padStart(2, '0');
@@ -55,7 +56,7 @@ export function LineChart({ runs, valueKey, invert = false, formatY, height = 24
     return `${mm}/${dd}/${String(d.getFullYear()).slice(2)}`;
   };
 
-  const line = pts.map((p) => `${X(p.x).toFixed(1)},${Y(p.y).toFixed(1)}`).join(' ');
+  const line = pts.map((p, i) => `${X(i).toFixed(1)},${Y(p.y).toFixed(1)}`).join(' ');
 
   return (
     <div>
@@ -70,15 +71,15 @@ export function LineChart({ runs, valueKey, invert = false, formatY, height = 24
         ))}
         <line x1={pad.l} x2={pad.l} y1={pad.t - 4} y2={baseY} stroke="#3a3f47" strokeWidth="1.5" />
         <line x1={pad.l} x2={W - pad.r} y1={baseY} y2={baseY} stroke="#3a3f47" strokeWidth="1.5" />
-        {xTicks.map((t, i) => (
-          <text key={i} x={X(t)} y={baseY + 19} textAnchor="middle" fontSize="10.5" fill="#9aa0aa" fontFamily="'JetBrains Mono', monospace">
-            {fmtX(t)}
+        {xIdx.map((i) => (
+          <text key={i} x={X(i)} y={baseY + 19} textAnchor="middle" fontSize="10.5" fill="#9aa0aa" fontFamily="'JetBrains Mono', monospace">
+            {fmtX(pts[i].x)}
           </text>
         ))}
         <polyline points={line} fill="none" stroke="#ffffff" strokeOpacity="0.35" strokeWidth="1.5" strokeDasharray="5 4" />
         {pts.map((p, i) => (
-          <circle key={i} cx={X(p.x)} cy={Y(p.y)} r="5" fill={colorOf(p.run.track)}>
-            <title>{`${p.run.track} · ${fmtDate(p.run.date)} · ${p.run.distance} · ${formatY(p.y)}`}</title>
+          <circle key={i} cx={X(i)} cy={Y(p.y)} r="5" fill={colorOf(p.run.track)}>
+            <title>{`Run ${i + 1} · ${p.run.track} · ${fmtDate(p.run.date)} · ${p.run.distance} · ${formatY(p.y)}`}</title>
           </circle>
         ))}
       </svg>

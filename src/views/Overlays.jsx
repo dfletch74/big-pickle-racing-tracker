@@ -12,43 +12,57 @@ export function GarageModal({ state, update, toast, onClose }) {
   const [editingId, setEditingId] = useState(null);
 
   const save = () => {
-    if (!form.name.trim()) { toast('Give the car a name.'); return; }
+    const name = form.name.trim();
+    if (!name) { toast('Give the car a name.', 'error'); return; }
+    const wasEditing = !!editingId;
+    const id = editingId || uid();
     update((s) => {
-      if (editingId) {
-        const c = s.cars.find((x) => x.id === editingId);
-        Object.assign(c, { name: form.name.trim(), year: form.year.trim(), make: form.make.trim(), model: form.model.trim() });
+      if (wasEditing) {
+        const c = s.cars.find((x) => x.id === id);
+        if (c) Object.assign(c, { name, year: form.year.trim(), make: form.make.trim(), model: form.model.trim() });
       } else {
-        s.cars.push({ id: uid(), name: form.name.trim(), year: form.year.trim(), make: form.make.trim(), model: form.model.trim() });
+        s.cars.push({ id, name, year: form.year.trim(), make: form.make.trim(), model: form.model.trim() });
+        // A new car starts clean and becomes active — its runs, setups and
+        // analysis are fully separate from the other cars.
+        s.activeCarId = id;
       }
     });
     setForm({ name: '', year: '', make: '', model: '' });
     setEditingId(null);
-    toast(editingId ? 'Car updated.' : 'Car added.');
+    toast(wasEditing ? 'Car updated.' : `Car added — switched to ${name}.`);
+  };
+
+  const cancelEdit = () => {
+    setEditingId(null);
+    setForm({ name: '', year: '', make: '', model: '' });
   };
 
   const remove = (id) => {
     const n = runsForCar(state, id).length;
-    if (n > 0) { toast(`That car has ${n} runs — delete its runs first.`); return; }
-    if (state.cars.length === 1) { toast('You need at least one car.'); return; }
+    if (n > 0) { toast(`That car has ${n} runs — delete its runs first.`, 'error'); return; }
+    if (state.cars.length === 1) { toast('You need at least one car.', 'error'); return; }
     if (!window.confirm('Delete this car?')) return;
     update((s) => {
       s.cars = s.cars.filter((c) => c.id !== id);
       if (s.activeCarId === id) s.activeCarId = s.cars[0].id;
     });
+    toast('Car deleted.');
   };
 
   return (
     <Modal title="Garage" onClose={onClose} wide>
-      <div className="mb-2 text-xs text-white/45">Runs, setups and analysis are scoped per car.</div>
+      <div className="mb-2 text-xs text-white/45">
+        Every car keeps its own runs, setups and analysis — switching cars switches all numbers on every screen.
+      </div>
       <div className="space-y-2">
         {state.cars.map((c) => (
-          <div key={c.id} className={`flex items-center justify-between rounded-xl border p-3 ${c.id === state.activeCarId ? 'border-pickle-500/50 bg-pickle-500/5' : 'border-white/10'}`}>
-            <div>
+          <div key={c.id} className={`flex items-center justify-between gap-2 rounded-xl border p-3 ${c.id === state.activeCarId ? 'border-pickle-500/50 bg-pickle-500/5' : 'border-white/10'}`}>
+            <div className="min-w-0">
               <div className="font-bold">{c.name} {c.id === state.activeCarId && <Badge tone="green">ACTIVE</Badge>}</div>
               <div className="text-xs text-white/45">{[c.year, c.make, c.model].filter(Boolean).join(' ')} · {runsForCar(state, c.id).length} runs</div>
             </div>
-            <div className="flex gap-1.5">
-              {c.id !== state.activeCarId && <Btn kind="ghost" onClick={() => { update((s) => { s.activeCarId = c.id; }); toast(`Switched to ${c.name}.`); }} className="!py-1.5 text-xs">Use</Btn>}
+            <div className="flex shrink-0 gap-1.5">
+              {c.id !== state.activeCarId && <Btn kind="ghost" onClick={() => { update((s) => { s.activeCarId = c.id; }); toast(`Switched to ${c.name} — all screens now show its numbers.`); }} className="!py-1.5 text-xs">Use</Btn>}
               <Btn kind="quiet" onClick={() => { setEditingId(c.id); setForm({ name: c.name, year: c.year, make: c.make, model: c.model }); }} className="!py-1.5 text-xs">Edit</Btn>
               <Btn kind="quiet" onClick={() => remove(c.id)} className="!py-1.5 text-xs text-red-400/80">Delete</Btn>
             </div>
@@ -56,14 +70,15 @@ export function GarageModal({ state, update, toast, onClose }) {
         ))}
       </div>
       <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
-        <Field label="Name *"><input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className={inputCls} placeholder="Big Pickle" /></Field>
-        <Field label="Year"><input value={form.year} onChange={(e) => setForm({ ...form, year: e.target.value })} className={inputCls} /></Field>
-        <Field label="Make"><input value={form.make} onChange={(e) => setForm({ ...form, make: e.target.value })} className={inputCls} /></Field>
-        <Field label="Model"><input value={form.model} onChange={(e) => setForm({ ...form, model: e.target.value })} className={inputCls} /></Field>
+        <Field label="Name *"><input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className={inputCls} placeholder="Big Pickle" autoComplete="off" /></Field>
+        <Field label="Year"><input value={form.year} onChange={(e) => setForm({ ...form, year: e.target.value })} className={inputCls} autoComplete="off" /></Field>
+        <Field label="Make"><input value={form.make} onChange={(e) => setForm({ ...form, make: e.target.value })} className={inputCls} autoComplete="off" /></Field>
+        <Field label="Model"><input value={form.model} onChange={(e) => setForm({ ...form, model: e.target.value })} className={inputCls} autoComplete="off" /></Field>
       </div>
-      <div className="mt-2 flex gap-2">
-        <Btn onClick={save}>{editingId ? 'Save car' : 'Add car'}</Btn>
-        {editingId && <Btn kind="ghost" onClick={() => { setEditingId(null); setForm({ name: '', year: '', make: '', model: '' }); }}>Cancel</Btn>}
+      {/* sticky action bar — always tappable, even with the keyboard open */}
+      <div className="sticky bottom-0 -mx-5 -mb-5 mt-4 flex gap-2 border-t border-white/10 bg-coal-900/95 px-5 py-4 backdrop-blur">
+        <Btn onClick={save} className="flex-1 !py-3 text-base">{editingId ? 'Save car' : 'Add car'}</Btn>
+        {editingId && <Btn kind="ghost" onClick={cancelEdit}>Cancel</Btn>}
       </div>
     </Modal>
   );
@@ -245,9 +260,12 @@ export function SettingsModal({ state, update, reset, toast, onClose }) {
     downloadFile(`big-pickle-backup-${new Date().toISOString().slice(0, 10)}.json`, JSON.stringify(state, null, 2), 'application/json');
     toast('Full backup downloaded (JSON).');
   };
+  const car = state.cars.find((c) => c.id === state.activeCarId);
   const exportCSV = () => {
-    downloadFile(`big-pickle-runs-${new Date().toISOString().slice(0, 10)}.csv`, runsToCSV(state.runs));
-    toast(`Exported ${state.runs.length} runs to CSV.`);
+    // Per-car separation: CSV exports the active car's runs only.
+    const carRuns = runsForCar(state, state.activeCarId);
+    downloadFile(`big-pickle-runs-${new Date().toISOString().slice(0, 10)}.csv`, runsToCSV(carRuns));
+    toast(`Exported ${carRuns.length} runs (${car?.name || 'car'}) to CSV.`);
   };
 
   return (
