@@ -4,6 +4,7 @@ import { uid, makeDemoState } from '../lib/store';
 import { runsForCar } from '../lib/stats';
 import { runsToCSV, downloadFile } from '../lib/io';
 import { syncTeamData, teamCsvUrl, teamSyncOnOpen, TEAM_CSV_DEFAULT_URL } from '../lib/teamSync';
+import { APP_VERSION } from '../version';
 import { fmtET, fmtMPH, fmtRT, fmtTemp, fmtDA, fmtDate, isNum } from '../lib/format';
 
 /* ---------------- Garage ---------------- */
@@ -562,7 +563,7 @@ export function SettingsModal({ state, update, reset, toast, onClose }) {
     onClose();
   };
   const clearAll = () => {
-    if (!window.confirm('Delete ALL runs, notes, events and racers? The car and tracks stay.')) return;
+    if (!window.confirm('Delete ALL runs, notes, events and racers from THIS DEVICE? The car and tracks stay. The GitHub team sheet is not touched.')) return;
     update((s) => { s.runs = []; s.trackNotes = []; s.events = []; s.presets = []; s.racers.forEach((r) => { r.attempts = []; }); });
     toast('All data cleared.');
   };
@@ -649,10 +650,12 @@ export function SettingsModal({ state, update, reset, toast, onClose }) {
       </div>
       <SectionTitle>Demo data</SectionTitle>
       <div className="mb-4 rounded-xl border border-amber-500/30 bg-amber-500/5 p-3 text-xs text-amber-200/90">
-        Demo data is 36 clearly-synthetic runs for trying the app. Loading it <b>replaces</b> your current data. Remove it anytime with "Clear all data".
+        Demo data is ~36 clearly-fake runs (2025–2026, 3 tracks) for trying the app's charts and predictors.
+        Loading it <b>replaces</b> everything currently on this device. Remove it anytime with "Clear all data".
       </div>
       <div className="mb-4"><Btn kind="ghost" onClick={loadDemo}>Load demo data</Btn></div>
       <SectionTitle>Danger zone</SectionTitle>
+      <div className="mb-2 text-xs text-white/50">Clear all data wipes this device's local data only — the GitHub team sheet is never touched.</div>
       <Btn kind="ghost" onClick={clearAll} className="!border-red-500/40 !text-red-300">Clear all data</Btn>
       <div className="mt-6 text-[11px] text-white/35">
         Local-first: everything lives in this browser's localStorage. No account, no server, no tracking.
@@ -661,7 +664,7 @@ export function SettingsModal({ state, update, reset, toast, onClose }) {
         air-density-ratio model (documented in src/lib/physics.js) — directionally correct: thinner air = slower.
       </div>
       <div className="mt-3 flex items-center justify-between rounded-xl border border-white/[0.07] bg-white/[0.02] px-3 py-2.5">
-        <span className="font-mono text-[11px] text-white/40">Build {current.slice(0, 7)}</span>
+        <span className="font-mono text-[11px] text-white/40">v{APP_VERSION} <span className="text-white/25">({current.slice(0, 7)})</span></span>
         <Btn kind="ghost" onClick={checkForUpdate} disabled={checking} className="!py-1.5 text-xs">
           {checking ? 'Checking…' : 'Check for updates'}
         </Btn>
