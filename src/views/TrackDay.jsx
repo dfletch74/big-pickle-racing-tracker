@@ -1,17 +1,13 @@
-import { useEffect, useMemo, useState } from 'react';
-import { Card, SectionTitle, Btn, Field, inputCls, Segmented, Badge, EmptyState } from '../components/ui';
+import { useMemo, useState } from 'react';
+import { Card, SectionTitle, Btn, inputCls, Segmented, Badge, EmptyState } from '../components/ui';
 import { fmtET, fmtMPH, fmtTemp, fmtDA, fmtDate, isNum } from '../lib/format';
 import { runsForCar, filterDistance, latestRun, segmentSplits, bestSegments, predictET, cheatSheet, avg } from '../lib/stats';
-import { DA_BANDS, TEMP_BANDS, airTrendLabel, densityAltitudeFt, stationPressureHpa } from '../lib/physics';
-import { fetchTrackWeather } from '../lib/weather';
+import { DA_BANDS, TEMP_BANDS, airTrendLabel } from '../lib/physics';
+import { useWeatherEntry, WeatherEntryCard } from '../components/WeatherEntry';
 import { uid } from '../lib/store';
 
 export default function TrackDay({ state, update, toast, dist, setDist, onAddRun }) {
   const [trackId, setTrackId] = useState(state.tracks[0]?.id || '');
-  const [wx, setWx] = useState(null);
-  const [wxBusy, setWxBusy] = useState(false);
-  const [wxErr, setWxErr] = useState('');
-  const [manual, setManual] = useState({ tempF: '', humidity: '' });
   const [noteText, setNoteText] = useState('');
   const [showElims, setShowElims] = useState(false);
   const [showTracks, setShowTracks] = useState(false);
@@ -22,38 +18,12 @@ export default function TrackDay({ state, update, toast, dist, setDist, onAddRun
   const last = useMemo(() => latestRun(runs), [runs]);
   const baseline = state.settings.daBaseline;
 
-  const loadWx = async () => {
-    if (!track) return;
-    setWxBusy(true);
-    setWxErr('');
-    try {
-      const w = await fetchTrackWeather(track);
-      setWx(w);
-    } catch (e) {
-      setWxErr(e.message);
-    }
-    setWxBusy(false);
-  };
-
-  useEffect(() => { loadWx(); /* eslint-disable-next-line */ }, [trackId]);
-
-  const live = wx?.current || null;
-  const trend = wx && wx.hourly.length
-    ? airTrendLabel(live.daFt, wx.hourly[wx.hourly.length - 1].daFt)
+  const weather = useWeatherEntry(track);
+  const { live, effDA } = weather;
+  const trend = weather.wx && weather.hourly.length
+    ? airTrendLabel(live.daFt, weather.hourly[weather.hourly.length - 1].daFt)
     : null;
-  const nextHr = wx && wx.hourly.length ? wx.hourly[wx.hourly.length - 1] : null;
-
-  // Manual entries override live weather for the predictor (also the fallback when
-  // live is unavailable). DA is estimated from temp + track elevation, the same
-  // standard-pressure assumption the run logger uses.
-  const manualTemp = manual.tempF === '' ? null : Number(manual.tempF);
-  const manualHum = manual.humidity === '' ? null : Number(manual.humidity);
-  const manualDA = (() => {
-    if (manualTemp == null || track?.elevationFt == null) return null;
-    const p = stationPressureHpa(1013.25, track.elevationFt);
-    return Math.round(densityAltitudeFt({ tempF: manualTemp, humidityPct: manualHum ?? 0, pressureHpa: p }));
-  })();
-  const effDA = manualDA ?? live?.daFt ?? null;
+  const nextHr = weather.wx && weather.hourly.length ? weather.hourly[weather.hourly.length - 1] : null;
 
   const buildPass = useMemo(() => {
     if (!last) return null;
@@ -90,35 +60,10 @@ export default function TrackDay({ state, update, toast, dist, setDist, onAddRun
       </div>
 
       {/* live conditions */}
-      <Card>
-        <div className="mb-2 flex items-center justify-between">
-          <SectionTitle>Live conditions</SectionTitle>
-          <Btn kind="ghost" onClick={loadWx} disabled={wxBusy} className="!py-1.5 text-xs">{wxBusy ? '…' : 'Refresh'}</Btn>
-        </div>
-        {wxErr && <div className="mb-2 text-xs text-amber-300">Live weather unavailable ({wxErr}).</div>}
-        <div className="grid grid-cols-3 gap-2">
-          <Field label="Temp °F"><input type="number" value={manual.tempF} onChange={(e) => setManual({ ...manual, tempF: e.target.value })} className={inputCls} /></Field>
-          <Field label="Humidity %"><input type="number" value={manual.humidity} onChange={(e) => setManual({ ...manual, humidity: e.target.value })} className={inputCls} /></Field>
-          <Field label="Est. DA">
-            <div className={`flex h-[42px] items-center rounded-xl border border-white/10 bg-white/[0.03] px-3 font-mono text-sm font-bold ${manualDA != null ? 'text-pickle-400' : 'text-white/25'}`}>
-              {manualDA != null ? fmtDA(manualDA) : '—'}
-            </div>
-          </Field>
-        </div>
-        <div className="mt-1 text-[11px] text-white/40">
-          Manual entries override live weather for the predictor below.
-          {manualTemp != null && manualDA == null && ' Add the track\'s elevation (Tracks → Manage → Edit) to enable the DA estimate.'}
-        </div>
-        {live && (
-          <div className="grid grid-cols-3 gap-2 text-center">
-            <div><div className="font-mono text-xl font-bold">{fmtTemp(live.tempF)}</div><div className="text-[10px] text-white/45">TEMP</div></div>
-            <div><div className="font-mono text-xl font-bold">{Math.round(live.humidity)}%</div><div className="text-[10px] text-white/45">HUMIDITY</div></div>
-            <div><div className="font-mono text-xl font-bold text-pickle-400">{fmtDA(live.daFt)}</div><div className="text-[10px] text-white/45">DENSITY ALT</div></div>
-          </div>
-        )}
+      <WeatherEntryCard title="Live conditions" weather={weather}>
         {trend && <div className="mt-2 text-center text-xs text-white/60">{trend}{nextHr && <> · next hr ≈ {fmtDA(nextHr.daFt)} ({fmtTemp(nextHr.tempF)})</>}</div>}
         <div className="mt-1 text-center text-[10px] text-white/35">Higher DA = thinner air = slower. Correcting to a lower DA gives a faster ET.</div>
-      </Card>
+      </WeatherEntryCard>
 
       {/* build the pass */}
       {last ? (

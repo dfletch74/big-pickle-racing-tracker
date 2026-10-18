@@ -1,45 +1,25 @@
-import { useEffect, useMemo, useState } from 'react';
-import { Card, SectionTitle, Btn, Field, inputCls, Segmented, Badge, EmptyState } from '../components/ui';
+import { useMemo, useState } from 'react';
+import { Card, SectionTitle, Segmented, Badge, EmptyState } from '../components/ui';
 import { fmtET, fmtTemp, fmtDA, fmtDate, isNum } from '../lib/format';
 import { runsForCar, filterDistance, latestRun, findSimilar, dialIn, rankSetups, crewChief, similarityPct, predictET } from '../lib/stats';
-import { fetchTrackWeather } from '../lib/weather';
+import { useWeatherEntry, WeatherEntryCard } from '../components/WeatherEntry';
 
 export default function Insight({ state, toast, dist, setDist }) {
   const [trackId, setTrackId] = useState(state.tracks[0]?.id || '');
-  const [cond, setCond] = useState({ tempF: '', humidity: '', daFt: '' });
-  const [wxBusy, setWxBusy] = useState(false);
   const baseline = state.settings.daBaseline;
 
   const track = state.tracks.find((t) => t.id === trackId) || state.tracks[0];
+  const weather = useWeatherEntry(track);
   const carRuns = useMemo(() => runsForCar(state, state.activeCarId), [state]);
   const runs = useMemo(() => filterDistance(carRuns, dist), [carRuns, dist]);
   const last = useMemo(() => latestRun(runs), [runs]);
 
   const target = {
-    tempF: cond.tempF === '' ? null : Number(cond.tempF),
-    humidity: cond.humidity === '' ? null : Number(cond.humidity),
-    daFt: cond.daFt === '' ? null : Number(cond.daFt),
+    tempF: weather.manualTemp,
+    humidity: weather.manualHum,
+    daFt: weather.effDA,
     distance: dist,
   };
-
-  const findMatching = async () => {
-    if (!track) return;
-    setWxBusy(true);
-    try {
-      const w = await fetchTrackWeather(track);
-      setCond({
-        tempF: w.current.tempF.toFixed(1),
-        humidity: String(Math.round(w.current.humidity)),
-        daFt: String(Math.round(w.current.daFt)),
-      });
-      toast(`Live conditions at ${track.name}: ${w.current.tempF.toFixed(1)}°F, DA ${fmtDA(w.current.daFt)}.`);
-    } catch (e) {
-      toast(`Weather fetch failed: ${e.message}`);
-    }
-    setWxBusy(false);
-  };
-
-  useEffect(() => { setCond({ tempF: '', humidity: '', daFt: '' }); }, [trackId, dist]);
 
   const similar = useMemo(
     () => (target.daFt != null ? findSimilar(runs, target) : []),
@@ -86,18 +66,7 @@ export default function Insight({ state, toast, dist, setDist }) {
         <Segmented value={dist} onChange={setDist} options={[{ value: '1/4', label: '1/4 mi' }, { value: '1/8', label: '1/8 mi' }]} />
       </div>
 
-      <Card>
-        <SectionTitle>Race conditions</SectionTitle>
-        <div className="grid grid-cols-3 gap-2">
-          <Field label="Temp °F"><input type="number" value={cond.tempF} onChange={(e) => setCond({ ...cond, tempF: e.target.value })} className={inputCls} /></Field>
-          <Field label="Humidity %"><input type="number" value={cond.humidity} onChange={(e) => setCond({ ...cond, humidity: e.target.value })} className={inputCls} /></Field>
-          <Field label="DA ft"><input type="number" value={cond.daFt} onChange={(e) => setCond({ ...cond, daFt: e.target.value })} className={inputCls} /></Field>
-        </div>
-        <div className="mt-2 flex gap-2">
-          <Btn kind="ghost" onClick={findMatching} disabled={wxBusy} className="!py-1.5 text-xs">{wxBusy ? 'Fetching…' : 'Find matching runs (live weather)'}</Btn>
-        </div>
-        <div className="mt-1 text-[11px] text-white/40">Or enter conditions manually. Predictions key off density altitude.</div>
-      </Card>
+      <WeatherEntryCard title="Race conditions" weather={weather} />
 
       {/* dial-in predictor */}
       <Card>
@@ -106,7 +75,7 @@ export default function Insight({ state, toast, dist, setDist }) {
           {dialShow && <Badge tone={confTone}>{dialShow.confidence} CONFIDENCE</Badge>}
         </div>
         {dialShow == null ? (
-          <div className="text-sm text-white/50">{target.daFt == null ? 'Enter a density altitude above to get a prediction.' : 'Log a run to get a prediction.'}</div>
+          <div className="text-sm text-white/50">{target.daFt == null ? 'Live weather or manual entries above will feed the prediction.' : 'Log a run to get a prediction.'}</div>
         ) : (
           <div>
             <div className="font-mono text-2xl font-black text-pickle-400">{dialShow.predicted.toFixed(3)}s</div>
