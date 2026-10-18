@@ -201,7 +201,7 @@ export function TreeSimModal({ state, update, toast, onClose }) {
   const [tree, setTree] = useState('500');
   const [mode, setMode] = useState('sportsman');
   const [showHelp, setShowHelp] = useState(false);
-  const [phase, setPhase] = useState('idle'); // idle|staged|holding|running|done
+  const [phase, setPhase] = useState('idle'); // idle|staged|running|done
   const [lit, setLit] = useState([]);
   const [lastRT, setLastRT] = useState(null);
   const timers = useRef([]);
@@ -217,26 +217,26 @@ export function TreeSimModal({ state, update, toast, onClose }) {
 
   const holdStart = () => {
     if (phase !== 'staged') return;
-    setPhase('holding');
-    // brief "ready" beat, then the tree runs
-    later(600, () => {
-      setPhase('running');
-      const d = TREE_DELAY[tree] * 1000;
-      const t0 = performance.now();
-      if (mode === 'sportsman') {
-        setLit(['pre', 'stage', 'a1']); later(d, () => setLit(['pre', 'stage', 'a1', 'a2'])); later(2 * d, () => setLit(['pre', 'stage', 'a1', 'a2', 'a3']));
-        greenAt.current = t0 + 3 * d;
-        later(3 * d, () => setLit((l) => [...l, 'green']));
-      } else {
-        setLit(['pre', 'stage', 'a1', 'a2', 'a3']);
-        greenAt.current = t0 + d;
-        later(d, () => setLit((l) => [...l, 'green']));
-      }
-    });
+    // Tree starts the instant you press — no dead zone. Release on green;
+    // releasing early is a red-light foul.
+    setPhase('running');
+    const d = TREE_DELAY[tree] * 1000;
+    const t0 = performance.now();
+    if (mode === 'sportsman') {
+      setLit(['pre', 'stage', 'a1']);
+      later(d, () => setLit(['pre', 'stage', 'a1', 'a2']));
+      later(2 * d, () => setLit(['pre', 'stage', 'a1', 'a2', 'a3']));
+      greenAt.current = t0 + 3 * d;
+      later(3 * d, () => setLit((l) => [...l, 'green']));
+    } else {
+      setLit(['pre', 'stage', 'a1', 'a2', 'a3']);
+      greenAt.current = t0 + d;
+      later(d, () => setLit((l) => [...l, 'green']));
+    }
   };
 
   const holdEnd = () => {
-    if (phase !== 'running') { if (phase === 'holding') { clearTimers(); setPhase('staged'); } return; }
+    if (phase !== 'running') return;
     const now = performance.now();
     const rt = (now - greenAt.current) / 1000;
     const red = rt < 0;
@@ -253,7 +253,7 @@ export function TreeSimModal({ state, update, toast, onClose }) {
   // iOS home-screen apps can cancel touches (system gestures, long-press
   // callout). Treat it like a release so a result ALWAYS appears.
   const holdCancel = () => {
-    if (phase === 'holding' || phase === 'running') holdEnd();
+    if (phase === 'running') holdEnd();
   };
 
   const reset = () => { clearTimers(); setLit([]); setPhase('idle'); setLastRT(null); };
@@ -289,7 +289,7 @@ export function TreeSimModal({ state, update, toast, onClose }) {
           Tap to stage
         </button>
       )}
-      {(phase === 'staged' || phase === 'holding' || phase === 'running') && (
+      {(phase === 'staged' || phase === 'running') && (
         <button
           onMouseDown={holdStart} onMouseUp={holdEnd} onMouseLeave={holdEnd}
           onTouchStart={(e) => { e.preventDefault(); holdStart(); }}
@@ -412,8 +412,7 @@ export function TreeSimModal({ state, update, toast, onClose }) {
 
             <div className="mt-3 text-center text-[15px] font-medium text-white/55">
               {phase === 'idle' && 'Tap Stage to begin'}
-              {phase === 'staged' && 'Press and HOLD — release on green'}
-              {phase === 'holding' && 'Get ready…'}
+              {phase === 'staged' && 'Press and HOLD — the tree starts instantly, release on green'}
               {phase === 'running' && <span className="font-bold text-pickle-400">RELEASE ON GREEN!</span>}
               {phase === 'done' && lastRT && (lastRT.red
                 ? <span className="font-bold text-red-400">RED LIGHT — {lastRT.rt.toFixed(3)} (foul)</span>
