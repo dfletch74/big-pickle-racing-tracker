@@ -206,32 +206,78 @@ function ManageTracks({ state, update, toast, selectedId, onSelectTrack }) {
   const [editingId, setEditingId] = useState(null);
   const [name, setName] = useState('');
   const [newName, setNewName] = useState('');
+  const [newLoc, setNewLoc] = useState('');
+  const [editLoc, setEditLoc] = useState('');
+  const [locBusy, setLocBusy] = useState(false);
 
   const runCount = (t) => state.runs.filter((r) => r.trackId === t.id || (r.trackId == null && r.track === t.name)).length;
 
-  const addTrack = () => {
+  // Free, keyless geocoding (same provider as the track weather).
+  const geocode = async (q) => {
+    const res = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(q)}&count=1&language=en&format=json`);
+    if (!res.ok) throw new Error('lookup failed');
+    const j = await res.json();
+    const r = j.results?.[0];
+    if (!r) return null;
+    return {
+      lat: r.latitude,
+      lon: r.longitude,
+      elevationFt: r.elevation != null ? Math.round(r.elevation * 3.28084) : null,
+      label: [r.name, r.admin1, r.country].filter(Boolean).join(', '),
+    };
+  };
+
+  const addTrack = async () => {
     const n = newName.trim();
     if (!n) { toast('Give the track a name.', 'error'); return; }
     if (state.tracks.some((t) => t.name.toLowerCase() === n.toLowerCase())) { toast('That track is already in the list.', 'error'); return; }
-    update((s) => { s.tracks.push({ id: uid(), name: n, lat: null, lon: null, elevationFt: null }); });
+    setLocBusy(true);
+    let coords = null;
+    const q = newLoc.trim();
+    if (q) {
+      try { coords = await geocode(q); } catch { /* no coords — manual weather still works */ }
+    }
+    update((s) => {
+      s.tracks.push({
+        id: uid(), name: n,
+        lat: coords?.lat ?? null, lon: coords?.lon ?? null,
+        elevationFt: coords?.elevationFt ?? null,
+      });
+    });
     setNewName('');
-    toast(`Track "${n}" added.`);
+    setNewLoc('');
+    setLocBusy(false);
+    toast(coords
+      ? `Track "${n}" added — near ${coords.label}.`
+      : q ? `Track "${n}" added — couldn't locate "${q}", weather can be entered manually.`
+      : `Track "${n}" added.`);
   };
 
-  const saveEdit = (t) => {
+  const saveEdit = async (t) => {
     const n = name.trim();
     if (!n) { toast('Give the track a name.', 'error'); return; }
     const oldName = t.name;
+    setLocBusy(true);
+    let coords = null;
+    const q = editLoc.trim();
+    if (q) {
+      try { coords = await geocode(q); } catch { /* keep existing coords */ }
+    }
     update((s) => {
       const tr = s.tracks.find((x) => x.id === t.id);
-      if (tr) tr.name = n;
+      if (tr) {
+        tr.name = n;
+        if (coords) { tr.lat = coords.lat; tr.lon = coords.lon; tr.elevationFt = coords.elevationFt; }
+      }
       // Keep history together: runs/events logged at this track follow the rename.
       s.runs.forEach((r) => { if (r.trackId === t.id || (r.trackId == null && r.track === oldName)) r.track = n; });
       s.events.forEach((e) => { if (e.trackId === t.id || (e.trackId == null && e.track === oldName)) e.track = n; });
     });
     setEditingId(null);
     setName('');
-    toast(`Track renamed to "${n}".`);
+    setEditLoc('');
+    setLocBusy(false);
+    toast(coords ? `Track renamed to "${n}" — near ${coords.label}.` : `Track renamed to "${n}".`);
   };
 
   const delTrack = (t) => {
@@ -251,28 +297,39 @@ function ManageTracks({ state, update, toast, selectedId, onSelectTrack }) {
   return (
     <div className="space-y-2">
       {state.tracks.map((t) => (
-        <div key={t.id} className="flex items-center gap-2 rounded-xl border border-white/10 p-3">
+        <div key={t.id} className="rounded-xl border border-white/10 p-3">
           {editingId === t.id ? (
-            <>
-              <input value={name} onChange={(e) => setName(e.target.value)} className={`${inputCls} min-w-0 flex-1`} autoFocus />
-              <Btn kind="ghost" onClick={() => saveEdit(t)} className="!py-1.5 text-xs">Save</Btn>
-              <Btn kind="quiet" onClick={() => { setEditingId(null); setName(''); }} className="!py-1.5 text-xs">Cancel</Btn>
-            </>
+            <div className="space-y-2">
+              <div className="flex gap-2">
+                <input value={name} onChange={(e) => setName(e.target.value)} className={`${inputCls} min-w-0 flex-1`} autoFocus />
+                <Btn kind="ghost" onClick={() => saveEdit(t)} disabled={locBusy} className="!py-1.5 text-xs">{locBusy ? '…' : 'Save'}</Btn>
+                <Btn kind="quiet" onClick={() => { setEditingId(null); setName(''); setEditLoc(''); }} className="!py-1.5 text-xs">Cancel</Btn>
+              </div>
+              <input value={editLoc} onChange={(e) => setEditLoc(e.target.value)} placeholder="Update location — city or address (for live weather)…" className={inputCls} />
+              <div className="text-[11px] text-white/35">
+                {t.lat != null
+                  ? `Located: ${t.lat.toFixed(2)}, ${t.lon.toFixed(2)}${t.elevationFt != null ? ` · ${t.elevationFt} ft` : ''}`
+                  : 'No location saved — live weather unavailable for this track.'}
+              </div>
+            </div>
           ) : (
-            <>
+            <div className="flex items-center gap-2">
               <div className="min-w-0 flex-1">
                 <div className="truncate text-sm font-bold">{t.name}</div>
-                <div className="text-xs text-white/40">{runCount(t)} runs</div>
+                <div className="text-xs text-white/40">{runCount(t)} runs{t.lat != null ? ' · live weather' : ''}</div>
               </div>
-              <Btn kind="quiet" onClick={() => { setEditingId(t.id); setName(t.name); }} className="!py-1.5 text-xs">Edit</Btn>
+              <Btn kind="quiet" onClick={() => { setEditingId(t.id); setName(t.name); setEditLoc(''); }} className="!py-1.5 text-xs">Edit</Btn>
               <button onClick={() => delTrack(t)} className="shrink-0 px-1 text-xs text-red-400/70">Delete</button>
-            </>
+            </div>
           )}
         </div>
       ))}
-      <div className="flex gap-2">
-        <input value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="New track name…" className={`${inputCls} min-w-0 flex-1`} />
-        <Btn kind="ghost" onClick={addTrack} className="shrink-0">Add track</Btn>
+      <div className="space-y-2 rounded-xl border border-white/10 p-3">
+        <input value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="New track name…" className={inputCls} />
+        <div className="flex gap-2">
+          <input value={newLoc} onChange={(e) => setNewLoc(e.target.value)} placeholder="Location — city or address (for live weather)…" className={`${inputCls} min-w-0 flex-1`} />
+          <Btn kind="ghost" onClick={addTrack} disabled={locBusy} className="shrink-0">{locBusy ? '…' : 'Add track'}</Btn>
+        </div>
       </div>
     </div>
   );
