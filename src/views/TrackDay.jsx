@@ -14,6 +14,7 @@ export default function TrackDay({ state, update, toast, dist, setDist, onAddRun
   const [manual, setManual] = useState({ tempF: '', humidity: '' });
   const [noteText, setNoteText] = useState('');
   const [showElims, setShowElims] = useState(false);
+  const [showTracks, setShowTracks] = useState(false);
 
   const track = state.tracks.find((t) => t.id === trackId) || state.tracks[0];
   const carRuns = useMemo(() => runsForCar(state, state.activeCarId), [state]);
@@ -184,6 +185,95 @@ export default function TrackDay({ state, update, toast, dist, setDist, onAddRun
           </div>
         ))}
       </Card>
+
+      {/* manage tracks */}
+      <Card>
+        <div className="mb-2 flex items-center justify-between">
+          <SectionTitle>Tracks</SectionTitle>
+          <Btn kind="ghost" onClick={() => setShowTracks((s) => !s)} className="!py-1.5 text-xs">{showTracks ? 'Hide' : 'Manage'}</Btn>
+        </div>
+        {showTracks ? (
+          <ManageTracks state={state} update={update} toast={toast} selectedId={trackId} onSelectTrack={setTrackId} />
+        ) : (
+          <div className="text-xs text-white/45">{state.tracks.length} track{state.tracks.length === 1 ? '' : 's'} in the list.</div>
+        )}
+      </Card>
+    </div>
+  );
+}
+
+function ManageTracks({ state, update, toast, selectedId, onSelectTrack }) {
+  const [editingId, setEditingId] = useState(null);
+  const [name, setName] = useState('');
+  const [newName, setNewName] = useState('');
+
+  const runCount = (t) => state.runs.filter((r) => r.trackId === t.id || (r.trackId == null && r.track === t.name)).length;
+
+  const addTrack = () => {
+    const n = newName.trim();
+    if (!n) { toast('Give the track a name.', 'error'); return; }
+    if (state.tracks.some((t) => t.name.toLowerCase() === n.toLowerCase())) { toast('That track is already in the list.', 'error'); return; }
+    update((s) => { s.tracks.push({ id: uid(), name: n, lat: null, lon: null, elevationFt: null }); });
+    setNewName('');
+    toast(`Track "${n}" added.`);
+  };
+
+  const saveEdit = (t) => {
+    const n = name.trim();
+    if (!n) { toast('Give the track a name.', 'error'); return; }
+    const oldName = t.name;
+    update((s) => {
+      const tr = s.tracks.find((x) => x.id === t.id);
+      if (tr) tr.name = n;
+      // Keep history together: runs/events logged at this track follow the rename.
+      s.runs.forEach((r) => { if (r.trackId === t.id || (r.trackId == null && r.track === oldName)) r.track = n; });
+      s.events.forEach((e) => { if (e.trackId === t.id || (e.trackId == null && e.track === oldName)) e.track = n; });
+    });
+    setEditingId(null);
+    setName('');
+    toast(`Track renamed to "${n}".`);
+  };
+
+  const delTrack = (t) => {
+    if (state.tracks.length === 1) { toast('You need at least one track.', 'error'); return; }
+    const n = runCount(t);
+    if (!window.confirm(`Delete "${t.name}"?${n > 0 ? ` Its ${n} run${n === 1 ? '' : 's'} keep the track name on their timeslips.` : ''} Its track notes will be removed.`)) return;
+    let nextId = '';
+    update((s) => {
+      s.tracks = s.tracks.filter((x) => x.id !== t.id);
+      s.trackNotes = s.trackNotes.filter((x) => x.trackId !== t.id);
+      nextId = s.tracks[0]?.id || '';
+    });
+    if (t.id === selectedId) onSelectTrack(nextId);
+    toast(`Track "${t.name}" deleted.`);
+  };
+
+  return (
+    <div className="space-y-2">
+      {state.tracks.map((t) => (
+        <div key={t.id} className="flex items-center gap-2 rounded-xl border border-white/10 p-3">
+          {editingId === t.id ? (
+            <>
+              <input value={name} onChange={(e) => setName(e.target.value)} className={`${inputCls} min-w-0 flex-1`} autoFocus />
+              <Btn kind="ghost" onClick={() => saveEdit(t)} className="!py-1.5 text-xs">Save</Btn>
+              <Btn kind="quiet" onClick={() => { setEditingId(null); setName(''); }} className="!py-1.5 text-xs">Cancel</Btn>
+            </>
+          ) : (
+            <>
+              <div className="min-w-0 flex-1">
+                <div className="truncate text-sm font-bold">{t.name}</div>
+                <div className="text-xs text-white/40">{runCount(t)} runs</div>
+              </div>
+              <Btn kind="quiet" onClick={() => { setEditingId(t.id); setName(t.name); }} className="!py-1.5 text-xs">Edit</Btn>
+              <button onClick={() => delTrack(t)} className="shrink-0 px-1 text-xs text-red-400/70">Delete</button>
+            </>
+          )}
+        </div>
+      ))}
+      <div className="flex gap-2">
+        <input value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="New track name…" className={`${inputCls} min-w-0 flex-1`} />
+        <Btn kind="ghost" onClick={addTrack} className="shrink-0">Add track</Btn>
+      </div>
     </div>
   );
 }
