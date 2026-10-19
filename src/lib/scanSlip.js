@@ -98,7 +98,7 @@ export async function geminiVision(file, apiKey) {
     img.onload = () => {
       URL.revokeObjectURL(url);
       try {
-        const maxDim = 2400;
+        const maxDim = 1200;
         const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
         const w = Math.round(img.width * scale);
         const h = Math.round(img.height * scale);
@@ -116,7 +116,7 @@ export async function geminiVision(file, apiKey) {
           px[i] = px[i + 1] = px[i + 2] = v;
         }
         ctx.putImageData(data, 0, 0);
-        resolve(canvas.toDataURL('image/jpeg', 0.92));
+        resolve(canvas.toDataURL('image/jpeg', 0.8));
       } catch (e) { reject(e); }
     };
     img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Could not read image')); };
