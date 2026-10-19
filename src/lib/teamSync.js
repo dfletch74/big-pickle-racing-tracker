@@ -32,7 +32,16 @@ export const setPat = (t) => { try { t ? localStorage.setItem(PAT_KEY, t) : loca
 // same car can't run the same ET twice at one track on one day.
 const runKey = (r) => [(r.carName || '').toLowerCase(), r.date, r.track, r.et, r.distance].join('|');
 
+/** Stable identity for a run across devices — used for dedupe and tombstones. */
+export function tombstoneKey(run, cars) {
+  const car = cars?.find((c) => c.id === run.carId);
+  const carName = (run.carName || car?.name || '').toLowerCase();
+  return [carName, run.date, run.track, run.et, run.distance].join('|');
+}
+
 const findCar = (cars, name) => cars.find((c) => (c.name || '').toLowerCase() === (name || '').toLowerCase());
+
+const TOMBSTONE_PATH = 'data/team-deleted.json';
 
 function parseRawUrl(url) {
   const m = String(url || '').match(/raw\.githubusercontent\.com\/([^/]+)\/([^/]+)\/([^/]+)\/(.+)/);
@@ -87,7 +96,9 @@ async function fetchTeamRuns(url) {
 }
 
 // Pure merge of pulled runs into a state draft. Mutates the draft.
+// Tombstoned runs (deleted by the user on any device) are never re-added.
 function mergePull(s, teamRuns) {
+  const tombstoned = new Set(s.deletedKeys || []);
   const fallbackCar =
     s.cars.find((c) => /big pickle/i.test(c.name || '')) ||
     s.cars.find((c) => c.id === s.activeCarId) ||
@@ -118,6 +129,7 @@ function mergePull(s, teamRuns) {
       return !keys.has(runKey({ ...r, carName: car.name }));
     });
     for (const r of runs) {
+      if (tombstoned.has(runKey({ ...r, carName: name }))) continue;
       s.runs.push({ ...r, id: uid(), carId: car.id, carName: car.name, source: 'team', createdAt: Date.now() });
       added++;
     }
@@ -125,6 +137,13 @@ function mergePull(s, teamRuns) {
   s.settings = s.settings || {};
   s.settings.lastTeamSync = new Date().toISOString();
   s.settings.lastTeamSyncCount = added;
+
+  // Drop local runs that were deleted on another device (tombstoned).
+  if (tombstoned.size) {
+    const before = s.runs.length;
+    s.runs = s.runs.filter((r) => r.source === 'demo' || !tombstoned.has(tombstoneKey(r, s.cars)));
+    if (s.runs.length !== before) added = Math.max(0, added - (before - s.runs.length));
+  }
   return { added, carNames };
 }
 
@@ -140,9 +159,27 @@ export async function pullTeamData(state, update) {
  * Publish a state draft's local runs to the sheet. Pulls the remote first so
  * the merge starts current; pushes only when the CSV actually changed.
  */
+/** Fetch the shared tombstone list (runs deleted on any device). 404 → empty. */
+async function fetchTombstones(loc, pat) {
+  try {
+    if (pat) {
+      const file = await ghApi(`/repos/${loc.owner}/${loc.repo}/contents/${TOMBSTONE_PATH}?ref=${loc.branch}`, pat);
+      const arr = JSON.parse(b64decode(file.content || '[]'));
+      return { keys: Array.isArray(arr) ? arr : [], sha: file.sha };
+    }
+    const res = await fetch(`https://raw.githubusercontent.com/${loc.owner}/${loc.repo}/${loc.branch}/${TOMBSTONE_PATH}?t=${Date.now()}`, { cache: 'no-store' });
+    if (!res.ok) return { keys: [], sha: null };
+    const arr = await res.json();
+    return { keys: Array.isArray(arr) ? arr : [], sha: null };
+  } catch {
+    return { keys: [], sha: null };
+  }
+}
+
 async function publishDraft(draft, pat) {
   const loc = parseRawUrl(teamCsvUrl(draft));
   if (!loc) throw new Error('Team CSV URL is not a GitHub raw URL');
+  const tombstoned = new Set(draft.deletedKeys || []);
 
   for (let attempt = 0; attempt < 3; attempt++) {
     const file = await ghApi(`/repos/${loc.owner}/${loc.repo}/contents/${loc.path}?ref=${loc.branch}`, pat);
@@ -151,8 +188,11 @@ async function publishDraft(draft, pat) {
     const { runs: remoteRuns } = await parseImportFile({ arrayBuffer: async () => buf }, null, null);
 
     // Merge: remote runs + local runs (no demo, no team), local wins on conflict.
+    // Tombstoned runs are dropped from both sides.
     const merged = new Map();
-    for (const r of remoteRuns) merged.set(runKey(r), { ...r });
+    for (const r of remoteRuns) {
+      if (!tombstoned.has(runKey(r))) merged.set(runKey(r), { ...r });
+    }
     let localCount = 0;
     for (const r of draft.runs) {
       if (r.source === 'demo' || r.source === 'team') continue;
@@ -160,7 +200,9 @@ async function publishDraft(draft, pat) {
       const carName = car?.name || r.carName || 'Big Pickle';
       const withCar = { ...r, carName };
       backfillAir(withCar, draft.tracks);
-      merged.set(runKey(withCar), withCar);
+      const k = runKey(withCar);
+      if (tombstoned.has(k)) { merged.delete(k); continue; }
+      merged.set(k, withCar);
       localCount++;
     }
     const all = [...merged.values()].sort(
@@ -168,20 +210,31 @@ async function publishDraft(draft, pat) {
     );
     const csv = runsToCSV(all);
 
-    if (csv.replace(/\n$/, '') === remoteText.replace(/\n$/, '')) {
-      return { published: localCount, pushed: false };
-    }
+    const tombJson = JSON.stringify([...tombstoned].sort());
+    let pushed = false;
     try {
-      await ghApi(`/repos/${loc.owner}/${loc.repo}/contents/${loc.path}`, pat, {
-        method: 'PUT',
-        body: JSON.stringify({
-          message: `Team data sync via app (${new Date().toISOString().slice(0, 16).replace('T', ' ')})`,
-          content: b64encode(csv),
-          sha: file.sha,
-          branch: loc.branch,
-        }),
-      });
-      return { published: localCount, pushed: true };
+      if (csv.replace(/\n$/, '') !== remoteText.replace(/\n$/, '')) {
+        await ghApi(`/repos/${loc.owner}/${loc.repo}/contents/${loc.path}`, pat, {
+          method: 'PUT',
+          body: JSON.stringify({
+            message: `Team data sync via app (${new Date().toISOString().slice(0, 16).replace('T', ' ')})`,
+            content: b64encode(csv),
+            sha: file.sha,
+            branch: loc.branch,
+          }),
+        });
+        pushed = true;
+      }
+      // Share tombstones so deletes propagate to other devices.
+      const remoteTomb = await fetchTombstones(loc, pat);
+      const mergedTomb = [...new Set([...remoteTomb.keys, ...tombstoned])].sort();
+      if (JSON.stringify(mergedTomb) !== JSON.stringify([...remoteTomb.keys].sort())) {
+        const putBody = { message: 'Team deleted-run list via app', content: b64encode(JSON.stringify(mergedTomb, null, 1)), branch: loc.branch };
+        if (remoteTomb.sha) putBody.sha = remoteTomb.sha;
+        await ghApi(`/repos/${loc.owner}/${loc.repo}/contents/${TOMBSTONE_PATH}`, pat, { method: 'PUT', body: JSON.stringify(putBody) });
+        pushed = true;
+      }
+      return { published: localCount, pushed };
     } catch (e) {
       if (e.status === 409 && attempt < 2) continue; // someone else pushed — re-pull and retry
       throw e;
@@ -197,15 +250,30 @@ async function publishDraft(draft, pat) {
 export async function syncTeamData(state, update) {
   const teamRuns = await fetchTeamRuns(teamCsvUrl(state));
   const draft = JSON.parse(JSON.stringify(state));
+  draft.deletedKeys = draft.deletedKeys || [];
+
+  // Merge in tombstones from other devices so their deletes apply here too.
+  const pat = getPat();
+  const loc = parseRawUrl(teamCsvUrl(draft));
+  if (loc) {
+    const remoteTomb = await fetchTombstones(loc, pat);
+    const before = draft.deletedKeys.length;
+    draft.deletedKeys = [...new Set([...draft.deletedKeys, ...remoteTomb.keys])];
+    if (draft.deletedKeys.length > 500) draft.deletedKeys = draft.deletedKeys.slice(-500);
+    if (draft.deletedKeys.length !== before) {
+      update((s) => { s.deletedKeys = draft.deletedKeys; });
+    }
+  }
+
   const pulled = mergePull(draft, teamRuns);
   update((s) => {
     s.runs = draft.runs;
     s.cars = draft.cars;
+    s.deletedKeys = draft.deletedKeys;
     s.settings = { ...s.settings, lastTeamSync: draft.settings.lastTeamSync, lastTeamSyncCount: draft.settings.lastTeamSyncCount };
   });
 
   let published = null;
-  const pat = getPat();
   if (pat) {
     try {
       published = await publishDraft(draft, pat);

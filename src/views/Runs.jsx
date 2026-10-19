@@ -4,6 +4,7 @@ import RunCard from '../components/RunCard';
 import { fmtET, fmtMPH, fmtRT, fmtDate, isNum, runDateTime } from '../lib/format';
 import { runsForCar, filterDistance, latestRun, avg, detectIssues, bestSegments, correctedETOf } from '../lib/stats';
 import { parseImportFile, runsToCSV, downloadFile } from '../lib/io';
+import { tombstoneKey } from '../lib/teamSync';
 
 const SORTS = [
   ['date', 'Date'], ['rt', 'R/T'], ['sixty', '60ft'], ['threeThirty', '330ft'],
@@ -61,7 +62,20 @@ export default function Runs({ state, update, toast, dist, setDist, onPrint, onA
     toast(`Exported ${filtered.length} run${filtered.length === 1 ? '' : 's'} to CSV.`);
   };
 
-  const doDelete = (id) => update((s) => { s.runs = s.runs.filter((r) => r.id !== id); });
+  // Deleting tombstones the run so the team sync doesn't resurrect it —
+  // the tombstone propagates to the sheet on the next sync.
+  const doDelete = (id) => update((s) => {
+    const run = s.runs.find((r) => r.id === id);
+    if (run && run.source !== 'demo') {
+      s.deletedKeys = s.deletedKeys || [];
+      const k = tombstoneKey(run, s.cars);
+      if (!s.deletedKeys.includes(k)) {
+        s.deletedKeys.push(k);
+        if (s.deletedKeys.length > 500) s.deletedKeys = s.deletedKeys.slice(-500);
+      }
+    }
+    s.runs = s.runs.filter((r) => r.id !== id);
+  });
 
   if (mode === 'compare') return <CompareView runs={filterDistance(carRuns, dist)} baseline={baseline} onBack={() => setMode('list')} />;
   if (mode === 'import') return <ImportView state={state} update={update} toast={toast} onBack={() => setMode('list')} onDone={() => setMode('list')} />;

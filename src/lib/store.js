@@ -23,6 +23,7 @@ function seedState() {
     activeCarId: carId,
     tracks,
     runs: [],
+    deletedKeys: [],
     racers: [
       { id: uid(), name: 'Dwayne Fletcher', attempts: [] },
       { id: uid(), name: 'Ethan Fletcher', attempts: [] },
