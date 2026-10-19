@@ -30,8 +30,10 @@ const COLUMNS = {
   rt: ['rt', 'reaction'],
   tempF: ['temp', 'temperature', 'tempf', 'airtemp', 'oat', 'airtemperature', 'ambienttemp'],
   humidity: ['humidity', 'humiditypct', 'rh', 'relhumidity', 'relativehumidity'],
-  altitudeFt: ['elevation', 'elevationft', 'trackaltitude', 'trackelevation'],
-  daFt: ['daft', 'densityaltitude', 'densityalt', 'da', 'altitude', 'altitudeft'],
+  // "Altitude" alone = the old app's DA number (user convention); "Altitude ft" =
+  // the track's raw elevation. Kept as separate aliases so the two never collide.
+  altitudeFt: ['altitudeft', 'elevation', 'elevationft', 'trackaltitude', 'trackelevation'],
+  daFt: ['daft', 'densityaltitude', 'densityalt', 'da', 'altitude'],
   jet: ['jet'],
   lPsi: ['lpsi', 'leftpsi'],
   rPsi: ['rpsi', 'rightpsi'],

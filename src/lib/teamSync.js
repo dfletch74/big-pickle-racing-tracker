@@ -1,5 +1,6 @@
 import { uid } from './store';
 import { parseImportFile } from './io';
+import { densityAltitudeFt, stationPressureHpa } from './physics';
 
 /**
  * Team data sync — pulls the shared run sheet from GitHub so every device
@@ -18,8 +19,10 @@ export const TEAM_CSV_DEFAULT_URL =
 export const teamCsvUrl = (state) => state.settings?.teamCsvUrl || TEAM_CSV_DEFAULT_URL;
 export const teamSyncOnOpen = (state) => state.settings?.teamSyncOnOpen !== false;
 
-// Runs are the same when date, time, track, ET and distance all match.
-const runKey = (r) => [r.date, r.time, r.track, r.et, r.distance].join('|');
+// Runs are the same when date, track, ET and distance all match. Time is
+// deliberately excluded — older imports may record it differently, and the
+// same car can't run the same ET twice at one track on one day.
+const runKey = (r) => [r.date, r.track, r.et, r.distance].join('|');
 
 const findCar = (cars, name) => cars.find((c) => (c.name || '').toLowerCase() === (name || '').toLowerCase());
 
@@ -50,6 +53,13 @@ export async function syncTeamData(state, update) {
     if (r.altitudeFt == null && r.track) {
       const t = state.tracks.find((x) => (x.name || '').toLowerCase() === r.track.toLowerCase());
       if (t?.elevationFt != null) r.altitudeFt = t.elevationFt;
+    }
+    // Estimate DA from temp + track elevation when the sheet has air temp but
+    // no DA value (same standard-pressure method the run logger uses).
+    if (r.daFt == null && r.tempF != null && r.altitudeFt != null) {
+      const p = stationPressureHpa(1013.25, r.altitudeFt);
+      r.daFt = Math.round(densityAltitudeFt({ tempF: r.tempF, humidityPct: r.humidity ?? 0, pressureHpa: p }));
+      r.daEstimated = true;
     }
     byCar.get(name).push(r);
   }
