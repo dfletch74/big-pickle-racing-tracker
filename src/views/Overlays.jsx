@@ -558,8 +558,11 @@ export function SettingsModal({ state, update, reset, toast, onClose }) {
   const current = bundleHash();
   const loadDemo = () => {
     if (!window.confirm('Load demo data? This REPLACES everything currently in the app.')) return;
-    reset(makeDemoState());
-    toast('Demo data loaded — clearly fake, delete anytime.');
+    const s = makeDemoState();
+    s.settings = s.settings || {};
+    s.settings.teamSyncOnOpen = false; // don't mix real team runs into the fake set
+    reset(s);
+    toast('Demo data loaded — team auto-sync paused (re-enable in Team data).');
     onClose();
   };
   const clearAll = () => {
