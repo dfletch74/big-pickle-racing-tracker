@@ -71,27 +71,27 @@ export default function Dash({ state, onAddRun, onImport, onSeeRuns }) {
     { value: 'last15', label: 'Last 15' },
   ], [conYears]);
 
-  // ET improvement: avg of first 3 vs avg of last 3.
+  // ET improvement: avg of first 3 vs avg of last 3 (selected distance, all years).
   const etImprovement = useMemo(() => {
-    const s = runs.filter((r) => isNum(r.et)).sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+    const s = distRuns.filter((r) => isNum(r.et)).sort((a, b) => (a.date || '').localeCompare(b.date || ''));
     if (s.length < 5) return null;
     const first = avg(s.slice(0, 3).map((r) => r.et));
     const lastAvg = avg(s.slice(-3).map((r) => r.et));
     const d = first - lastAvg; // positive = faster now
     if (Math.abs(d) < 0.001) return null;
     return d > 0 ? { text: `−${d.toFixed(3)}s improvement`, good: true } : { text: `+${Math.abs(d).toFixed(3)}s slower`, good: false };
-  }, [runs]);
+  }, [distRuns]);
 
-  // MPH improvement: avg of first 3 vs avg of last 3.
+  // MPH improvement: avg of first 3 vs avg of last 3 (selected distance, all years).
   const mphImprovement = useMemo(() => {
-    const s = runs.filter((r) => isNum(r.mph)).sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+    const s = distRuns.filter((r) => isNum(r.mph)).sort((a, b) => (a.date || '').localeCompare(b.date || ''));
     if (s.length < 5) return null;
     const first = avg(s.slice(0, 3).map((r) => r.mph));
     const lastAvg = avg(s.slice(-3).map((r) => r.mph));
     const d = lastAvg - first; // positive = faster now
     if (Math.abs(d) < 0.05) return null;
     return d > 0 ? { text: `+${d.toFixed(1)} mph improvement`, good: true } : { text: `${d.toFixed(1)} mph slower`, good: false };
-  }, [runs]);
+  }, [distRuns]);
 
   const bestETOf = (d) => {
     const p = runs.filter((r) => r.distance === d && isNum(r.et));
