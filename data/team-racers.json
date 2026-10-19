@@ -1,5 +1,159 @@
 {
-  "updatedAt": "2026-10-19T18:30:22Z",
-  "resetAt": 1792434622000,
-  "racers": []
+  "updatedAt": "2026-10-19T18:31:51.639Z",
+  "racers": [
+    {
+      "name": "Dwayne Fletcher",
+      "attempts": [
+        {
+          "rt": -0.038,
+          "red": true,
+          "date": "2026-10-19",
+          "tree": "500",
+          "mode": "sportsman",
+          "id": "mvflcj13-b6bx4zd"
+        },
+        {
+          "rt": 0.027,
+          "red": false,
+          "date": "2026-10-19",
+          "tree": "500",
+          "mode": "sportsman",
+          "id": "mvflcj13-zoxge8t"
+        },
+        {
+          "rt": -0.055,
+          "red": true,
+          "date": "2026-10-19",
+          "tree": "500",
+          "mode": "sportsman",
+          "id": "mvflcj13-g9jgbay"
+        },
+        {
+          "rt": -0.054,
+          "red": true,
+          "date": "2026-10-19",
+          "tree": "500",
+          "mode": "sportsman",
+          "id": "mvflcj13-m21z3cw"
+        },
+        {
+          "rt": -0.073,
+          "red": true,
+          "date": "2026-10-19",
+          "tree": "500",
+          "mode": "sportsman",
+          "id": "mvflcj13-cg8asun"
+        },
+        {
+          "rt": 0.028,
+          "red": false,
+          "date": "2026-10-19",
+          "tree": "500",
+          "mode": "sportsman",
+          "id": "mvflcj13-q9xkawc"
+        },
+        {
+          "rt": -0.048,
+          "red": true,
+          "date": "2026-10-19",
+          "tree": "500",
+          "mode": "sportsman",
+          "id": "mvflcj13-fl04ukv"
+        },
+        {
+          "rt": 0.111,
+          "red": false,
+          "date": "2026-10-19",
+          "tree": "500",
+          "mode": "sportsman",
+          "id": "mvflcj13-sgrw7w9"
+        },
+        {
+          "rt": -0.039,
+          "red": true,
+          "date": "2026-10-19",
+          "tree": "500",
+          "mode": "sportsman",
+          "id": "mvflcj13-f6k3w97"
+        },
+        {
+          "rt": -0.006,
+          "red": true,
+          "date": "2026-10-19",
+          "tree": "500",
+          "mode": "sportsman",
+          "id": "mvflcj13-i93v4k6"
+        },
+        {
+          "rt": -0.072,
+          "red": true,
+          "date": "2026-10-19",
+          "tree": "500",
+          "mode": "sportsman",
+          "id": "mvflcj13-7mmoyfg"
+        },
+        {
+          "rt": 0.013,
+          "red": false,
+          "date": "2026-10-19",
+          "tree": "500",
+          "mode": "sportsman",
+          "id": "mvflcj13-q1fap66"
+        },
+        {
+          "rt": 0.094,
+          "red": false,
+          "date": "2026-10-19",
+          "tree": "500",
+          "mode": "sportsman",
+          "id": "mvflcj13-eidwfdk"
+        },
+        {
+          "rt": -0.021,
+          "red": true,
+          "date": "2026-10-19",
+          "tree": "500",
+          "mode": "sportsman",
+          "id": "mvflcj13-vi2w3lk"
+        },
+        {
+          "rt": 0.012,
+          "red": false,
+          "date": "2026-10-19",
+          "tree": "500",
+          "mode": "sportsman",
+          "id": "mvflcj13-rob7rql"
+        },
+        {
+          "rt": 0.011,
+          "red": false,
+          "date": "2026-10-19",
+          "tree": "500",
+          "mode": "sportsman",
+          "id": "mvflcj13-xm1g6xm"
+        }
+      ]
+    },
+    {
+      "name": "Ethan Fletcher",
+      "attempts": []
+    },
+    {
+      "name": "Hughie",
+      "attempts": [
+        {
+          "rt": 0.012,
+          "red": false,
+          "date": "2026-10-19",
+          "tree": "500",
+          "mode": "sportsman",
+          "id": "mvflcj13-v4dno0s"
+        }
+      ]
+    },
+    {
+      "name": "Fletch",
+      "attempts": []
+    }
+  ]
 }
