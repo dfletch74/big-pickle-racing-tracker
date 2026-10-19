@@ -242,7 +242,7 @@ export default function App() {
 
       {/* overlays */}
       {overlay === 'garage' && <GarageModal state={state} update={update} toast={toast} onClose={() => setOverlay(null)} role={role} />}
-      {overlay === 'tree' && <TreeSimModal state={state} update={update} toast={toast} onClose={() => setOverlay(null)} />}
+      {overlay === 'tree' && <TreeSimModal state={state} update={update} toast={toast} onClose={() => setOverlay(null)} roleId={roleId} />}
       {overlay === 'settings' && <SettingsModal state={state} update={update} reset={reset} toast={toast} onClose={() => setOverlay(null)} />}
       {overlay === 'crew' && <CrewModal state={state} update={update} toast={toast} onClose={() => setOverlay(null)} />}
 

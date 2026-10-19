@@ -6,6 +6,7 @@ import { runsToCSV, downloadFile } from '../lib/io';
 import { syncTeamData, teamCsvUrl, teamSyncOnOpen, getPat, setPat, TEAM_CSV_DEFAULT_URL } from '../lib/teamSync';
 import { APP_VERSION } from '../version';
 import { fmtET, fmtMPH, fmtRT, fmtTemp, fmtDA, fmtDate, isNum } from '../lib/format';
+import { ROLES } from '../lib/roles';
 
 /* ---------------- Garage ---------------- */
 
@@ -232,8 +233,17 @@ function RacerPicker({ racers, racerId, onPick, onAdd, onClose }) {
   );
 }
 
-export function TreeSimModal({ state, update, toast, onClose }) {
-  const [racerId, setRacerId] = useState(state.racers[0]?.id || '');
+export function TreeSimModal({ state, update, toast, onClose, roleId }) {
+  // Auto-select the racer matching the logged-in user (don't default to someone else's stats).
+  const defaultRacerId = (() => {
+    const label = roleId ? ROLES[roleId]?.label : null;
+    if (label) {
+      const match = state.racers.find((r) => r.name.toLowerCase() === label.toLowerCase());
+      if (match) return match.id;
+    }
+    return state.racers[0]?.id || '';
+  })();
+  const [racerId, setRacerId] = useState(defaultRacerId);
   const [showPicker, setShowPicker] = useState(true);
   const [tree, setTree] = useState('500');
   const [mode, setMode] = useState('sportsman');
