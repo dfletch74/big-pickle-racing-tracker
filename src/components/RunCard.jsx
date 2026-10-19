@@ -76,7 +76,9 @@ export default function RunCard({ run, ctx, baseline, onEdit, onDelete, onPrint,
           {run.notes && <div className="mt-3 rounded-xl bg-white/5 p-3 text-xs text-white/70">{run.notes}</div>}
 
           <div className="mt-4 flex gap-2">
-            <Btn kind="ghost" onClick={() => onEdit(run)} className="flex-1">Edit</Btn>
+            {onEdit && (
+              <Btn kind="ghost" onClick={() => onEdit(run)} className="flex-1">Edit</Btn>
+            )}
             {onDelete && (
               <Btn kind="quiet" onClick={() => { if (window.confirm('Delete this run?')) onDelete(run.id); }} className="text-red-400/80">Delete</Btn>
             )}

@@ -190,7 +190,7 @@ export default function App() {
               onDone={() => { setEditId(null); setView('runs'); }} />
           )}
           {view === 'track' && (
-            <TrackDay state={state} update={update} toast={toast} dist={dist} setDist={setDist} onAddRun={() => goAdd()} />
+            <TrackDay state={state} update={update} toast={toast} dist={dist} setDist={setDist} onAddRun={() => goAdd()} role={role} />
           )}
           {view === 'insight' && (
             <Insight state={state} toast={toast} dist={dist} setDist={setDist} />
@@ -232,7 +232,7 @@ export default function App() {
       </nav>
 
       {/* overlays */}
-      {overlay === 'garage' && <GarageModal state={state} update={update} toast={toast} onClose={() => setOverlay(null)} />}
+      {overlay === 'garage' && <GarageModal state={state} update={update} toast={toast} onClose={() => setOverlay(null)} role={role} />}
       {overlay === 'tree' && <TreeSimModal state={state} update={update} toast={toast} onClose={() => setOverlay(null)} />}
       {overlay === 'settings' && <SettingsModal state={state} update={update} reset={reset} toast={toast} onClose={() => setOverlay(null)} />}
       {overlay === 'crew' && <CrewModal state={state} update={update} toast={toast} onClose={() => setOverlay(null)} />}

@@ -120,7 +120,7 @@ export default function Runs({ state, update, toast, dist, setDist, onPrint, onA
         <div className="space-y-2">
           {filtered.map((r) => (
             <RunCard key={r.id} run={r} ctx={ctx} baseline={baseline}
-              onEdit={(run) => onAddRun(run.id)} onDelete={role?.canDelete ? doDelete : null} onPrint={onPrint} />
+              onEdit={role?.canLog ? (run) => onAddRun(run.id) : null} onDelete={role?.canDelete ? doDelete : null} onPrint={onPrint} />
           ))}
         </div>
       )}

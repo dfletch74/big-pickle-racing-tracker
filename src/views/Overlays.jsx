@@ -9,7 +9,9 @@ import { fmtET, fmtMPH, fmtRT, fmtTemp, fmtDA, fmtDate, isNum } from '../lib/for
 
 /* ---------------- Garage ---------------- */
 
-export function GarageModal({ state, update, toast, onClose }) {
+export function GarageModal({ state, update, toast, onClose, role }) {
+  const canEdit = role?.canLog ?? true;
+  const canDelete = role?.canDelete ?? true;
   const [form, setForm] = useState({ name: '', year: '', make: '', model: '' });
   const [editingId, setEditingId] = useState(null);
 
@@ -68,23 +70,31 @@ export function GarageModal({ state, update, toast, onClose }) {
             </div>
             <div className="flex shrink-0 gap-1.5">
               {c.id !== state.activeCarId && <Btn kind="ghost" onClick={() => { update((s) => { s.activeCarId = c.id; }); toast(`Switched to ${c.name} — all screens now show its numbers.`); }} className="!py-1.5 text-xs">Use</Btn>}
-              <Btn kind="quiet" onClick={() => { setEditingId(c.id); setForm({ name: c.name, year: c.year, make: c.make, model: c.model }); }} className="!py-1.5 text-xs">Edit</Btn>
-              <Btn kind="quiet" onClick={() => remove(c.id)} className="!py-1.5 text-xs text-red-400/80">Delete</Btn>
+              {canEdit && (
+                <Btn kind="quiet" onClick={() => { setEditingId(c.id); setForm({ name: c.name, year: c.year, make: c.make, model: c.model }); }} className="!py-1.5 text-xs">Edit</Btn>
+              )}
+              {canDelete && (
+                <Btn kind="quiet" onClick={() => remove(c.id)} className="!py-1.5 text-xs text-red-400/80">Delete</Btn>
+              )}
             </div>
           </div>
         ))}
       </div>
-      <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
-        <Field label="Name *"><input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className={inputCls} placeholder="Big Pickle" autoComplete="off" /></Field>
-        <Field label="Year"><input value={form.year} onChange={(e) => setForm({ ...form, year: e.target.value })} className={inputCls} autoComplete="off" /></Field>
-        <Field label="Make"><input value={form.make} onChange={(e) => setForm({ ...form, make: e.target.value })} className={inputCls} autoComplete="off" /></Field>
-        <Field label="Model"><input value={form.model} onChange={(e) => setForm({ ...form, model: e.target.value })} className={inputCls} autoComplete="off" /></Field>
-      </div>
-      {/* sticky action bar — always tappable, even with the keyboard open */}
-      <div className="sticky bottom-0 -mx-5 -mb-5 mt-4 flex gap-2 border-t border-white/10 bg-coal-900/95 px-5 py-4 backdrop-blur">
-        <Btn onClick={save} className="flex-1 !py-3 text-base">{editingId ? 'Save car' : 'Add car'}</Btn>
-        {editingId && <Btn kind="ghost" onClick={cancelEdit}>Cancel</Btn>}
-      </div>
+      {canEdit && (
+        <>
+          <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
+            <Field label="Name *"><input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className={inputCls} placeholder="Big Pickle" autoComplete="off" /></Field>
+            <Field label="Year"><input value={form.year} onChange={(e) => setForm({ ...form, year: e.target.value })} className={inputCls} autoComplete="off" /></Field>
+            <Field label="Make"><input value={form.make} onChange={(e) => setForm({ ...form, make: e.target.value })} className={inputCls} autoComplete="off" /></Field>
+            <Field label="Model"><input value={form.model} onChange={(e) => setForm({ ...form, model: e.target.value })} className={inputCls} autoComplete="off" /></Field>
+          </div>
+          {/* sticky action bar — always tappable, even with the keyboard open */}
+          <div className="sticky bottom-0 -mx-5 -mb-5 mt-4 flex gap-2 border-t border-white/10 bg-coal-900/95 px-5 py-4 backdrop-blur">
+            <Btn onClick={save} className="flex-1 !py-3 text-base">{editingId ? 'Save car' : 'Add car'}</Btn>
+            {editingId && <Btn kind="ghost" onClick={cancelEdit}>Cancel</Btn>}
+          </div>
+        </>
+      )}
     </Modal>
   );
 }

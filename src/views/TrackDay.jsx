@@ -6,7 +6,9 @@ import { DA_BANDS, TEMP_BANDS, airTrendLabel } from '../lib/physics';
 import { useWeatherEntry, WeatherEntryCard } from '../components/WeatherEntry';
 import { uid } from '../lib/store';
 
-export default function TrackDay({ state, update, toast, dist, setDist, onAddRun }) {
+export default function TrackDay({ state, update, toast, dist, setDist, onAddRun, role }) {
+  const canEdit = role?.canLog ?? true;
+  const canDelete = role?.canDelete ?? true;
   const [trackId, setTrackId] = useState(state.tracks[0]?.id || '');
   const [noteText, setNoteText] = useState('');
   const [showElims, setShowElims] = useState(false);
@@ -127,7 +129,9 @@ export default function TrackDay({ state, update, toast, dist, setDist, onAddRun
       <Card>
         <div className="mb-2 flex items-center justify-between">
           <SectionTitle>Eliminations</SectionTitle>
-          <Btn kind="ghost" onClick={() => setShowElims((s) => !s)} className="!py-1.5 text-xs">{showElims ? 'Hide' : 'Manage'}</Btn>
+          {canEdit && (
+            <Btn kind="ghost" onClick={() => setShowElims((s) => !s)} className="!py-1.5 text-xs">{showElims ? 'Hide' : 'Manage'}</Btn>
+          )}
         </div>
         {showElims && <Elims state={state} update={update} toast={toast} track={track} dist={dist} />}
         {!showElims && <div className="text-xs text-white/45">{state.events.length} event{state.events.length === 1 ? '' : 's'} on record.</div>}
@@ -136,15 +140,19 @@ export default function TrackDay({ state, update, toast, dist, setDist, onAddRun
       {/* track notes */}
       <Card>
         <SectionTitle>Track notes</SectionTitle>
-        <div className="mb-2 flex gap-2">
-          <input value={noteText} onChange={(e) => setNoteText(e.target.value)} placeholder="Lane 2 hooking better after 6pm…" className={`${inputCls} flex-1`} />
-          <Btn kind="ghost" onClick={addNote}>Add</Btn>
-        </div>
+        {canEdit && (
+          <div className="mb-2 flex gap-2">
+            <input value={noteText} onChange={(e) => setNoteText(e.target.value)} placeholder="Lane 2 hooking better after 6pm…" className={`${inputCls} flex-1`} />
+            <Btn kind="ghost" onClick={addNote}>Add</Btn>
+          </div>
+        )}
         {notes.length === 0 && <div className="text-xs text-white/40">No notes for this track yet.</div>}
         {notes.map((n) => (
           <div key={n.id} className="flex items-start justify-between gap-2 border-t border-white/5 py-2 text-sm">
             <div><span className="mr-2 text-xs text-white/40">{fmtDate(n.date)}</span>{n.text}</div>
-            <button onClick={() => update((s) => { s.trackNotes = s.trackNotes.filter((x) => x.id !== n.id); })} className="text-xs text-red-400/70">✕</button>
+            {canDelete && (
+              <button onClick={() => update((s) => { s.trackNotes = s.trackNotes.filter((x) => x.id !== n.id); })} className="text-xs text-red-400/70">✕</button>
+            )}
           </div>
         ))}
       </Card>
@@ -153,7 +161,9 @@ export default function TrackDay({ state, update, toast, dist, setDist, onAddRun
       <Card>
         <div className="mb-2 flex items-center justify-between">
           <SectionTitle>Tracks</SectionTitle>
-          <Btn kind="ghost" onClick={() => setShowTracks((s) => !s)} className="!py-1.5 text-xs">{showTracks ? 'Hide' : 'Manage'}</Btn>
+          {canEdit && (
+            <Btn kind="ghost" onClick={() => setShowTracks((s) => !s)} className="!py-1.5 text-xs">{showTracks ? 'Hide' : 'Manage'}</Btn>
+          )}
         </div>
         {showTracks ? (
           <ManageTracks state={state} update={update} toast={toast} selectedId={trackId} onSelectTrack={setTrackId} />
