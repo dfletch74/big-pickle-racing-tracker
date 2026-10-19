@@ -205,9 +205,14 @@ export function ScanSlipButton({ onFill }) {
 
   return (
     <>
-      <Btn kind="ghost" onClick={() => setStage('choose')} className="w-full">
-        <span className="mr-1">📷</span> Scan timeslip
-      </Btn>
+      <div className="flex gap-2">
+        <Btn kind="primary" onClick={() => openCamera()} className="flex-1">
+          <span className="mr-1">📷</span> Scan with camera
+        </Btn>
+        <Btn kind="ghost" onClick={() => setStage('choose')} className="flex-1">
+          More options
+        </Btn>
+      </div>
       <input
         ref={fileRef}
         type="file"
@@ -219,9 +224,6 @@ export function ScanSlipButton({ onFill }) {
       {stage === 'choose' && (
         <Modal title="Get the numbers" onClose={() => setStage('idle')}>
           <div className="space-y-2">
-            <Btn kind="primary" onClick={() => { setStage('idle'); openCamera(); }} className="w-full">
-              <span className="mr-1">📷</span> Scan with camera
-            </Btn>
             <Btn kind="ghost" onClick={() => { setAiDirect(true); setStage('idle'); fileRef.current?.click(); }} className="w-full">
               <span className="mr-1">🤖</span> AI read photo
             </Btn>
@@ -232,7 +234,7 @@ export function ScanSlipButton({ onFill }) {
               <span className="mr-1">📋</span> Paste copied text
             </Btn>
             <div className="pt-1 text-[11px] text-white/40">
-              Camera scan uses AI — no photo saved to your library.
+              AI read is best for faded slips. Paste uses iPhone's text reader.
             </div>
           </div>
         </Modal>
