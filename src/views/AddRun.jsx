@@ -6,6 +6,7 @@ import { densityAltitudeFt, stationPressureHpa } from '../lib/physics';
 import { fetchTrackWeather } from '../lib/weather';
 import { fmtDA } from '../lib/format';
 import { isNum } from '../lib/format';
+import { ScanSlipButton } from '../components/ScanSlip';
 
 const SETUP_FIELDS = [
   ['jet', 'Jet'], ['lPsi', 'L Tire PSI'], ['rPsi', 'R Tire PSI'],
@@ -58,6 +59,18 @@ export default function AddRun({ state, update, toast, editId, onDone }) {
   const [wxBusy, setWxBusy] = useState(false);
 
   const set = (k, v) => setF((p) => ({ ...p, [k]: v }));
+
+  // Fill the form from scanned timeslip values.
+  const fillFromScan = (vals) => {
+    setF((p) => {
+      const next = { ...p };
+      for (const k of ['rt', 'sixty', 'threeThirty', 'eighthET', 'eighthMPH', 'thousand', 'et', 'mph', 'date', 'time']) {
+        if (vals[k] != null && vals[k] !== '') next[k] = String(vals[k]);
+      }
+      return next;
+    });
+    toast('Timeslip values filled — check them before saving.');
+  };
   const track = state.tracks.find((t) => t.id === f.trackId);
 
   const etNum = numOrNull(f.et);
@@ -151,6 +164,10 @@ export default function AddRun({ state, update, toast, editId, onDone }) {
   return (
     <div className="space-y-4">
       <SectionTitle>{editing ? 'Edit run' : 'Log a run'}</SectionTitle>
+
+      {!editing && (
+        <ScanSlipButton onFill={fillFromScan} />
+      )}
 
       <Card className="space-y-3">
         <div className="flex flex-wrap gap-3">
