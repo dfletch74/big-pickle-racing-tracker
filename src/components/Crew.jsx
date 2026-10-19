@@ -1,19 +1,61 @@
 import { useState } from 'react';
 import { Modal, Btn, inputCls } from './ui';
-import { ROLES, ROLE_IDS, hashPin, verifyPin, saveRole } from '../lib/roles';
+import { ROLES, hashPin, verifyPin, saveRole } from '../lib/roles';
+
+// Which roles each PIN unlocks.
+const PIN_ROLES = {
+  pinHashAdmin: ['admin'],
+  pinHashDriver: ['driver'],
+  pinHashCrew: ['crew'],
+  pinHashViewer: ['viewer', 'temp'],
+};
+
+const PIN_LABELS = {
+  pinHashAdmin: 'Admin PIN (Fletch)',
+  pinHashDriver: 'Driver PIN (Dean)',
+  pinHashCrew: 'Crew PIN (Ethan)',
+  pinHashViewer: 'Viewer PIN (Hughie, Temp)',
+};
+
+const PIN_KEYS = Object.keys(PIN_ROLES);
+
+export function getPinHashes(settings) {
+  const out = {};
+  for (const k of PIN_KEYS) out[k] = settings[k] || null;
+  return out;
+}
+
+export function hasAnyPin(settings) {
+  return PIN_KEYS.some((k) => !!settings[k]);
+}
+
+// Given a PIN, return the role IDs it unlocks.
+export function rolesForPin(pin, settings) {
+  const h = getPinHashes(settings);
+  const roles = [];
+  for (const [key, roleIds] of Object.entries(PIN_ROLES)) {
+    if (h[key] && verifyPin(pin, h[key])) {
+      roles.push(...roleIds);
+    }
+  }
+  return [...new Set(roles)];
+}
 
 /**
- * Lock screen: PIN entry, then role picker.
- * Shown on app start when a team PIN is set.
+ * Lock screen: PIN entry, then role picker (only roles unlocked by that PIN).
+ * Shown on app start when any team PIN is set.
  */
-export function LockScreen({ pinHash, onUnlock }) {
+export function LockScreen({ settings, onUnlock }) {
   const [pin, setPin] = useState('');
   const [error, setError] = useState('');
   const [stage, setStage] = useState('pin'); // pin | role
+  const [allowedRoles, setAllowedRoles] = useState([]);
 
   const submitPin = () => {
-    if (verifyPin(pin, pinHash)) {
+    const roles = rolesForPin(pin, settings);
+    if (roles.length > 0) {
       setError('');
+      setAllowedRoles(roles);
       setStage('role');
     } else {
       setError('Wrong PIN. Try again.');
@@ -34,7 +76,7 @@ export function LockScreen({ pinHash, onUnlock }) {
             <div className="font-display text-2xl font-bold uppercase tracking-wider text-white/90">Who are you?</div>
             <div className="mt-1 text-xs text-white/40">Pick your name to continue</div>
           </div>
-          {ROLE_IDS.map((id) => (
+          {allowedRoles.map((id) => (
             <button
               key={id}
               onClick={() => pickRole(id)}
@@ -75,79 +117,92 @@ export function LockScreen({ pinHash, onUnlock }) {
   );
 }
 
-/**
- * Crew management modal: set/change team PIN, view roles.
- * Only accessible to admin (Fletch).
- */
-export function CrewModal({ state, update, toast, onClose }) {
-  const [newPin, setNewPin] = useState('');
-  const [confirmPin, setConfirmPin] = useState('');
-  const hasPin = !!state.settings.teamPinHash;
+function PinField({ label, pinKey, settings, update, toast }) {
+  const [val, setVal] = useState('');
+  const [confirm, setConfirm] = useState('');
+  const hasPin = !!settings[pinKey];
 
-  const setPin = () => {
-    if (newPin.length < 4) {
+  const save = () => {
+    if (val.length < 4) {
       toast('PIN must be at least 4 digits.');
       return;
     }
-    if (newPin !== confirmPin) {
+    if (val !== confirm) {
       toast('PINs do not match.');
       return;
     }
-    update((s) => { s.settings.teamPinHash = hashPin(newPin); });
-    setNewPin('');
-    setConfirmPin('');
-    toast('Team PIN set. The app will lock on next launch.');
+    update((s) => { s.settings[pinKey] = hashPin(val); });
+    setVal('');
+    setConfirm('');
+    toast(`${label} set.`);
   };
 
-  const clearPin = () => {
-    if (!confirm('Remove the team PIN? The app will no longer lock on launch.')) return;
-    update((s) => { s.settings.teamPinHash = null; });
-    toast('Team PIN removed.');
+  const clear = () => {
+    if (!confirm(`Remove the ${label}?`)) return;
+    update((s) => { s.settings[pinKey] = null; });
+    toast(`${label} removed.`);
   };
 
+  return (
+    <div className="rounded-xl border border-white/[0.07] bg-white/[0.02] p-3">
+      <div className="mb-2 flex items-center justify-between">
+        <div className="text-sm font-semibold text-white/80">{label}</div>
+        <div className="text-[11px] text-white/40">{hasPin ? 'Set' : 'Not set'}</div>
+      </div>
+      <div className="flex gap-2">
+        <input
+          type="password"
+          inputMode="numeric"
+          value={val}
+          onChange={(e) => setVal(e.target.value.replace(/\D/g, '').slice(0, 8))}
+          placeholder={hasPin ? 'New PIN' : 'Set PIN'}
+          className={`${inputCls} min-w-0 flex-1 font-mono`}
+        />
+        <input
+          type="password"
+          inputMode="numeric"
+          value={confirm}
+          onChange={(e) => setConfirm(e.target.value.replace(/\D/g, '').slice(0, 8))}
+          placeholder="Confirm"
+          className={`${inputCls} min-w-0 flex-1 font-mono`}
+        />
+      </div>
+      <div className="mt-2 flex gap-2">
+        <Btn kind="primary" onClick={save} disabled={!val || !confirm} className="flex-1 !py-2 text-xs">
+          {hasPin ? 'Change' : 'Set'}
+        </Btn>
+        {hasPin && (
+          <Btn kind="ghost" onClick={clear} className="flex-1 !py-2 text-xs">Remove</Btn>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Crew management modal: set/change per-role PINs, view roles.
+ * Only accessible to admin (Fletch).
+ */
+export function CrewModal({ state, update, toast, onClose }) {
   return (
     <Modal title="Crew Management" onClose={onClose}>
       <div className="space-y-4">
         <div>
-          <div className="mb-2 text-sm font-semibold text-white/80">Team PIN</div>
-          <div className="text-xs text-white/50 mb-3">
-            {hasPin
-              ? 'A PIN is set. The app locks on launch and asks who you are.'
-              : 'No PIN set. Anyone who opens the app gets full access.'}
+          <div className="mb-2 text-sm font-semibold text-white/80">Team PINs</div>
+          <div className="mb-3 text-xs text-white/50">
+            Each PIN unlocks only its roles. The app locks on launch and asks for a PIN, then shows just the names that PIN allows.
           </div>
-          <div className="flex gap-2">
-            <input
-              type="password"
-              inputMode="numeric"
-              value={newPin}
-              onChange={(e) => setNewPin(e.target.value.replace(/\D/g, '').slice(0, 8))}
-              placeholder={hasPin ? 'New PIN' : 'Set PIN'}
-              className={`${inputCls} min-w-0 flex-1 font-mono`}
-            />
-            <input
-              type="password"
-              inputMode="numeric"
-              value={confirmPin}
-              onChange={(e) => setConfirmPin(e.target.value.replace(/\D/g, '').slice(0, 8))}
-              placeholder="Confirm"
-              className={`${inputCls} min-w-0 flex-1 font-mono`}
-            />
-          </div>
-          <div className="mt-2 flex gap-2">
-            <Btn kind="primary" onClick={setPin} disabled={!newPin || !confirmPin} className="flex-1">
-              {hasPin ? 'Change PIN' : 'Set PIN'}
-            </Btn>
-            {hasPin && (
-              <Btn kind="ghost" onClick={clearPin} className="flex-1">Remove</Btn>
-            )}
+          <div className="space-y-2">
+            {PIN_KEYS.map((k) => (
+              <PinField key={k} label={PIN_LABELS[k]} pinKey={k} settings={state.settings} update={update} toast={toast} />
+            ))}
           </div>
         </div>
 
         <div>
           <div className="mb-2 text-sm font-semibold text-white/80">Roles</div>
           <div className="space-y-1.5">
-            {ROLE_IDS.map((id) => {
-              const r = ROLES[id];
+            {Object.entries(ROLES).map(([id, r]) => {
               const perms = [];
               if (r.canLog) perms.push('log runs');
               if (r.canDelete) perms.push('delete');
@@ -163,9 +218,6 @@ export function CrewModal({ state, update, toast, onClose }) {
                 </div>
               );
             })}
-          </div>
-          <div className="mt-2 text-[11px] text-white/35">
-            After entering the PIN, each person picks their name. Only Fletch (Admin) can delete runs or change settings.
           </div>
         </div>
       </div>

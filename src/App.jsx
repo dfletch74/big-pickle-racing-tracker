@@ -2,8 +2,8 @@ import { useState, useCallback, useEffect } from 'react';
 import { useStore, uid } from './lib/store';
 import { Toasts, Icon } from './components/ui';
 import { LOGO_DATA_URI } from './components/logo';
-import { LockScreen, CrewModal } from './components/Crew';
-import { ROLES, getSavedRole, clearRole } from './lib/roles';
+import { LockScreen, CrewModal, hasAnyPin } from './components/Crew';
+import { ROLES, getSavedRole, clearRole, hashPin } from './lib/roles';
 import { checkForAppUpdate, reloadForUpdate } from './lib/updater';
 import { parseSetupLink, clearSetupLink } from './lib/setupLink';
 import { setPat } from './lib/teamSync';
@@ -84,18 +84,23 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Crew lock: if a team PIN is set, lock on launch.
+  // Crew lock: if any team PIN is set, lock on launch.
+  // One-time migration from the old single PIN to per-role PINs.
   useEffect(() => {
     if (lockChecked) return;
     setLockChecked(true);
-    if (state.settings.teamPinHash) {
-      const saved = getSavedRole();
-      if (saved) {
-        // Role remembered from last time, but still require PIN.
-        setLocked(true);
-      } else {
-        setLocked(true);
-      }
+    // Migrate old single PIN to the per-role PINs the user requested.
+    if (state.settings.teamPinHash && !hasAnyPin(state.settings)) {
+      update((s) => {
+        s.settings.pinHashAdmin = hashPin('1966');
+        s.settings.pinHashDriver = hashPin('1966');
+        s.settings.pinHashCrew = hashPin('2007');
+        s.settings.pinHashViewer = hashPin('0000');
+        s.settings.teamPinHash = null;
+      });
+    }
+    if (hasAnyPin(state.settings) || state.settings.teamPinHash) {
+      setLocked(true);
     } else {
       setRoleId('admin');
     }
@@ -125,11 +130,11 @@ export default function App() {
 
   const car = state.cars.find((c) => c.id === state.activeCarId);
 
-  // Show lock screen if PIN is set and not yet unlocked.
+  // Show lock screen if any PIN is set and not yet unlocked.
   if (isLocked) {
     return (
       <div className="min-h-screen bg-coal-950 text-white">
-        <LockScreen pinHash={state.settings.teamPinHash} onUnlock={handleUnlock} />
+        <LockScreen settings={state.settings} onUnlock={handleUnlock} />
         <Toasts toasts={toasts} />
       </div>
     );
