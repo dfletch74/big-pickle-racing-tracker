@@ -45,6 +45,12 @@ export async function syncTeamData(state, update) {
   for (const r of teamRuns) {
     const name = (r.carName || '').trim() || fallbackName;
     if (!byCar.has(name)) byCar.set(name, []);
+    // Backfill the track's raw elevation when the sheet doesn't carry one —
+    // Altitude ft is the track elevation; DA ft is the (separate) density altitude.
+    if (r.altitudeFt == null && r.track) {
+      const t = state.tracks.find((x) => (x.name || '').toLowerCase() === r.track.toLowerCase());
+      if (t?.elevationFt != null) r.altitudeFt = t.elevationFt;
+    }
     byCar.get(name).push(r);
   }
 
