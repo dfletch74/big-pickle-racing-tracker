@@ -144,7 +144,14 @@ export default function App() {
           </button>
           <div className="flex gap-1.5">
             <button
-              onClick={() => setOverlay('tree')}
+              onClick={() => {
+                // Ensure the logged-in user has a racer profile so Tree stats stay separate.
+                const label = roleId ? ROLES[roleId]?.label : null;
+                if (label && !state.racers.some((r) => r.name.toLowerCase() === label.toLowerCase())) {
+                  update((s) => { s.racers.push({ id: uid(), name: label, attempts: [] }); });
+                }
+                setOverlay('tree');
+              }}
               className="flex items-center gap-1.5 rounded-xl border border-white/10 px-3 py-2 font-display text-[15px] font-semibold uppercase tracking-wider text-white/75 transition hover:bg-white/5 hover:text-white active:scale-95"
               title="Tree simulator"
             >

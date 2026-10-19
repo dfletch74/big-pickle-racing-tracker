@@ -234,16 +234,14 @@ function RacerPicker({ racers, racerId, onPick, onAdd, onClose }) {
 }
 
 export function TreeSimModal({ state, update, toast, onClose, roleId }) {
-  // Auto-select the racer matching the logged-in user (don't default to someone else's stats).
-  const defaultRacerId = (() => {
+  const [racerId, setRacerId] = useState(() => {
     const label = roleId ? ROLES[roleId]?.label : null;
     if (label) {
       const match = state.racers.find((r) => r.name.toLowerCase() === label.toLowerCase());
       if (match) return match.id;
     }
     return state.racers[0]?.id || '';
-  })();
-  const [racerId, setRacerId] = useState(defaultRacerId);
+  });
   const [showPicker, setShowPicker] = useState(true);
   const [tree, setTree] = useState('500');
   const [mode, setMode] = useState('sportsman');
