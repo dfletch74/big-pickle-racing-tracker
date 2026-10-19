@@ -91,21 +91,32 @@ export const setGeminiKey = (t) => { try { t ? localStorage.setItem(GEMINI_KEY, 
  * Needs a free API key from https://aistudio.google.com/app/apikey.
  */
 export async function geminiVision(file, apiKey) {
-  // Downscale to max 1600px to keep the request small.
+  // Keep full resolution for faded print — downscale only if huge.
   const dataUrl = await new Promise((resolve, reject) => {
     const img = new Image();
     const url = URL.createObjectURL(file);
     img.onload = () => {
       URL.revokeObjectURL(url);
       try {
-        const maxDim = 1600;
+        const maxDim = 2400;
         const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
         const w = Math.round(img.width * scale);
         const h = Math.round(img.height * scale);
         const canvas = document.createElement('canvas');
         canvas.width = w; canvas.height = h;
-        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
-        resolve(canvas.toDataURL('image/jpeg', 0.85));
+        const ctx = canvas.getContext('2d');
+        // Boost contrast for faded thermal print before sending.
+        ctx.drawImage(img, 0, 0, w, h);
+        const data = ctx.getImageData(0, 0, w, h);
+        const px = data.data;
+        for (let i = 0; i < px.length; i += 4) {
+          const g = 0.299 * px[i] + 0.587 * px[i + 1] + 0.114 * px[i + 2];
+          // S-curve: darken darks, whiten lights.
+          const v = 255 / (1 + Math.exp(-0.04 * (g - 128)));
+          px[i] = px[i + 1] = px[i + 2] = v;
+        }
+        ctx.putImageData(data, 0, 0);
+        resolve(canvas.toDataURL('image/jpeg', 0.92));
       } catch (e) { reject(e); }
     };
     img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Could not read image')); };
@@ -113,19 +124,20 @@ export async function geminiVision(file, apiKey) {
   });
   const base64 = dataUrl.split(',')[1];
 
-  const prompt = `Read this drag racing timeslip and return ONLY valid JSON (no markdown, no explanation).
-If two lanes are shown, return both. Use null for anything unreadable.
+  const prompt = `This is a faded, wrinkled drag racing timeslip on thermal paper. Read it VERY carefully — the print is faint. Look at every number, even if barely visible. The slip has two lanes (left and right) with these fields in order: Reaction, 60 ft, 330 ft, 1/8 mile ET, 1/8 mile MPH, 1000 ft ET, 1/4 mile ET, 1/4 mile MPH. There may also be a date and time at the top.
+
+Return ONLY valid JSON (no markdown, no explanation). Use null for anything truly unreadable, but try hard — squint at the faint numbers.
 {
   "lanes": [
     {
       "rt": "0.123 or null",
-      "sixty": "1.234 or null (60 ft)",
-      "threeThirty": "3.456 or null (330 ft)",
-      "eighthET": "5.678 or null (1/8 mile ET)",
-      "eighthMPH": "100.00 or null (1/8 mile MPH)",
-      "thousand": "7.890 or null (1000 ft ET)",
-      "et": "9.012 or null (1/4 mile ET)",
-      "mph": "130.00 or null (1/4 mile MPH)"
+      "sixty": "1.234 or null",
+      "threeThirty": "3.456 or null",
+      "eighthET": "5.678 or null",
+      "eighthMPH": "100.00 or null",
+      "thousand": "7.890 or null",
+      "et": "9.012 or null",
+      "mph": "130.00 or null"
     }
   ],
   "date": "YYYY-MM-DD or null",
