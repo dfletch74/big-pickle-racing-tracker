@@ -45,7 +45,8 @@ export default function AddRun({ state, update, toast, editId, onDone }) {
     }
     const now = new Date();
     const f = { ...EMPTY };
-    f.date = now.toISOString().slice(0, 10);
+    // Local date, not UTC — toISOString would date an evening run as tomorrow.
+    f.date = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
     f.time = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
     f.trackId = state.tracks[0]?.id || '';
     return f;

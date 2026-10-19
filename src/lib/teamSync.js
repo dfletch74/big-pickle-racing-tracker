@@ -74,7 +74,9 @@ function backfillAir(r, tracks) {
 }
 
 async function fetchTeamRuns(url) {
-  const res = await fetch(url, { cache: 'no-store' });
+  // Cache-buster: the raw CDN can serve a stale copy for minutes after a push.
+  const busted = url + (url.includes('?') ? '&' : '?') + 't=' + Date.now();
+  const res = await fetch(busted, { cache: 'no-store' });
   if (!res.ok) throw new Error(`Team sheet returned HTTP ${res.status}`);
   const text = await res.text();
   if (!text.trim()) throw new Error('Team sheet is empty');
