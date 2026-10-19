@@ -132,17 +132,28 @@ If two lanes are shown, return both. Use null for anything unreadable.
   "time": "HH:MM (24h) or null"
 }`;
 
-  const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=${encodeURIComponent(apiKey)}`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }, { inline_data: { mime_type: 'image/jpeg', data: base64 } }] }],
-        generationConfig: { temperature: 0, maxOutputTokens: 800 },
-      }),
-    }
-  );
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 60000); // 60s timeout
+  let res;
+  try {
+    res = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=${encodeURIComponent(apiKey)}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }, { inline_data: { mime_type: 'image/jpeg', data: base64 } }] }],
+          generationConfig: { temperature: 0, maxOutputTokens: 800 },
+        }),
+        signal: controller.signal,
+      }
+    );
+  } catch (e) {
+    clearTimeout(timeoutId);
+    if (e.name === 'AbortError') throw new Error('AI read timed out (60s) — try again with a smaller photo');
+    throw new Error(`AI read failed: ${e.message}`);
+  }
+  clearTimeout(timeoutId);
   if (!res.ok) {
     let detail = '';
     try {
