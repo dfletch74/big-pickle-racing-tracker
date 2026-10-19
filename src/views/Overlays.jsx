@@ -263,11 +263,21 @@ export function TreeSimModal({ state, update, toast, onClose, roleId }) {
   const [phase, setPhase] = useState('idle'); // idle|staged|running|done
   const [lit, setLit] = useState([]);
   const [lastRT, setLastRT] = useState(null);
-  const [delayBox, setDelayBox] = useState(0);
+  const [delayBox, setDelayBox] = useState(() => state.settings?.delayBox || 0);
   const [crossTalk, setCrossTalk] = useState(false);
   const [oppLit, setOppLit] = useState([]);
   const timers = useRef([]);
   const greenAt = useRef(0);
+
+  // Delay box persists in settings so it survives closing the Tree.
+  const persistDelay = (v) => {
+    update((s) => { s.settings = s.settings || {}; s.settings.delayBox = Math.round(v * 1000) / 1000; });
+  };
+  const bumpDelay = (delta) => {
+    const v = Math.min(1, Math.max(0, Math.round((delayBox + delta) * 1000) / 1000));
+    setDelayBox(v);
+    persistDelay(v);
+  };
 
   const racer = state.racers.find((r) => r.id === racerId);
   const clearTimers = () => { timers.current.forEach(clearTimeout); timers.current = []; };
@@ -484,16 +494,30 @@ export function TreeSimModal({ state, update, toast, onClose, roleId }) {
                   <span className="text-xs font-semibold uppercase tracking-wider text-white/60">Delay box</span>
                   <span className="font-mono text-sm font-bold text-pickle-400">{delayBox.toFixed(3)}s</span>
                 </div>
+                <div className="mb-2 flex items-center gap-2">
+                  <button
+                    onClick={() => bumpDelay(-0.005)}
+                    className="flex-1 rounded-xl bg-white/10 py-2 font-mono text-lg font-bold text-white/80 active:bg-white/20"
+                  >−</button>
+                  <button
+                    onClick={() => bumpDelay(0.005)}
+                    className="flex-1 rounded-xl bg-white/10 py-2 font-mono text-lg font-bold text-white/80 active:bg-white/20"
+                  >+</button>
+                  <button
+                    onClick={() => { setDelayBox(0); persistDelay(0); }}
+                    className="rounded-xl bg-white/5 px-3 py-2 text-xs text-white/50 active:bg-white/10"
+                  >Clear</button>
+                </div>
                 <input
                   type="range" min="0" max="1" step="0.005" value={delayBox}
-                  onChange={(e) => setDelayBox(parseFloat(e.target.value))}
+                  onChange={(e) => { const v = parseFloat(e.target.value); setDelayBox(v); persistDelay(v); }}
                   className="w-full accent-pickle-400"
                 />
                 <div className="mt-1 flex justify-between text-[10px] text-white/35">
-                  <span>0.000</span><span>1.000</span>
+                  <span>0.000</span><span>±0.005 per tap</span><span>1.000</span>
                 </div>
                 <div className="mt-2 text-[11px] text-white/40">
-                  Add delay if red-lighting, remove if late. Effective RT = your hit + box.
+                  Bump up if red-lighting, down if late. Saved automatically. Effective RT = your hit + box.
                 </div>
               </div>
               <button

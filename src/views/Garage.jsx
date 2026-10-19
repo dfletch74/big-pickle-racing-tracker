@@ -1,7 +1,7 @@
 import { useState, useRef } from 'react';
 import { Card, SectionTitle, Btn, inputCls, Badge } from '../components/ui';
 import { predictET } from '../lib/stats';
-import { densityAltitudeFt, stationPressureHpa, waterGrains } from '../lib/physics';
+import { densityAltitudeFt, stationPressureHpa, waterGrains, correctET } from '../lib/physics';
 import { jsPDF } from 'jspdf';
 
 /**
@@ -91,6 +91,49 @@ function Maintenance({ state, update, toast, canEdit }) {
     update((s) => { s.maintenance = (s.maintenance || []).filter((x) => x.id !== id); });
   };
 
+  // Standard bracket-racing service intervals, compiled from:
+  // - Greeley Automotive Machine (race engine maintenance sheet)
+  // - Speedway Motors race-expert Q&A (oil/filter/plugs/wires)
+  // - Powerglide builder guidance (25–50 passes fluid changes)
+  const STANDARD_SCHEDULE = [
+    { name: 'Engine oil & filter', runsPerService: 20, notes: 'Gas: every 4–5 race nights (Speedway Motors); every night (GAM). ~5 passes/night.' },
+    { name: 'Cut open oil filter / inspect', runsPerService: 5, notes: 'Every race night — check for metal (Speedway Motors).' },
+    { name: 'Valve lash check', runsPerService: 20, notes: 'Adjust weekly (GAM).' },
+    { name: 'Valve spring pressure check', runsPerService: 5, notes: 'Check after each night; watch consistency, not just pressure (GAM).' },
+    { name: 'Spark plugs', runsPerService: 30, notes: 'Replace when they stop reading cleanly; inspect regularly.' },
+    { name: 'Plug wires', runsPerService: 200, notes: 'Yearly (Speedway Motors) ≈ one season.' },
+    { name: 'Transmission fluid & filter', runsPerService: 40, notes: 'Powerglide: every 25–50 passes depending on power.' },
+    { name: 'Rear end gear oil', runsPerService: 50, notes: 'Seasonal.' },
+    { name: 'Torque converter bolts', runsPerService: 10, notes: 'Check tightness every couple of race days.' },
+    { name: 'Lug nuts / wheel studs', runsPerService: 5, notes: 'Torque check every race day.' },
+    { name: 'Fuel filter', runsPerService: 40, notes: '' },
+    { name: 'Air filter clean / inspect', runsPerService: 5, notes: 'Every race day.' },
+    { name: 'Drive belts', runsPerService: 200, notes: 'Inspect every race day; replace yearly.' },
+    { name: 'Chassis nut-and-bolt check', runsPerService: 5, notes: 'Every race day.' },
+    { name: 'Slicks', runsPerService: 120, notes: 'Bracket slicks ~100–150 passes; watch 60-ft falloff.' },
+    { name: 'Shock rebuild', runsPerService: 200, notes: 'Yearly ≈ one season.' },
+    { name: 'Harness / belts (SFI tag)', runsPerService: 400, notes: 'SFI expires 2 years from manufacture — check the tag date.' },
+    { name: 'Fire extinguisher charge', runsPerService: 200, notes: 'Check yearly.' },
+  ];
+
+  const loadStandard = () => {
+    update((s) => {
+      s.maintenance = s.maintenance || [];
+      const existing = new Set(s.maintenance.map((p) => p.name.toLowerCase()));
+      for (const item of STANDARD_SCHEDULE) {
+        if (existing.has(item.name.toLowerCase())) continue;
+        s.maintenance.push({
+          id: Math.random().toString(36).slice(2),
+          name: item.name,
+          runsPerService: item.runsPerService,
+          lastServiceAt: totalRuns,
+          notes: item.notes,
+        });
+      }
+    });
+    toast('Standard schedule loaded — set each item\'s last-service point with "Mark serviced".');
+  };
+
   return (
     <div className="space-y-3">
       {parts.map((p) => {
@@ -125,7 +168,16 @@ function Maintenance({ state, update, toast, canEdit }) {
         );
       })}
       {parts.length === 0 && (
-        <div className="text-sm text-white/40">No parts tracked yet. Add valve springs, oil, tires, belts…</div>
+        <div className="text-sm text-white/40">No parts tracked yet. Load the standard schedule below or add your own.</div>
+      )}
+      {canEdit && parts.length === 0 && (
+        <Card>
+          <SectionTitle>Standard schedule</SectionTitle>
+          <div className="mb-3 text-xs text-white/40">
+            Bracket-racing service intervals compiled from engine builder and racer guidance. Adjust to your combo.
+          </div>
+          <Btn kind="primary" onClick={loadStandard} className="w-full">Load standard schedule</Btn>
+        </Card>
       )}
       {canEdit && (
         <Card>
@@ -822,33 +874,41 @@ function SetupRecommendations({ state }) {
 
   const generate = () => {
     const out = [];
-    const withJet = runs.filter((r) => r.jet != null && r.et != null);
+    const baseline = state.settings?.daBaseline || 2500;
+    const withJet = runs.filter((r) => r.jet != null && r.et != null && r.daFt != null);
     const withPsi = runs.filter((r) => (r.lPsi != null || r.rPsi != null) && r.sixty != null);
+    const withRev = runs.filter((r) => r.revLim != null && r.sixty != null);
 
-    // Jet analysis: compare ET at different jet settings in similar DA
+    // Jet analysis: compare DA-CORRECTED ET at different jet settings,
+    // so weather differences don't skew the comparison.
     if (withJet.length >= 6) {
       const byJet = {};
       for (const r of withJet) {
         const j = r.jet;
         if (!byJet[j]) byJet[j] = [];
-        byJet[j].push(r);
+        byJet[j].push(correctET(r.et, r.daFt, baseline));
       }
       const jets = Object.keys(byJet).map(Number).sort((a, b) => a - b);
       if (jets.length >= 2) {
-        // Find best jet by weather-corrected ET (simple: compare avg ET within DA bands)
         let bestJet = null, bestAvg = Infinity;
+        const avgs = {};
         for (const j of jets) {
           const rs = byJet[j];
-          const avgET = rs.reduce((a, r) => a + r.et, 0) / rs.length;
-          if (avgET < bestAvg) { bestAvg = avgET; bestJet = j; }
+          avgs[j] = rs.reduce((a, c) => a + c, 0) / rs.length;
+          if (avgs[j] < bestAvg) { bestAvg = avgs[j]; bestJet = j; }
         }
         const latestJet = withJet[withJet.length - 1].jet;
+        const detail = jets.map((j) => `${j} (${byJet[j].length}n): ${avgs[j].toFixed(3)}`).join(' · ');
         if (bestJet !== latestJet) {
-          out.push(`Jet: your best average ET (${bestAvg.toFixed(3)}) came with jet ${bestJet}, but you're currently on ${latestJet}. Consider testing ${bestJet} again.`);
+          out.push(`Jet: DA-corrected, jet ${bestJet} averages ${bestAvg.toFixed(3)} — best of what you've tried. You're currently on ${latestJet}. Worth testing ${bestJet} again. (${detail})`);
         } else {
-          out.push(`Jet: ${bestJet} looks optimal based on your history (avg ET ${bestAvg.toFixed(3)}).`);
+          out.push(`Jet: ${bestJet} looks optimal on DA-corrected ET (${bestAvg.toFixed(3)} avg). (${detail})`);
         }
+      } else {
+        out.push(`Jet: you've only run one jet size (${jets[0]}) with complete data — no comparison possible yet.`);
       }
+    } else if (runs.filter((r) => r.jet != null && r.et != null).length >= 6) {
+      out.push('Jet: several runs are missing DA, so a fair weather-corrected comparison isn\'t possible yet.');
     }
 
     // Tire pressure analysis: compare 60-ft at different pressures
@@ -862,11 +922,30 @@ function SetupRecommendations({ state }) {
       if (Math.abs(lowAvg - highAvg) > 0.01) {
         const better = lowAvg < highAvg ? 'lower' : 'higher';
         out.push(`Tire pressure: ${better} pressures average ${Math.min(lowAvg, highAvg).toFixed(3)} 60-ft vs ${Math.max(lowAvg, highAvg).toFixed(3)}. Consider ${better === 'lower' ? 'dropping' : 'raising'} PSI by 0.5 and testing.`);
+      } else {
+        out.push('Tire pressure: 60-ft is flat across the pressures you\'ve tried — current PSI range looks fine.');
+      }
+    }
+
+    // Rev limiter analysis: does a higher launch RPM help 60-ft?
+    if (withRev.length >= 6) {
+      const byRev = {};
+      for (const r of withRev) {
+        const v = r.revLim;
+        if (!byRev[v]) byRev[v] = [];
+        byRev[v].push(r.sixty);
+      }
+      const revs = Object.keys(byRev).map(Number).sort((a, b) => a - b);
+      if (revs.length >= 2) {
+        const avgs = revs.map((v) => ({ v, avg: byRev[v].reduce((a, c) => a + c, 0) / byRev[v].length, n: byRev[v].length }));
+        avgs.sort((a, b) => a.avg - b.avg);
+        const best = avgs[0];
+        out.push(`Rev limiter: ${best.v} rpm gives your best 60-ft (${best.avg.toFixed(3)} avg over ${best.n} runs). ${avgs.map((a) => `${a.v}: ${a.avg.toFixed(3)}`).join(' · ')}`);
       }
     }
 
     if (out.length === 0) {
-      out.push('Not enough setup data yet. Log runs with jet and tire pressure to get recommendations.');
+      out.push('Not enough setup data yet. Log runs with jet, tire pressure, and rev limiter to get recommendations.');
     }
     setRecs(out);
   };
