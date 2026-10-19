@@ -214,10 +214,134 @@ export function rankSetups(runs, baseline) {
 }
 
 /**
- * Rule-based crew chief narrative (no LLM). References: DA trend, weakest
- * segment vs best, and the top-ranked setup from rankSetups() — the same
- * ranking the IDEAL SETUP card shows.
+ * Rich crew chief's call: data-driven setup recommendations with structured
+ * explanations. Compares current conditions to historical baseline, pulls the
+ * top-ranked setup, and generates template-based rationale.
+ * 
+ * Returns {
+ *   conditions: { daFt, baselineDA, delta, tempF, airDesc },
+ *   opening: string,
+ *   setup: [{ field, label, value, from, why }],
+ *   rationale: string,
+ *   advice: [string],
+ * }
  */
+export function crewChiefCall(runs, target, baseline, latest) {
+  const daFt = target.daFt;
+  const tempF = target.tempF;
+  
+  // Baseline DA: average of runs with DA data.
+  const daRuns = runs.filter((r) => isNum(r.daFt));
+  const baselineDA = daRuns.length ? avg(daRuns.map((r) => r.daFt)) : baseline || 2500;
+  const delta = daFt != null ? daFt - baselineDA : null;
+  
+  // Air description.
+  let airDesc = 'similar to';
+  if (delta != null) {
+    if (delta < -1000) airDesc = 'significantly better than';
+    else if (delta < -300) airDesc = 'better than';
+    else if (delta > 1000) airDesc = 'significantly worse than';
+    else if (delta > 300) airDesc = 'worse than';
+  }
+  
+  // Top-ranked setup by weather-corrected ET.
+  const ranked = rankSetups(runs, baseline);
+  const top = ranked[0] || null;
+  
+  // Build opening.
+  let opening = '';
+  if (daFt != null && daRuns.length) {
+    opening = `Listen up. The air is ${airDesc} our previous logs. We're looking at a Density Altitude of roughly ${Math.round(daFt)} ft, `;
+    if (delta < -300) {
+      opening += `which is ${Math.abs(Math.round(delta))} ft lower than our baseline (${Math.round(baselineDA)} ft). That air is dense, cold, and packed with oxygen — the engine is going to wake up, so don't choke it out.`;
+    } else if (delta > 300) {
+      opening += `which is ${Math.round(delta)} ft higher than our baseline (${Math.round(baselineDA)} ft). That air is thin — the engine will be down on power, so don't over-fuel it.`;
+    } else {
+      opening += `right around our baseline (${Math.round(baselineDA)} ft). Expect the car to run like it has been.`;
+    }
+  } else {
+    opening = 'Log runs with weather data to unlock air analysis.';
+  }
+  
+  // Build setup recommendations with explanations.
+  const setup = [];
+  if (top && latest) {
+    const fields = [
+      { k: 'revLim', label: 'Rev Limiter', unit: ' RPM' },
+      { k: 'jet', label: 'Jet', unit: '' },
+      { k: 'lPsi', label: 'Left Tire PSI', unit: '' },
+      { k: 'rPsi', label: 'Right Tire PSI', unit: '' },
+      { k: 'lBar', label: 'Left Bar', unit: '' },
+      { k: 'rBar', label: 'Right Bar', unit: '' },
+      { k: 'comp', label: 'Compression', unit: '' },
+      { k: 'rebound', label: 'Rebound', unit: '' },
+    ];
+    for (const { k, label, unit } of fields) {
+      const to = top.fields[k];
+      const from = latest[k];
+      if (!isNum(to)) continue;
+      let why = '';
+      if (k === 'jet' && isNum(from) && to !== from) {
+        if (to > from && delta < -300) why = ' (We need more fuel to match the increased air density)';
+        else if (to < from && delta > 300) why = ' (Less fuel for the thinner air)';
+        else if (to > from) why = ' (More fuel based on what worked)';
+        else if (to < from) why = ' (Less fuel based on what worked)';
+      } else if (k === 'revLim' && isNum(from) && to !== from) {
+        if (to > from && delta < -300) why = ' (Bump it up to account for the extra power in the dense air)';
+        else if (to > from) why = ' (Take advantage of the power band)';
+      } else if ((k === 'lPsi' || k === 'rPsi') && isNum(from) && to !== from) {
+        if (tempF != null && tempF < 50 && to > from) why = ' (Cooler track surface — keep sidewalls stable)';
+      }
+      setup.push({ field: k, label, value: to, from: isNum(from) ? from : null, why, unit });
+    }
+  }
+  
+  // Rationale paragraph.
+  let rationale = '';
+  if (daFt != null && top) {
+    const parts = [];
+    if (delta < -300) {
+      parts.push(`The current Density Altitude (${Math.round(daFt)} ft) is significantly lower than our baseline (${Math.round(baselineDA)} ft), meaning the engine is pulling in much denser air.`);
+      const jetRec = setup.find((s) => s.field === 'jet');
+      if (jetRec && jetRec.from != null && jetRec.value !== jetRec.from) {
+        parts.push(`If we run our old ${jetRec.from} jet, we'll lean out and risk burning a piston. We are bumping the jet to ${jetRec.value} to compensate for the oxygen-rich environment.`);
+      }
+      const revRec = setup.find((s) => s.field === 'revLim');
+      if (revRec && revRec.from != null && revRec.value > revRec.from) {
+        parts.push(`Raising the rev limiter to take advantage of the increased power band.`);
+      }
+      if (tempF != null && tempF < 50) {
+        parts.push(`I've bumped the tire pressure to account for the cooler track surface (${tempF.toFixed(1)}°F), which will help keep the sidewalls stable and prevent the tires from dragging too much on the launch.`);
+      }
+    } else if (delta > 300) {
+      parts.push(`The current Density Altitude (${Math.round(daFt)} ft) is higher than our baseline (${Math.round(baselineDA)} ft). Thinner air means less oxygen — the engine will make less power.`);
+      const jetRec = setup.find((s) => s.field === 'jet');
+      if (jetRec && jetRec.from != null && jetRec.value < jetRec.from) {
+        parts.push(`We're leaning the jet to ${jetRec.value} to match the thinner air and avoid running rich.`);
+      }
+    } else {
+      parts.push(`Conditions are close to baseline. The recommended setup is what has worked best in similar air.`);
+    }
+    rationale = parts.join(' ');
+  }
+  
+  // Key advice based on conditions.
+  const advice = [];
+  if (delta != null && delta < -500) {
+    advice.push(`**Watch your launch.** With the air this dense, you're going to have more torque off the line than you're used to. Don't hammer it and blow the tires off; feed the power in and keep the car straight.`);
+  }
+  if (tempF != null && tempF < 50) {
+    advice.push(`The track is cold (${tempF.toFixed(1)}°F), so make sure you get enough heat into those tires during the burnout, or you'll be spinning instead of winning.`);
+  }
+  if (delta != null && delta > 500) {
+    advice.push(`Thin air means less downforce on the launch. Be smooth — the car won't hook as hard as you're used to.`);
+  }
+  if (!advice.length && daFt != null) {
+    advice.push(`Conditions are near baseline. Run your proven setup and focus on the tree.`);
+  }
+  
+  return { conditions: { daFt, baselineDA, delta, tempF, airDesc }, opening, setup, rationale, advice, top, hasData: daRuns.length > 0 };
+}
 export function crewChief(runs, baseline, daTrend) {
   const ranked = rankSetups(runs, baseline);
   const top = ranked[0] || null;

@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Card, SectionTitle, inputCls, Segmented, Badge, EmptyState } from '../components/ui';
 import { fmtET, fmtTemp, fmtDA, fmtDate, isNum } from '../lib/format';
-import { runsForCar, filterDistance, latestRun, findSimilar, dialIn, rankSetups, crewChief, similarityPct, predictET } from '../lib/stats';
+import { runsForCar, filterDistance, latestRun, findSimilar, dialIn, rankSetups, crewChief, crewChiefCall, similarityPct, predictET } from '../lib/stats';
 import { useWeatherEntry, WeatherEntryCard } from '../components/WeatherEntry';
 
 export default function Insight({ state, toast, dist, setDist }) {
@@ -43,6 +43,10 @@ export default function Insight({ state, toast, dist, setDist }) {
   } : null;
   const ranked = useMemo(() => rankSetups(runs, baseline), [runs, baseline]);
   const chief = useMemo(() => crewChief(runs, baseline, null), [runs, baseline]);
+  const call = useMemo(
+    () => (target.daFt != null ? crewChiefCall(runs, target, baseline, last) : null),
+    [runs, target.daFt, target.tempF, baseline, last],
+  );
   const top = ranked[0];
   const nAir = useMemo(() => runs.filter((r) => isNum(r.et) && isNum(r.daFt)).length, [runs]);
 
@@ -117,13 +121,58 @@ export default function Insight({ state, toast, dist, setDist }) {
         {top && last && <SetupDeltas top={top} last={last} />}
       </Card>
 
-      {/* crew chief — rule-based, derived from the SAME ranking above */}
+      {/* crew chief's call — data-driven with structured explanations */}
       <Card>
-        <SectionTitle>Crew chief's call</SectionTitle>
-        <div className="space-y-2 text-sm text-white/75">
-          {chief.bullets.map((b, i) => <div key={i} className="flex gap-2"><span className="text-pickle-400">▸</span><span>{b}</span></div>)}
-        </div>
-        <div className="mt-2 text-[10px] text-white/35">Rule-based analysis — no AI involved. Setup advice always matches the Ideal Setup ranking above.</div>
+        <SectionTitle>🧠 Crew chief's call</SectionTitle>
+        {!call ? (
+          <div className="text-sm text-white/50">Enter conditions above to get the crew chief's analysis.</div>
+        ) : !call.hasData ? (
+          <div className="text-sm text-white/50">Log runs with weather data to unlock air analysis.</div>
+        ) : (
+          <div className="space-y-3 text-sm text-white/75">
+            <p className="leading-relaxed">{call.opening}</p>
+            
+            {call.setup.length > 0 && (
+              <div>
+                <div className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-white/45">1. Recommended Setup</div>
+                <div className="space-y-1">
+                  {call.setup.map((s) => (
+                    <div key={s.field} className="flex gap-2">
+                      <span className="min-w-[110px] font-semibold text-white/90">{s.label}:</span>
+                      <span className="font-mono text-pickle-400">{s.value}{s.unit}</span>
+                      {s.why && <span className="text-white/60">{s.why}</span>}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            
+            {call.rationale && (
+              <div>
+                <div className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-white/45">2. Rationale</div>
+                <p className="leading-relaxed">{call.rationale}</p>
+              </div>
+            )}
+            
+            {call.advice.length > 0 && (
+              <div>
+                <div className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-white/45">3. Key Advice</div>
+                <div className="space-y-1.5">
+                  {call.advice.map((a, i) => (
+                    <div key={i} className="flex gap-2">
+                      <span className="text-pickle-400">▸</span>
+                      <span dangerouslySetInnerHTML={{ __html: a.replace(/\*\*(.+?)\*\*/g, '<b>$1</b>') }} />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            
+            <div className="pt-1 text-[10px] text-white/35">
+              Data-driven from {runs.length} runs. Get it done.
+            </div>
+          </div>
+        )}
       </Card>
 
       {/* similar past runs */}
