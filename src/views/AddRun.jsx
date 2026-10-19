@@ -7,6 +7,7 @@ import { fetchTrackWeather } from '../lib/weather';
 import { fmtDA } from '../lib/format';
 import { isNum } from '../lib/format';
 import { ScanSlipButton } from '../components/ScanSlip';
+import { parseSlipText, pickLane, laneCount } from '../lib/scanSlip';
 
 const SETUP_FIELDS = [
   ['jet', 'Jet'], ['lPsi', 'L Tire PSI'], ['rPsi', 'R Tire PSI'],
@@ -70,6 +71,30 @@ export default function AddRun({ state, update, toast, editId, onDone }) {
       return next;
     });
     toast('Timeslip values filled — check them before saving.');
+  };
+
+  const [clipMsg, setClipMsg] = useState('');
+  const fillFromClipboard = async () => {
+    setClipMsg('');
+    let text = '';
+    try {
+      text = await navigator.clipboard.readText();
+    } catch {
+      setClipMsg('Clipboard blocked — copy the slip text first, then try again.');
+      return;
+    }
+    if (!text || !text.trim()) {
+      setClipMsg('Clipboard is empty — copy the slip text in Photos first.');
+      return;
+    }
+    const p = parseSlipText(text);
+    const vals = pickLane(p, 0);
+    const n = Object.keys(vals).filter((k) => k !== 'date' && k !== 'time' && vals[k]).length;
+    if (n === 0) {
+      setClipMsg('No slip numbers found in clipboard.');
+      return;
+    }
+    fillFromScan(vals);
   };
   const track = state.tracks.find((t) => t.id === f.trackId);
 
@@ -166,7 +191,13 @@ export default function AddRun({ state, update, toast, editId, onDone }) {
       <SectionTitle>{editing ? 'Edit run' : 'Log a run'}</SectionTitle>
 
       {!editing && (
-        <ScanSlipButton onFill={fillFromScan} />
+        <div className="space-y-2">
+          <Btn kind="primary" onClick={fillFromClipboard} className="w-full">
+            <span className="mr-1">📋</span> Fill from clipboard
+          </Btn>
+          {clipMsg && <div className="text-center text-xs text-amber-300/80">{clipMsg}</div>}
+          <ScanSlipButton onFill={fillFromScan} />
+        </div>
       )}
 
       <Card className="space-y-3">
