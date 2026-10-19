@@ -8,6 +8,7 @@ import { APP_VERSION } from '../version';
 import { fmtET, fmtMPH, fmtRT, fmtTemp, fmtDA, fmtDate, isNum } from '../lib/format';
 import { ROLES } from '../lib/roles';
 import { pullRacers, publishRacers } from '../lib/teamSync';
+import { makeSetupLink } from '../lib/setupLink';
 import QRCode from 'qrcode';
 
 /* ---------------- Garage ---------------- */
@@ -598,12 +599,13 @@ export function SettingsModal({ state, update, reset, toast, onClose }) {
   const [qrUrl, setQrUrl] = useState('');
   const current = currentBundleHash();
 
-  // Generate QR code for the token when the share modal opens.
+  // Generate QR code for the setup link when the share modal opens.
   useEffect(() => {
     if (showQr) {
       const pat = getPat();
       if (pat) {
-        QRCode.toDataURL(pat, { width: 256, margin: 2 }).then(setQrUrl).catch(() => setQrUrl(''));
+        const link = makeSetupLink(pat);
+        QRCode.toDataURL(link, { width: 256, margin: 2 }).then(setQrUrl).catch(() => setQrUrl(''));
       }
     } else {
       setQrUrl('');
@@ -764,6 +766,15 @@ export function SettingsModal({ state, update, reset, toast, onClose }) {
 }
 
 function QrShareModal({ onClose, qrUrl, toast }) {
+  const copyLink = async () => {
+    try {
+      await navigator.clipboard.writeText(makeSetupLink(getPat()));
+      toast('Setup link copied — text it to the crew member.');
+    } catch {
+      toast('Copy failed — try the QR code instead.', 'error');
+    }
+  };
+
   const copyToken = async () => {
     try {
       await navigator.clipboard.writeText(getPat());
@@ -778,18 +789,21 @@ function QrShareModal({ onClose, qrUrl, toast }) {
       <div className="w-full max-w-xs rounded-3xl border border-white/10 bg-coal-900 p-6 text-center" onClick={(e) => e.stopPropagation()}>
         <h3 className="font-display text-lg font-bold uppercase tracking-wider text-white/90">Share token</h3>
         <div className="mt-1 text-xs text-white/50">
-          Have the crew point their iPhone camera at this code, tap the text, and paste it into their app's Team data settings.
+          They tap the link (or scan the code with their camera) and the app sets itself up — no copy/paste needed.
         </div>
         <div className="mx-auto mt-4 flex h-64 w-64 items-center justify-center rounded-2xl bg-white p-2">
           {qrUrl ? (
-            <img src={qrUrl} alt="Token QR code" className="h-full w-full" />
+            <img src={qrUrl} alt="Setup link QR code" className="h-full w-full" />
           ) : (
             <div className="text-sm text-black/50">Generating…</div>
           )}
         </div>
         <div className="mt-4 flex gap-2">
+          <Btn kind="ghost" onClick={copyLink} className="flex-1">Copy link</Btn>
           <Btn kind="ghost" onClick={copyToken} className="flex-1">Copy token</Btn>
-          <Btn kind="ghost" onClick={onClose} className="flex-1">Done</Btn>
+        </div>
+        <div className="mt-2">
+          <Btn kind="quiet" onClick={onClose} className="w-full">Done</Btn>
         </div>
       </div>
     </div>

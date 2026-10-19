@@ -5,6 +5,8 @@ import { LOGO_DATA_URI } from './components/logo';
 import { LockScreen, CrewModal } from './components/Crew';
 import { ROLES, getSavedRole, clearRole } from './lib/roles';
 import { checkForAppUpdate, reloadForUpdate } from './lib/updater';
+import { parseSetupLink, clearSetupLink } from './lib/setupLink';
+import { setPat } from './lib/teamSync';
 import Dash from './views/Dash';
 import Runs from './views/Runs';
 import AddRun from './views/AddRun';
@@ -68,6 +70,17 @@ export default function App() {
   useEffect(() => {
     if (!teamSyncOnOpen(state)) return;
     syncTeamData(state, update).catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Magic setup link: if the URL has #setup=..., save the token automatically.
+  useEffect(() => {
+    const setup = parseSetupLink();
+    if (setup?.token) {
+      setPat(setup.token);
+      clearSetupLink();
+      toast('Team setup complete! Publishing is enabled.');
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
