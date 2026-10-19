@@ -123,7 +123,7 @@ export default function Insight({ state, toast, dist, setDist }) {
 
       {/* crew chief's call — data-driven with structured explanations */}
       <Card>
-        <SectionTitle>🧠 Crew chief's call</SectionTitle>
+        <SectionTitle>Crew chief's call</SectionTitle>
         {!call ? (
           <div className="text-sm text-white/50">Enter conditions above to get the crew chief's analysis.</div>
         ) : !call.hasData ? (
@@ -161,7 +161,7 @@ export default function Insight({ state, toast, dist, setDist }) {
                   {call.advice.map((a, i) => (
                     <div key={i} className="flex gap-2">
                       <span className="text-pickle-400">▸</span>
-                      <span dangerouslySetInnerHTML={{ __html: a.replace(/\*\*(.+?)\*\*/g, '<b>$1</b>') }} />
+                      <span>{renderBold(a)}</span>
                     </div>
                   ))}
                 </div>
@@ -192,6 +192,16 @@ export default function Insight({ state, toast, dist, setDist }) {
         )}
       </Card>
     </div>
+  );
+}
+
+function renderBold(text) {
+  // Render **bold** markers as <b> elements without dangerouslySetInnerHTML.
+  const parts = text.split(/(\*\*.+?\*\*)/g);
+  return parts.map((p, i) =>
+    p.startsWith('**') && p.endsWith('**') && p.length > 4
+      ? <b key={i}>{p.slice(2, -2)}</b>
+      : <span key={i}>{p}</span>
   );
 }
 
