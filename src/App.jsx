@@ -12,6 +12,7 @@ import Runs from './views/Runs';
 import AddRun from './views/AddRun';
 import TrackDay from './views/TrackDay';
 import Insight from './views/Insight';
+import Garage from './views/Garage';
 import { GarageModal, TreeSimModal, SettingsModal, PrintSheet } from './views/Overlays';
 import { syncTeamData, teamSyncOnOpen } from './lib/teamSync';
 
@@ -21,6 +22,7 @@ const NAV = [
   { id: 'add', label: 'ADD', icon: 'plus', fab: true },
   { id: 'track', label: 'TRACK', icon: 'flag' },
   { id: 'insight', label: 'INSIGHT', icon: 'chart' },
+  { id: 'garage', label: 'GARAGE', icon: 'wrench' },
 ];
 
 export default function App() {
@@ -229,13 +231,20 @@ export default function App() {
           {view === 'insight' && (
             <Insight state={state} toast={toast} dist={dist} setDist={setDist} />
           )}
+          {view === 'garage' && roleId === 'admin' && (
+            <Garage state={state} update={update} toast={toast} role={role} />
+          )}
         </div>
       </main>
 
       {/* bottom nav */}
       <nav className="app-chrome fixed inset-x-0 bottom-0 z-40 border-t border-white/10 bg-coal-950/95 pb-[env(safe-area-inset-bottom)] backdrop-blur">
-        <div className={`mx-auto grid max-w-3xl items-end px-2 ${role.canLog ? 'grid-cols-5' : 'grid-cols-4'}`}>
-          {NAV.filter((n) => n.id !== 'add' || role.canLog).map((n) =>
+        <div className={`mx-auto grid max-w-3xl items-end px-2 ${role.canLog ? (roleId === 'admin' ? 'grid-cols-6' : 'grid-cols-5') : 'grid-cols-4'}`}>
+          {NAV.filter((n) => {
+            if (n.id === 'add' && !role.canLog) return false;
+            if (n.id === 'garage' && roleId !== 'admin') return false;
+            return true;
+          }).map((n) =>
             n.fab ? (
               <button
                 key={n.id}

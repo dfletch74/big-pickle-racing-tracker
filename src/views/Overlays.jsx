@@ -263,6 +263,9 @@ export function TreeSimModal({ state, update, toast, onClose, roleId }) {
   const [phase, setPhase] = useState('idle'); // idle|staged|running|done
   const [lit, setLit] = useState([]);
   const [lastRT, setLastRT] = useState(null);
+  const [delayBox, setDelayBox] = useState(0);
+  const [crossTalk, setCrossTalk] = useState(false);
+  const [oppLit, setOppLit] = useState([]);
   const timers = useRef([]);
   const greenAt = useRef(0);
 
@@ -272,7 +275,7 @@ export function TreeSimModal({ state, update, toast, onClose, roleId }) {
 
   const later = (ms, fn) => timers.current.push(setTimeout(fn, ms));
 
-  const stage = () => { setLit(['pre', 'stage']); setPhase('staged'); setLastRT(null); };
+  const stage = () => { setLit(['pre', 'stage']); setOppLit([]); setPhase('staged'); setLastRT(null); };
 
   const holdStart = () => {
     if (phase !== 'staged') return;
@@ -281,35 +284,47 @@ export function TreeSimModal({ state, update, toast, onClose, roleId }) {
     setPhase('running');
     const d = TREE_DELAY[tree] * 1000;
     const t0 = performance.now();
+    // Cross Talk: opponent's tree runs 0.15s ahead (staggered start).
+    // Watch YOUR tree, not theirs.
+    const oppOffset = crossTalk ? -150 : 0;
     if (mode === 'sportsman') {
       setLit(['pre', 'stage', 'a1']);
+      if (crossTalk) setOppLit(['pre', 'stage', 'a1']);
       later(d, () => setLit(['pre', 'stage', 'a1', 'a2']));
+      if (crossTalk) later(d + oppOffset, () => setOppLit(['pre', 'stage', 'a1', 'a2']));
       later(2 * d, () => setLit(['pre', 'stage', 'a1', 'a2', 'a3']));
+      if (crossTalk) later(2 * d + oppOffset, () => setOppLit(['pre', 'stage', 'a1', 'a2', 'a3']));
       greenAt.current = t0 + 3 * d;
       later(3 * d, () => setLit((l) => [...l, 'green']));
+      if (crossTalk) later(3 * d + oppOffset, () => setOppLit((l) => [...l, 'green']));
     } else {
       setLit(['pre', 'stage', 'a1', 'a2', 'a3']);
+      if (crossTalk) setOppLit(['pre', 'stage', 'a1', 'a2', 'a3']);
       greenAt.current = t0 + d;
       later(d, () => setLit((l) => [...l, 'green']));
+      if (crossTalk) later(d + oppOffset, () => setOppLit((l) => [...l, 'green']));
     }
   };
 
   const holdEnd = () => {
     if (phase !== 'running') return;
     const now = performance.now();
-    const rt = (now - greenAt.current) / 1000;
+    // Delay box: effective RT = raw release time + box delay.
+    // Add delay if red-lighting, remove if late.
+    const rawRt = (now - greenAt.current) / 1000;
+    const rt = rawRt + delayBox;
     const red = rt < 0;
     clearTimers();
     setLit((l) => (red ? [...l, 'red'] : l));
     setPhase('done');
-    setLastRT({ rt, red });
+    setLastRT({ rt, red, rawRt, delayBox });
     update((s) => {
       const r = s.racers.find((x) => x.id === racerId);
-      if (r) r.attempts.push({ id: uid(), rt: Math.round(rt * 1000) / 1000, red, date: new Date().toISOString().slice(0, 10), tree, mode });
+      if (r) r.attempts.push({ id: uid(), rt: Math.round(rt * 1000) / 1000, red, date: new Date().toISOString().slice(0, 10), tree, mode, delayBox });
     });
   };
 
-  const reset = () => { clearTimers(); setLit([]); setPhase('idle'); setLastRT(null); };
+  const reset = () => { clearTimers(); setLit([]); setOppLit([]); setPhase('idle'); setLastRT(null); };
 
   // Ghost-click-proof wiring (see useNativeTap): the hold button gets real
   // non-passive touch handlers; the stage/reset buttons get native taps.
@@ -464,6 +479,36 @@ export function TreeSimModal({ state, update, toast, onClose, roleId }) {
                 options={[{ value: 'sportsman', label: 'SPORTSMAN' }, { value: 'pro', label: 'PRO' }]}
                 value={mode} onChange={setMode} labelClass="font-display tracking-[0.08em]" compact
               />
+              <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
+                <div className="mb-2 flex items-center justify-between">
+                  <span className="text-xs font-semibold uppercase tracking-wider text-white/60">Delay box</span>
+                  <span className="font-mono text-sm font-bold text-pickle-400">{delayBox.toFixed(3)}s</span>
+                </div>
+                <input
+                  type="range" min="0" max="1" step="0.005" value={delayBox}
+                  onChange={(e) => setDelayBox(parseFloat(e.target.value))}
+                  className="w-full accent-pickle-400"
+                />
+                <div className="mt-1 flex justify-between text-[10px] text-white/35">
+                  <span>0.000</span><span>1.000</span>
+                </div>
+                <div className="mt-2 text-[11px] text-white/40">
+                  Add delay if red-lighting, remove if late. Effective RT = your hit + box.
+                </div>
+              </div>
+              <button
+                onClick={() => setCrossTalk((v) => !v)}
+                className={`w-full rounded-2xl border px-3 py-2.5 text-sm font-semibold transition ${
+                  crossTalk ? 'border-pickle-500/50 bg-pickle-500/10 text-pickle-300' : 'border-white/10 bg-white/5 text-white/60'
+                }`}
+              >
+                Cross Talk {crossTalk ? 'ON' : 'OFF'}
+              </button>
+              {crossTalk && (
+                <div className="rounded-2xl border border-amber-500/30 bg-amber-500/5 p-3 text-[11px] text-amber-200/80">
+                  Opponent's tree lights first — watch YOUR tree, not theirs. Simulates staggered bracket racing.
+                </div>
+              )}
             </div>
 
             <button onClick={() => setShowHelp((s) => !s)} className="mx-auto flex items-center gap-1.5 py-2.5 text-sm text-white/55 transition hover:text-white">
@@ -480,32 +525,54 @@ export function TreeSimModal({ state, update, toast, onClose, roleId }) {
             )}
 
             {/* the tree — compact so bulbs + action bar share one screen */}
-            <div className="mx-auto mt-1 w-full max-w-[250px] rounded-[22px] border border-white/[0.08] bg-[#12141a] px-6 py-4">
-              <div className="flex items-start justify-center gap-8">
-                <div className="flex flex-col items-center gap-1.5">
-                  <TreeBulb on={lit.includes('pre')} color="#3b82f6" className="h-8 w-8 sm:h-9 sm:w-9" />
-                  <span className="font-display text-[11px] font-semibold uppercase tracking-[0.2em] text-white/45">Pre</span>
-                </div>
-                <div className="flex flex-col items-center gap-1.5">
-                  <TreeBulb on={lit.includes('stage')} color="#3b82f6" className="h-8 w-8 sm:h-9 sm:w-9" />
-                  <span className="font-display text-[11px] font-semibold uppercase tracking-[0.2em] text-white/45">Stage</span>
-                </div>
-              </div>
-              <div className="my-3 h-px bg-white/[0.07]" />
-              <div className="space-y-3">
-                {[
-                  ['a1', 'Amber', '#fbbf24'],
-                  ['a2', 'Amber', '#fbbf24'],
-                  ['a3', 'Amber', '#fbbf24'],
-                  ['green', 'Go', '#22c55e'],
-                  ['red', 'Foul', '#ef4444'],
-                ].map(([id, label, color]) => (
-                  <div key={id} className="flex items-center gap-4">
-                    <TreeBulb on={lit.includes(id)} color={color} className="h-11 w-11 sm:h-14 sm:w-14" />
-                    <span className="font-display text-[13px] font-semibold uppercase tracking-[0.24em] text-white/45">{label}</span>
+            <div className="flex items-start justify-center gap-4">
+              <div className="mx-auto mt-1 w-full max-w-[250px] rounded-[22px] border border-white/[0.08] bg-[#12141a] px-6 py-4">
+                <div className="mb-2 text-center text-[10px] uppercase tracking-[0.2em] text-white/40">You</div>
+                <div className="flex items-start justify-center gap-8">
+                  <div className="flex flex-col items-center gap-1.5">
+                    <TreeBulb on={lit.includes('pre')} color="#3b82f6" className="h-8 w-8 sm:h-9 sm:w-9" />
+                    <span className="font-display text-[11px] font-semibold uppercase tracking-[0.2em] text-white/45">Pre</span>
                   </div>
-                ))}
+                  <div className="flex flex-col items-center gap-1.5">
+                    <TreeBulb on={lit.includes('stage')} color="#3b82f6" className="h-8 w-8 sm:h-9 sm:w-9" />
+                    <span className="font-display text-[11px] font-semibold uppercase tracking-[0.2em] text-white/45">Stage</span>
+                  </div>
+                </div>
+                <div className="my-3 h-px bg-white/[0.07]" />
+                <div className="space-y-3">
+                  {[
+                    ['a1', 'Amber', '#fbbf24'],
+                    ['a2', 'Amber', '#fbbf24'],
+                    ['a3', 'Amber', '#fbbf24'],
+                    ['green', 'Go', '#22c55e'],
+                    ['red', 'Foul', '#ef4444'],
+                  ].map(([id, label, color]) => (
+                    <div key={id} className="flex items-center gap-4">
+                      <TreeBulb on={lit.includes(id)} color={color} className="h-11 w-11 sm:h-14 sm:w-14" />
+                      <span className="font-display text-[13px] font-semibold uppercase tracking-[0.24em] text-white/45">{label}</span>
+                    </div>
+                  ))}
+                </div>
               </div>
+
+              {crossTalk && (
+                <div className="mt-1 w-full max-w-[140px] rounded-[22px] border border-white/[0.06] bg-[#0f1116] px-4 py-4 opacity-70">
+                  <div className="mb-2 text-center text-[10px] uppercase tracking-[0.2em] text-white/30">Opponent</div>
+                  <div className="space-y-2">
+                    {[
+                      ['a1', '#fbbf24'],
+                      ['a2', '#fbbf24'],
+                      ['a3', '#fbbf24'],
+                      ['green', '#22c55e'],
+                    ].map(([id, color]) => (
+                      <div key={id} className="flex justify-center">
+                        <TreeBulb on={oppLit.includes(id)} color={color} className="h-8 w-8" />
+                      </div>
+                    ))}
+                  </div>
+                  <div className="mt-2 text-center text-[9px] text-white/30">Ignore this tree</div>
+                </div>
+              )}
             </div>
 
             <div className="mt-3 text-center text-[15px] font-medium text-white/55">

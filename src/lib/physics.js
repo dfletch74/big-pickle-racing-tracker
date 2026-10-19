@@ -53,6 +53,21 @@ export function stationPressureHpa(mslpHpa, elevationFt) {
 }
 
 /**
+ * Water grains: grains of moisture per pound of dry air.
+ * More tuning-relevant than relative humidity alone — quantifies
+ * humidity's actual effect on air/fuel mixture.
+ * @param {object} p - { tempF, humidityPct (0-100), pressureHpa (station) }
+ */
+export function waterGrains({ tempF, humidityPct = 0, pressureHpa = 1013.25 }) {
+  const tempC = (tempF - 32) * 5 / 9;
+  const es = saturationVaporPressureHpa(tempC);
+  const e = es * (humidityPct / 100);
+  // Mixing ratio -> grains per lb: 7000 grains per lb, ratio = 0.622 * e/(p-e)
+  const grains = 7000 * 0.622 * e / Math.max(pressureHpa - e, 1);
+  return Math.round(grains);
+}
+
+/**
  * Density altitude in feet.
  * @param {object} p - { tempF, humidityPct (0-100), pressureHpa (station pressure) }
  */

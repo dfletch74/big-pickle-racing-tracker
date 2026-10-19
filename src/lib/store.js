@@ -31,6 +31,8 @@ function seedState() {
     trackNotes: [],
     presets: [],
     events: [],
+    maintenance: [],
+    checklists: {},
     settings: { daBaseline: 2500 },
   };
 }
