@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Modal, Btn, inputCls } from './ui';
 import { ROLES, hashPin, verifyPin, saveRole } from '../lib/roles';
+import { APP_VERSION } from '../version';
 
 // Which roles each PIN unlocks.
 const PIN_ROLES = {
@@ -112,6 +113,7 @@ export function LockScreen({ settings, onUnlock }) {
         <Btn kind="primary" onClick={submitPin} className="w-full" disabled={!pin}>
           Unlock
         </Btn>
+        <div className="text-center font-mono text-[11px] text-white/25">v{APP_VERSION}</div>
       </div>
     </div>
   );
