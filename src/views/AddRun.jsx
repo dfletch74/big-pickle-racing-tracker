@@ -121,14 +121,28 @@ export default function AddRun({ state, update, toast, editId, onDone }) {
       setClipMsg('Voice input not supported in this browser.');
       return;
     }
+    // Stop any existing recognition first.
+    if (window._bprRec) {
+      try { window._bprRec.stop(); } catch {}
+      window._bprRec = null;
+    }
     const rec = new SR();
+    window._bprRec = rec;
     rec.lang = 'en-US';
     rec.interimResults = false;
     rec.maxAlternatives = 1;
     setListening(true);
-    setClipMsg('Listening… say the 8 numbers in order: reaction, 60 ft, 330 ft, 1/8 ET, 1/8 MPH, 1000 ft, 1/4 ET, 1/4 MPH.');
-    rec.onresult = (e) => {
+    setClipMsg('Listening… say the 8 numbers in order. Tap Stop when done.');
+    const timeout = setTimeout(() => {
+      try { rec.stop(); } catch {}
+    }, 30000); // auto-stop after 30s
+    const cleanup = () => {
+      clearTimeout(timeout);
       setListening(false);
+      if (window._bprRec === rec) window._bprRec = null;
+    };
+    rec.onresult = (e) => {
+      cleanup();
       const transcript = e.results[0][0].transcript;
       // Extract numbers: handles "0.366", "point three six six", "13.49", etc.
       const nums = parseSpokenNumbers(transcript);
@@ -144,11 +158,20 @@ export default function AddRun({ state, update, toast, editId, onDone }) {
       else setClipMsg('');
     };
     rec.onerror = (e) => {
-      setListening(false);
+      cleanup();
       setClipMsg(e.error === 'not-allowed' ? 'Microphone blocked — allow it in Settings.' : 'Voice input failed. Try again.');
     };
-    rec.onend = () => setListening(false);
-    try { rec.start(); } catch { setListening(false); }
+    rec.onend = () => cleanup();
+    try { rec.start(); } catch { cleanup(); }
+  };
+
+  const stopDictation = () => {
+    if (window._bprRec) {
+      try { window._bprRec.stop(); } catch {}
+      window._bprRec = null;
+    }
+    setListening(false);
+    setClipMsg('');
   };
 
   // Parse spoken numbers like "zero point three six six" or "13.49".
@@ -304,9 +327,15 @@ export default function AddRun({ state, update, toast, editId, onDone }) {
             <Btn kind="ghost" onClick={fillFromClipboard} className="flex-1">
               <span className="mr-1">📋</span> Clipboard
             </Btn>
-            <Btn kind="ghost" onClick={dictateNumbers} disabled={listening} className="flex-1">
-              <span className="mr-1">🎤</span> {listening ? 'Listening…' : 'Dictate'}
-            </Btn>
+            {listening ? (
+              <Btn kind="primary" onClick={stopDictation} className="flex-1">
+                <span className="mr-1">⏹</span> Stop
+              </Btn>
+            ) : (
+              <Btn kind="ghost" onClick={dictateNumbers} className="flex-1">
+                <span className="mr-1">🎤</span> Dictate
+              </Btn>
+            )}
           </div>
           {clipMsg && <div className="text-center text-xs text-amber-300/80">{clipMsg}</div>}
           <ScanSlipButton onFill={fillFromScan} />
