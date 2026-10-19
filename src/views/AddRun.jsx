@@ -6,8 +6,7 @@ import { densityAltitudeFt, stationPressureHpa } from '../lib/physics';
 import { fetchTrackWeather } from '../lib/weather';
 import { fmtDA } from '../lib/format';
 import { isNum } from '../lib/format';
-import { ScanSlipButton } from '../components/ScanSlip';
-import { parseSlipText, pickLane, laneCount } from '../lib/scanSlip';
+import { parseSlipText } from '../lib/scanSlip';
 
 const SETUP_FIELDS = [
   ['jet', 'Jet'], ['lPsi', 'L Tire PSI'], ['rPsi', 'R Tire PSI'],
@@ -220,14 +219,11 @@ export default function AddRun({ state, update, toast, editId, onDone }) {
             />
             <Btn kind="primary" onClick={fillFromQuickNums} className="shrink-0">Fill</Btn>
           </div>
-          <div className="text-center text-[11px] text-white/40">Type or paste the 8 slip numbers separated by spaces — fills the form in order.</div>
-          <div className="flex gap-2">
-            <Btn kind="ghost" onClick={fillFromClipboard} className="flex-1">
-              <span className="mr-1">📋</span> Fill from clipboard
-            </Btn>
-          </div>
+          <div className="text-center text-[11px] text-white/40">Type the 8 slip numbers separated by spaces — fills the form in order.</div>
+          <Btn kind="ghost" onClick={fillFromClipboard} className="w-full">
+            <span className="mr-1">📋</span> Fill from clipboard
+          </Btn>
           {clipMsg && <div className="text-center text-xs text-amber-300/80">{clipMsg}</div>}
-          <ScanSlipButton onFill={fillFromScan} />
         </div>
       )}
 
