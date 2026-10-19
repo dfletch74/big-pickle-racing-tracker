@@ -295,7 +295,6 @@ export default function AddRun({ state, update, toast, editId, onDone }) {
               onChange={(e) => setQuickNums(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter') fillFromQuickNums(); }}
               placeholder="0.366 1.903 5.443 8.5 79.39 11.195 13.49 97.96"
-              inputMode="decimal"
               className={`${inputCls} min-w-0 flex-1 font-mono !text-xs`}
             />
             <Btn kind="primary" onClick={fillFromQuickNums} className="shrink-0">Fill</Btn>
