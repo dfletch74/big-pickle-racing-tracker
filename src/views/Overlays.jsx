@@ -8,6 +8,7 @@ import { APP_VERSION } from '../version';
 import { fmtET, fmtMPH, fmtRT, fmtTemp, fmtDA, fmtDate, isNum } from '../lib/format';
 import { ROLES } from '../lib/roles';
 import { pullRacers, publishRacers } from '../lib/teamSync';
+import QRCode from 'qrcode';
 
 /* ---------------- Garage ---------------- */
 
@@ -593,7 +594,21 @@ export function SettingsModal({ state, update, reset, toast, onClose }) {
   const [teamUrl, setTeamUrl] = useState(teamCsvUrl(state));
   const [patInput, setPatInput] = useState('');
   const [hasPat, setHasPat] = useState(!!getPat());
+  const [showQr, setShowQr] = useState(false);
+  const [qrUrl, setQrUrl] = useState('');
   const current = currentBundleHash();
+
+  // Generate QR code for the token when the share modal opens.
+  useEffect(() => {
+    if (showQr) {
+      const pat = getPat();
+      if (pat) {
+        QRCode.toDataURL(pat, { width: 256, margin: 2 }).then(setQrUrl).catch(() => setQrUrl(''));
+      }
+    } else {
+      setQrUrl('');
+    }
+  }, [showQr]);
   const loadDemo = () => {
     if (!window.confirm('Load demo data? This REPLACES everything currently in the app.')) return;
     const s = makeDemoState();
@@ -703,7 +718,10 @@ export function SettingsModal({ state, update, reset, toast, onClose }) {
         {hasPat ? (
           <div className="flex items-center justify-between gap-2">
             <div className="text-[11px] text-white/45">Runs you log will be published to the sheet on sync.</div>
-            <Btn kind="quiet" onClick={() => { setPat(''); setHasPat(false); toast('GitHub token removed — publishing off.'); }} className="shrink-0 !py-1.5 text-xs">Remove token</Btn>
+            <div className="flex shrink-0 gap-2">
+              <Btn kind="quiet" onClick={() => setShowQr(true)} className="!py-1.5 text-xs">Share</Btn>
+              <Btn kind="quiet" onClick={() => { setPat(''); setHasPat(false); toast('GitHub token removed — publishing off.'); }} className="!py-1.5 text-xs">Remove token</Btn>
+            </div>
           </div>
         ) : (
           <>
@@ -740,7 +758,41 @@ export function SettingsModal({ state, update, reset, toast, onClose }) {
           {checking ? 'Checking…' : 'Check for updates'}
         </Btn>
       </div>
+      {showQr && <QrShareModal onClose={() => setShowQr(false)} qrUrl={qrUrl} toast={toast} />}
     </Modal>
+  );
+}
+
+function QrShareModal({ onClose, qrUrl, toast }) {
+  const copyToken = async () => {
+    try {
+      await navigator.clipboard.writeText(getPat());
+      toast('Token copied — paste it into a message to share.');
+    } catch {
+      toast('Copy failed — try the QR code instead.', 'error');
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/80 p-6" onClick={onClose}>
+      <div className="w-full max-w-xs rounded-3xl border border-white/10 bg-coal-900 p-6 text-center" onClick={(e) => e.stopPropagation()}>
+        <h3 className="font-display text-lg font-bold uppercase tracking-wider text-white/90">Share token</h3>
+        <div className="mt-1 text-xs text-white/50">
+          Have the crew point their iPhone camera at this code, tap the text, and paste it into their app's Team data settings.
+        </div>
+        <div className="mx-auto mt-4 flex h-64 w-64 items-center justify-center rounded-2xl bg-white p-2">
+          {qrUrl ? (
+            <img src={qrUrl} alt="Token QR code" className="h-full w-full" />
+          ) : (
+            <div className="text-sm text-black/50">Generating…</div>
+          )}
+        </div>
+        <div className="mt-4 flex gap-2">
+          <Btn kind="ghost" onClick={copyToken} className="flex-1">Copy token</Btn>
+          <Btn kind="ghost" onClick={onClose} className="flex-1">Done</Btn>
+        </div>
+      </div>
+    </div>
   );
 }
 
