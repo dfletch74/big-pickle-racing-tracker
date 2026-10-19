@@ -174,47 +174,27 @@ export default function AddRun({ state, update, toast, editId, onDone }) {
     setClipMsg('');
   };
 
-  // Parse spoken numbers like "zero point three six six" or "13.49".
+  // Parse spoken numbers: converts words to digits, then extracts numbers.
   const parseSpokenNumbers = (text) => {
     const wordNum = {
       zero: '0', oh: '0', o: '0', one: '1', two: '2', three: '3', four: '4',
-      five: '5', six: '6', seven: '7', eight: '8', nine: '9', ten: '10',
-      eleven: '11', twelve: '12', thirteen: '13', fourteen: '14', fifteen: '15',
-      sixteen: '16', seventeen: '17', eighteen: '18', nineteen: '19', twenty: '20',
-      thirty: '30', forty: '40', fifty: '50', sixty: '60', seventy: '70',
-      eighty: '80', ninety: '90', hundred: '100',
+      five: '5', six: '6', seven: '7', eight: '8', nine: '9',
     };
-    // First try: direct decimal numbers in the transcript.
-    const direct = text.match(/\d+\.\d+|\d+/g) || [];
-    // If we have 8+ direct numbers, use them.
-    if (direct.filter((n) => n.includes('.')).length >= 6) {
-      return direct.filter((n) => /^\d*\.?\d+$/.test(n)).slice(0, 8);
+    // Replace number words with digits, "point" with ".".
+    let t = ' ' + text.toLowerCase() + ' ';
+    t = t.replace(/\bpoint\b/g, '.');
+    t = t.replace(/\bdot\b/g, '.');
+    for (const [w, d] of Object.entries(wordNum)) {
+      t = t.replace(new RegExp(`\\b${w}\\b`, 'g'), d);
     }
-    // Otherwise, convert words to digits.
-    const tokens = text.toLowerCase().replace(/[,]/g, ' ').split(/\s+/);
-    const out = [];
-    let cur = '';
-    const flush = () => { if (cur && /^\d*\.?\d+$/.test(cur)) out.push(cur); cur = ''; };
-    for (const t of tokens) {
-      if (t === 'point' || t === 'dot') {
-        if (!cur.includes('.')) cur += '.';
-        else { flush(); }
-      } else if (wordNum[t] !== undefined) {
-        // Handle compound like "thirteen" vs "one three".
-        if (cur === '' || cur.endsWith('.')) cur += wordNum[t];
-        else if (/^\d+$/.test(cur) && cur.length === 1 && wordNum[t].length === 1) cur += wordNum[t];
-        else { flush(); cur = wordNum[t]; }
-      } else if (/^\d+\.\d+$/.test(t)) {
-        flush(); cur = t; flush();
-      } else if (/^\d+$/.test(t)) {
-        if (cur === '' || cur.endsWith('.')) cur += t;
-        else { flush(); cur = t; }
-      } else {
-        flush();
-      }
-    }
-    flush();
-    return out.slice(0, 8);
+    // Now extract numbers like "0.366" or "0 . 3 6 6" (spaced digits).
+    // First, collapse spaced digits: "0 . 3 6 6" -> "0.366".
+    t = t.replace(/(\d)\s*\.\s*(\d)/g, '$1.$2'); // "0 . 3" -> "0.3"
+    t = t.replace(/(\.\d)\s+(\d)/g, '$1$2'); // ".3 6" -> ".36" (repeat to collapse all)
+    t = t.replace(/(\.\d+)\s+(\d)/g, '$1$2');
+    t = t.replace(/(\.\d+)\s+(\d)/g, '$1$2');
+    const nums = t.match(/\d+\.\d+/g) || [];
+    return nums.slice(0, 8);
   };
   const track = state.tracks.find((t) => t.id === f.trackId);
 
