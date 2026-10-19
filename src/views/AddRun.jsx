@@ -74,6 +74,7 @@ export default function AddRun({ state, update, toast, editId, onDone }) {
   };
 
   const [clipMsg, setClipMsg] = useState('');
+  const [listening, setListening] = useState(false);
   const fillFromClipboard = async () => {
     setClipMsg('');
     let text = '';
@@ -95,6 +96,85 @@ export default function AddRun({ state, update, toast, editId, onDone }) {
       return;
     }
     fillFromScan(vals);
+  };
+
+  const dictateNumbers = () => {
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SR) {
+      setClipMsg('Voice input not supported in this browser.');
+      return;
+    }
+    const rec = new SR();
+    rec.lang = 'en-US';
+    rec.interimResults = false;
+    rec.maxAlternatives = 1;
+    setListening(true);
+    setClipMsg('Listening… say the 8 numbers in order: reaction, 60 ft, 330 ft, 1/8 ET, 1/8 MPH, 1000 ft, 1/4 ET, 1/4 MPH.');
+    rec.onresult = (e) => {
+      setListening(false);
+      const transcript = e.results[0][0].transcript;
+      // Extract numbers: handles "0.366", "point three six six", "13.49", etc.
+      const nums = parseSpokenNumbers(transcript);
+      if (nums.length === 0) {
+        setClipMsg(`Heard: "${transcript}" — no numbers found. Try again.`);
+        return;
+      }
+      const keys = ['rt', 'sixty', 'threeThirty', 'eighthET', 'eighthMPH', 'thousand', 'et', 'mph'];
+      const vals = {};
+      nums.slice(0, 8).forEach((n, i) => { vals[keys[i]] = n; });
+      fillFromScan(vals);
+      if (nums.length < 8) setClipMsg(`Got ${nums.length} of 8 numbers — check and fill the rest manually.`);
+      else setClipMsg('');
+    };
+    rec.onerror = (e) => {
+      setListening(false);
+      setClipMsg(e.error === 'not-allowed' ? 'Microphone blocked — allow it in Settings.' : 'Voice input failed. Try again.');
+    };
+    rec.onend = () => setListening(false);
+    try { rec.start(); } catch { setListening(false); }
+  };
+
+  // Parse spoken numbers like "zero point three six six" or "13.49".
+  const parseSpokenNumbers = (text) => {
+    const wordNum = {
+      zero: '0', oh: '0', o: '0', one: '1', two: '2', three: '3', four: '4',
+      five: '5', six: '6', seven: '7', eight: '8', nine: '9', ten: '10',
+      eleven: '11', twelve: '12', thirteen: '13', fourteen: '14', fifteen: '15',
+      sixteen: '16', seventeen: '17', eighteen: '18', nineteen: '19', twenty: '20',
+      thirty: '30', forty: '40', fifty: '50', sixty: '60', seventy: '70',
+      eighty: '80', ninety: '90', hundred: '100',
+    };
+    // First try: direct decimal numbers in the transcript.
+    const direct = text.match(/\d+\.\d+|\d+/g) || [];
+    // If we have 8+ direct numbers, use them.
+    if (direct.filter((n) => n.includes('.')).length >= 6) {
+      return direct.filter((n) => /^\d*\.?\d+$/.test(n)).slice(0, 8);
+    }
+    // Otherwise, convert words to digits.
+    const tokens = text.toLowerCase().replace(/[,]/g, ' ').split(/\s+/);
+    const out = [];
+    let cur = '';
+    const flush = () => { if (cur && /^\d*\.?\d+$/.test(cur)) out.push(cur); cur = ''; };
+    for (const t of tokens) {
+      if (t === 'point' || t === 'dot') {
+        if (!cur.includes('.')) cur += '.';
+        else { flush(); }
+      } else if (wordNum[t] !== undefined) {
+        // Handle compound like "thirteen" vs "one three".
+        if (cur === '' || cur.endsWith('.')) cur += wordNum[t];
+        else if (/^\d+$/.test(cur) && cur.length === 1 && wordNum[t].length === 1) cur += wordNum[t];
+        else { flush(); cur = wordNum[t]; }
+      } else if (/^\d+\.\d+$/.test(t)) {
+        flush(); cur = t; flush();
+      } else if (/^\d+$/.test(t)) {
+        if (cur === '' || cur.endsWith('.')) cur += t;
+        else { flush(); cur = t; }
+      } else {
+        flush();
+      }
+    }
+    flush();
+    return out.slice(0, 8);
   };
   const track = state.tracks.find((t) => t.id === f.trackId);
 
@@ -192,9 +272,14 @@ export default function AddRun({ state, update, toast, editId, onDone }) {
 
       {!editing && (
         <div className="space-y-2">
-          <Btn kind="primary" onClick={fillFromClipboard} className="w-full">
-            <span className="mr-1">📋</span> Fill from clipboard
-          </Btn>
+          <div className="flex gap-2">
+            <Btn kind="primary" onClick={fillFromClipboard} className="flex-1">
+              <span className="mr-1">📋</span> Fill from clipboard
+            </Btn>
+            <Btn kind="primary" onClick={dictateNumbers} disabled={listening} className="flex-1">
+              <span className="mr-1">🎤</span> {listening ? 'Listening…' : 'Dictate numbers'}
+            </Btn>
+          </div>
           {clipMsg && <div className="text-center text-xs text-amber-300/80">{clipMsg}</div>}
           <ScanSlipButton onFill={fillFromScan} />
         </div>
