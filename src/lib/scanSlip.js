@@ -144,8 +144,15 @@ If two lanes are shown, return both. Use null for anything unreadable.
     }
   );
   if (!res.ok) {
-    const err = await res.text().catch(() => '');
-    throw new Error(`AI read failed (HTTP ${res.status})${err.includes('API key') ? ' — check your API key' : ''}`);
+    let detail = '';
+    try {
+      const errJson = await res.json();
+      detail = errJson.error?.message || JSON.stringify(errJson).slice(0, 200);
+    } catch {
+      detail = await res.text().catch(() => '');
+      detail = detail.slice(0, 200);
+    }
+    throw new Error(`AI read failed (HTTP ${res.status}): ${detail || 'no details'}`);
   }
   const data = await res.json();
   const text = data.candidates?.[0]?.content?.parts?.map((p) => p.text || '').join('') || '';
