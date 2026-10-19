@@ -12,18 +12,19 @@ export default function Dash({ state, onAddRun, onImport, onSeeRuns }) {
   const allRuns = useMemo(() => runsForCar(state, state.activeCarId), [state]);
 
   const curYear = String(new Date().getFullYear());
+  const prevYear = String(new Date().getFullYear() - 1);
 
-  // Time scope: 'all' (every logged run) or the current year. Distance: '1/4' | '1/8'.
-  // Everything on the dashboard follows both selectors.
-  const [timeScope, setTimeScope] = useState('year');
+  // Time scope: 'all' (every logged run), current year, or previous year.
+  // Everything on the dashboard follows the selector.
+  const [timeScope, setTimeScope] = useState(curYear);
   const [dist, setDist] = useState('1/4');
 
   const runs = useMemo(() => {
     const scoped = filterDistance(allRuns, dist);
-    return timeScope === 'all' ? scoped : scoped.filter((r) => (r.date || '').startsWith(curYear));
-  }, [allRuns, dist, timeScope, curYear]);
+    return timeScope === 'all' ? scoped : scoped.filter((r) => (r.date || '').startsWith(timeScope));
+  }, [allRuns, dist, timeScope]);
 
-  const scopeLabel = `${dist} mi · ${timeScope === 'all' ? 'All runs' : curYear}`;
+  const scopeLabel = `${dist} mi · ${timeScope === 'all' ? 'All runs' : timeScope}`;
   const distLabel = `${dist} mi`;
 
   const pb = useMemo(() => personalBests(runs), [runs]);
@@ -34,7 +35,7 @@ export default function Dash({ state, onAddRun, onImport, onSeeRuns }) {
   const elimWL = useMemo(() => {
     let w = 0, l = 0;
     for (const ev of state.events || []) {
-      if (timeScope === 'year' && !(ev.date || '').startsWith(curYear)) continue;
+      if (timeScope !== 'all' && !(ev.date || '').startsWith(timeScope)) continue;
       if (ev.distance !== dist) continue;
       for (const r of ev.rounds || []) {
         if (r.result === 'W') w++;
@@ -42,7 +43,7 @@ export default function Dash({ state, onAddRun, onImport, onSeeRuns }) {
       }
     }
     return { w, l, rate: w + l ? Math.round((w / (w + l)) * 100) : null };
-  }, [state.events, timeScope, curYear, dist]);
+  }, [state.events, timeScope, dist]);
   const showWinRate = elimWL.w + elimWL.l > 0;
 
   // Consistency: per-year or last N runs. Options below the card title.
@@ -166,7 +167,8 @@ export default function Dash({ state, onAddRun, onImport, onSeeRuns }) {
               onChange={setTimeScope}
               options={[
                 { value: 'all', label: 'All' },
-                { value: 'year', label: curYear },
+                { value: curYear, label: curYear },
+                { value: prevYear, label: prevYear },
               ]}
             />
           </div>
@@ -189,7 +191,7 @@ export default function Dash({ state, onAddRun, onImport, onSeeRuns }) {
           title="No runs in view"
           body={`Nothing logged for ${scopeLabel.toLowerCase()} yet.`}
           action={<div className="flex justify-center gap-2">
-            <Btn kind="ghost" onClick={() => { setTimeScope('year'); setDist('1/4'); }}>Clear filters</Btn>
+            <Btn kind="ghost" onClick={() => { setTimeScope(curYear); setDist('1/4'); }}>Clear filters</Btn>
           </div>}
         />
       ) : (
