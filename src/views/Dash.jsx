@@ -45,15 +45,31 @@ export default function Dash({ state, onAddRun, onImport, onSeeRuns }) {
   }, [state.events, timeScope, curYear, dist]);
   const showWinRate = elimWL.w + elimWL.l > 0;
 
-  // Consistency: season (scoped) or last 5 runs.
-  const [conMode, setConMode] = useState('season'); // season | last5
+  // Consistency: per-year or last N runs. Options below the card title.
+  const distRuns = useMemo(() => filterDistance(allRuns, dist), [allRuns, dist]);
+  const conYears = useMemo(() => {
+    const ys = new Set();
+    for (const r of distRuns) {
+      const y = (r.date || '').slice(0, 4);
+      if (/^\d{4}$/.test(y)) ys.add(y);
+    }
+    return [...ys].sort().reverse();
+  }, [distRuns]);
+  const [conMode, setConMode] = useState(curYear); // year | last5 | last10 | last15
   const conRuns = useMemo(() => {
-    if (conMode !== 'last5') return runs;
-    return [...runs]
-      .sort((a, b) => (b.date || '').localeCompare(a.date || '') || b.createdAt - a.createdAt)
-      .slice(0, 5);
-  }, [runs, conMode]);
+    const sorted = [...distRuns].sort((a, b) => (b.date || '').localeCompare(a.date || '') || (b.createdAt || 0) - (a.createdAt || 0));
+    if (conMode === 'last5') return sorted.slice(0, 5);
+    if (conMode === 'last10') return sorted.slice(0, 10);
+    if (conMode === 'last15') return sorted.slice(0, 15);
+    return distRuns.filter((r) => (r.date || '').startsWith(conMode));
+  }, [distRuns, conMode]);
   const con = useMemo(() => consistency(conRuns, state.settings.daBaseline), [conRuns, state.settings.daBaseline]);
+  const conOptions = useMemo(() => [
+    ...conYears.map((y) => ({ value: y, label: y })),
+    { value: 'last5', label: 'Last 5' },
+    { value: 'last10', label: 'Last 10' },
+    { value: 'last15', label: 'Last 15' },
+  ], [conYears]);
 
   // ET improvement: avg of first 3 vs avg of last 3.
   const etImprovement = useMemo(() => {
@@ -195,15 +211,22 @@ export default function Dash({ state, onAddRun, onImport, onSeeRuns }) {
 
           {/* consistency */}
           <Card>
-            <div className="mb-2.5 flex items-center justify-between gap-2">
-              <h2 className="font-display text-[17px] font-bold uppercase tracking-[0.14em] text-white/55">
-                Consistency · {timeScope === 'all' ? 'All runs' : curYear} · {dist} mi
-              </h2>
-              <Segmented
-                value={conMode}
-                onChange={setConMode}
-                options={[{ value: 'season', label: 'Season' }, { value: 'last5', label: 'Last 5' }]}
-              />
+            <h2 className="font-display text-[17px] font-bold uppercase tracking-[0.14em] text-white/55">
+              Consistency · {dist} mi
+            </h2>
+            <div className="mb-2.5 mt-2 flex flex-wrap gap-1.5">
+              {conOptions.map((o) => (
+                <button
+                  key={o.value}
+                  type="button"
+                  onClick={() => setConMode(o.value)}
+                  className={`rounded-lg px-3 py-1.5 font-display text-[14px] font-semibold uppercase tracking-wider transition ${
+                    conMode === o.value ? 'bg-pickle-400 text-black shadow-glow' : 'bg-white/5 text-white/55 hover:text-white'
+                  }`}
+                >
+                  {o.label}
+                </button>
+              ))}
             </div>
             {con ? (
               <>
@@ -220,7 +243,7 @@ export default function Dash({ state, onAddRun, onImport, onSeeRuns }) {
                   </div>
                 </div>
                 <div className="mt-2 text-[11px] text-white/40">
-                  {conMode === 'last5' ? 'Last 5 runs' : `${timeScope === 'all' ? 'All runs' : curYear} season`} · {dist} mi · avg ET {con.avgET.toFixed(3)}s over {con.n} runs.
+                  {conMode.startsWith('last') ? `Last ${conMode.slice(4)} runs` : `${conMode} season`} · {dist} mi · avg ET {con.avgET.toFixed(3)}s over {con.n} runs.
                   {con.corrected && <span className="text-pickle-400/70"> · Weather-corrected</span>}
                 </div>
               </>
