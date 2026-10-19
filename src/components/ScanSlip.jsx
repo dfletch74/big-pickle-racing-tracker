@@ -111,8 +111,16 @@ export function ScanSlipButton({ onFill }) {
       setParsed(null);
       setStage('review');
     } catch (e) {
-      setError(e.message || 'AI read failed');
-      setStage('error');
+      const msg = e.message || 'AI read failed';
+      // If the key is invalid, clear it and prompt for a new one.
+      if (msg.includes('API key not valid') || msg.includes('400')) {
+        setGeminiKey(''); // clear the bad key
+        setShowGeminiSetup(true);
+        setStage('idle');
+      } else {
+        setError(msg);
+        setStage('error');
+      }
     }
   };
 
