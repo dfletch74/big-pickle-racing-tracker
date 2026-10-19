@@ -19,7 +19,7 @@ const SCAN_FIELDS = [
  */
 export function ScanSlipButton({ onFill }) {
   const fileRef = useRef(null);
-  const [stage, setStage] = useState('idle'); // idle | scanning | review | error
+  const [stage, setStage] = useState('idle'); // idle | choose | scanning | review | error | paste
   const [progress, setProgress] = useState('');
   const [parsed, setParsed] = useState(null);
   const [lane, setLane] = useState(0);
@@ -28,6 +28,13 @@ export function ScanSlipButton({ onFill }) {
   const [cloudKey, setCloudKey] = useState('');
   const [showCloudSetup, setShowCloudSetup] = useState(false);
   const [lastFile, setLastFile] = useState(null);
+  const [pasteText, setPasteText] = useState('');
+
+  const doPasteParse = () => {
+    const p = parseSlipText(pasteText);
+    setPasteText('');
+    finishParse(p);
+  };
 
   const fieldCount = (p) => p ? SCAN_FIELDS.filter(([k]) => pickLane(p, 0)[k]).length : 0;
 
@@ -88,7 +95,7 @@ export function ScanSlipButton({ onFill }) {
 
   return (
     <>
-      <Btn kind="ghost" onClick={() => fileRef.current?.click()} className="w-full">
+      <Btn kind="ghost" onClick={() => setStage('choose')} className="w-full">
         <span className="mr-1">📷</span> Scan timeslip
       </Btn>
       <input
@@ -98,6 +105,38 @@ export function ScanSlipButton({ onFill }) {
         className="hidden"
         onChange={(e) => { startScan(e.target.files?.[0]); e.target.value = ''; }}
       />
+
+      {stage === 'choose' && (
+        <Modal title="Get the numbers" onClose={() => setStage('idle')}>
+          <div className="space-y-2">
+            <Btn kind="ghost" onClick={() => { setStage('idle'); fileRef.current?.click(); }} className="w-full">
+              <span className="mr-1">📷</span> Take / choose photo
+            </Btn>
+            <Btn kind="ghost" onClick={() => setStage('paste')} className="w-full">
+              <span className="mr-1">📋</span> Paste copied text
+            </Btn>
+            <div className="pt-1 text-[11px] text-white/40">
+              Tip: in Photos, long-press the slip → Select All → Copy, then paste here. iPhone reads faded slips better than any scanner.
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {stage === 'paste' && (
+        <Modal title="Paste slip text" onClose={() => setStage('idle')}>
+          <textarea
+            value={pasteText}
+            onChange={(e) => setPasteText(e.target.value)}
+            placeholder="Long-press → Paste the text you copied from Photos…"
+            rows={8}
+            className={`${inputCls} w-full font-mono !text-xs`}
+          />
+          <div className="mt-3 flex gap-2">
+            <Btn kind="quiet" onClick={() => setStage('choose')} className="flex-1">Back</Btn>
+            <Btn kind="primary" onClick={doPasteParse} disabled={!pasteText.trim()} className="flex-1">Parse</Btn>
+          </div>
+        </Modal>
+      )}
 
       {stage === 'scanning' && (
         <Modal title="Scanning timeslip" onClose={() => setStage('idle')}>
