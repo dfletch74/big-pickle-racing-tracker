@@ -179,13 +179,18 @@ Return ONLY valid JSON (no markdown, no explanation). Use null for anything trul
   }
   const data = await res.json();
   const text = data.candidates?.[0]?.content?.parts?.map((p) => p.text || '').join('') || '';
-  if (!text.trim()) throw new Error('AI returned no text');
-  // Extract JSON from response (may have markdown fences).
-  const jsonM = text.match(/\{[\s\S]*\}/);
-  if (!jsonM) throw new Error('AI returned unreadable response');
+  if (!text.trim()) throw new Error('AI returned no text — the photo may be too blurry');
+  // Extract JSON from response (may have markdown fences or extra text).
+  let jsonM = text.match(/\{[\s\S]*\}/);
+  if (!jsonM) {
+    // Try to find JSON in code blocks.
+    const codeM = text.match(/```(?:json)?\s*(\{[\s\S]*?\})\s*```/);
+    if (codeM) jsonM = [codeM[1]];
+  }
+  if (!jsonM) throw new Error(`AI could not read this slip. Try a clearer photo. (AI said: ${text.slice(0, 100)})`);
   let parsed;
   try { parsed = JSON.parse(jsonM[0]); }
-  catch { throw new Error('AI returned invalid data'); }
+  catch { throw new Error('AI returned invalid data — try again'); }
   if (!parsed.lanes || !Array.isArray(parsed.lanes) || !parsed.lanes.length) {
     throw new Error('AI found no lanes on this slip');
   }
