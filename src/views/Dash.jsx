@@ -82,6 +82,17 @@ export default function Dash({ state, onAddRun, onImport, onSeeRuns }) {
     return d > 0 ? { text: `−${d.toFixed(3)}s improvement`, good: true } : { text: `+${Math.abs(d).toFixed(3)}s slower`, good: false };
   }, [runs]);
 
+  // MPH improvement: avg of first 3 vs avg of last 3.
+  const mphImprovement = useMemo(() => {
+    const s = runs.filter((r) => isNum(r.mph)).sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+    if (s.length < 5) return null;
+    const first = avg(s.slice(0, 3).map((r) => r.mph));
+    const lastAvg = avg(s.slice(-3).map((r) => r.mph));
+    const d = lastAvg - first; // positive = faster now
+    if (Math.abs(d) < 0.05) return null;
+    return d > 0 ? { text: `+${d.toFixed(1)} mph improvement`, good: true } : { text: `${d.toFixed(1)} mph slower`, good: false };
+  }, [runs]);
+
   const bestETOf = (d) => {
     const p = runs.filter((r) => r.distance === d && isNum(r.et));
     return p.length ? p.reduce((a, b) => (b.et < a.et ? b : a)) : null;
@@ -279,6 +290,7 @@ export default function Dash({ state, onAddRun, onImport, onSeeRuns }) {
           <PerfCard
             title="Speed Progression"
             subtitle={`MPH over time — ${runs.filter((r) => isNum(r.mph)).length} runs`}
+            improvement={mphImprovement}
           >
             <LineChart runs={runs} valueKey="mph" formatY={(v) => v.toFixed(0)} distLabel={distLabel} />
           </PerfCard>
@@ -391,21 +403,19 @@ function PBRow({ label, run, text }) {
   );
 }
 
-/** Chart card matching the reference: title + improvement, subtitle, year chips, chart, legend. */
+/** Chart card: title on top line, improvement on second, subtitle on third. */
 function PerfCard({ title, subtitle, improvement, children }) {
   return (
     <Card className="!border-white/[0.07] !bg-[#12141a]">
-      <div className="mb-1 flex items-start justify-between gap-2">
-        <h3 className="font-display text-[24px] font-bold uppercase leading-none tracking-[0.05em] text-white/90">
-          {title}
-        </h3>
-        {improvement && (
-          <div className={`shrink-0 font-mono text-[13px] font-semibold ${improvement.good ? 'text-pickle-400' : 'text-amber-300'}`}>
-            {improvement.text}
-          </div>
-        )}
-      </div>
-      <div className="mb-3 text-[15px] text-white/40">{subtitle}</div>
+      <h3 className="font-display text-[24px] font-bold uppercase leading-none tracking-[0.05em] text-white/90">
+        {title}
+      </h3>
+      {improvement && (
+        <div className={`mt-1 font-mono text-[13px] font-semibold ${improvement.good ? 'text-pickle-400' : 'text-amber-300'}`}>
+          {improvement.text}
+        </div>
+      )}
+      <div className="mb-3 mt-1 text-[15px] text-white/40">{subtitle}</div>
       {children}
     </Card>
   );
