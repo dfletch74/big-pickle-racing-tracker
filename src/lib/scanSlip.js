@@ -24,8 +24,9 @@ function preprocess(file) {
     img.onload = () => {
       URL.revokeObjectURL(url);
       try {
-        const maxDim = 2000;
-        const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
+        // Upscale small/faded text — Tesseract reads larger glyphs better.
+        const targetLong = 2400;
+        const scale = Math.max(1, Math.min(2.5, targetLong / Math.max(img.width, img.height)));
         const w = Math.round(img.width * scale);
         const h = Math.round(img.height * scale);
         const canvas = document.createElement('canvas');
@@ -35,18 +36,30 @@ function preprocess(file) {
         ctx.drawImage(img, 0, 0, w, h);
         const data = ctx.getImageData(0, 0, w, h);
         const px = data.data;
-        // Grayscale + contrast stretch.
-        let lo = 255, hi = 0;
+        // Grayscale histogram for percentile-based stretch (ignores outliers
+        // like fingers/shadows that would otherwise crush the text contrast).
         const gray = new Uint8ClampedArray(w * h);
+        const hist = new Array(256).fill(0);
         for (let i = 0; i < w * h; i++) {
-          const g = 0.299 * px[i * 4] + 0.587 * px[i * 4 + 1] + 0.114 * px[i * 4 + 2];
+          const g = Math.round(0.299 * px[i * 4] + 0.587 * px[i * 4 + 1] + 0.114 * px[i * 4 + 2]);
           gray[i] = g;
-          if (g < lo) lo = g;
-          if (g > hi) hi = g;
+          hist[g]++;
+        }
+        const total = w * h;
+        let lo = 0, hi = 255, acc = 0;
+        for (let i = 0; i < 256; i++) {
+          acc += hist[i];
+          if (acc / total >= 0.02) { lo = i; break; }
+        }
+        acc = 0;
+        for (let i = 255; i >= 0; i--) {
+          acc += hist[i];
+          if (acc / total >= 0.02) { hi = i; break; }
         }
         const range = Math.max(1, hi - lo);
         for (let i = 0; i < w * h; i++) {
-          const v = Math.round(((gray[i] - lo) / range) * 255);
+          let v = Math.round(((gray[i] - lo) / range) * 255);
+          v = v < 0 ? 0 : v > 255 ? 255 : v;
           px[i * 4] = px[i * 4 + 1] = px[i * 4 + 2] = v;
           px[i * 4 + 3] = 255;
         }
@@ -72,13 +85,33 @@ export async function ocrTimeslip(file, onProgress) {
 
 // Each field: list of regexes (first capture group = number). All matches are
 // collected so two-lane slips yield two candidates per field.
+// Patterns cover BOTH layouts: "R/T .061" and ".061 ------ REACTION".
 const PATTERNS = {
-  rt: [/(?:R\s*\/\s*T|RT|REACTION)\s*[:.]?\s*(-?\d*\.\d+)/gi],
-  sixty: [/\b60\s*(?:FT|'|′)?\s*(\d+\.\d+)/gi],
-  threeThirty: [/\b330\s*(?:FT)?\s*(\d+\.\d+)/gi],
-  eighthET: [/(?:1\s*\/\s*8|660)\s*(?:FT|'|ET)?\s*(\d+\.\d+)/gi],
-  thousand: [/\b1000\s*(?:FT|'|ET)?\s*(\d+\.\d+)/gi],
-  et: [/(?:1\s*\/\s*4|1320|QUARTER)\s*(?:ET)?\s*(\d+\.\d+)/gi, /\bE\.?\s*T\.?\s*(\d+\.\d+)/gi],
+  rt: [
+    /(?:R\s*\/\s*T|RT|REACTION)\s*[:.]?\s*(-?\d*\.\d+)/gi,
+    /(-?\d*\.\d+)\s*[-–—]+\s*(?:R\s*\/\s*T|REACTION)/gi,
+  ],
+  sixty: [
+    /\b60\s*(?:FT|'|′)?\s*(\d+\.\d+)/gi,
+    /(\d+\.\d+)\s*[-–—]+\s*60\s*FT/gi,
+  ],
+  threeThirty: [
+    /\b330\s*(?:FT)?\s*(\d+\.\d+)/gi,
+    /(\d+\.\d+)\s*[-–—]+\s*330\s*FT/gi,
+  ],
+  eighthET: [
+    /(?:1\s*\/\s*8|660)\s*(?:FT|'|ET)?\s*(\d+\.\d+)/gi,
+    /(\d+\.\d+)\s*[-–—]+\s*1\s*\/\s*8\s*ET/gi,
+  ],
+  thousand: [
+    /\b1000\s*(?:FT|'|ET)?\s*(\d+\.\d+)/gi,
+    /(\d+\.\d+)\s*[-–—]+\s*1000\s*ET/gi,
+  ],
+  et: [
+    /(?:1\s*\/\s*4|1320|QUARTER)\s*(?:ET)?\s*(\d+\.\d+)/gi,
+    /\bE\.?\s*T\.?\s*(\d+\.\d+)/gi,
+    /(\d+\.\d+)\s*[-–—]+\s*1\s*\/\s*4\s*ET/gi,
+  ],
 };
 
 function allMatches(text, patterns) {
@@ -108,14 +141,17 @@ export function parseSlipText(rawText) {
 
   // MPH: positional — values before the 1/4 ET are 1/8 MPH, after are 1/4 MPH.
   // (Standard slip layout lists 1/8 MPH, then 1000', 1/4 ET, then 1/4 MPH.)
+  // Handles both "MPH 107.27" and "92.08 ------ 1/8 MPH".
   const mphs = [];
   {
-    const re = /\bMPH\s*[:.]?\s*(\d+\.\d+)/gi;
-    let m;
-    while ((m = re.exec(text)) !== null) {
-      const v = parseFloat(m[1]);
-      if (!Number.isNaN(v) && v > 20 && v < 400 && !mphs.some((x) => x.v === m[1])) {
-        mphs.push({ v: m[1], idx: m.index });
+    const patterns = [/\bMPH\s*[:.]?\s*(\d+\.\d+)/gi, /(\d+\.\d+)\s*[-–—]+\s*1\s*\/\s*[48]\s*MPH/gi];
+    for (const re of patterns) {
+      let m;
+      while ((m = re.exec(text)) !== null) {
+        const v = parseFloat(m[1]);
+        if (!Number.isNaN(v) && v > 20 && v < 400 && !mphs.some((x) => x.v === m[1])) {
+          mphs.push({ v: m[1], idx: m.index });
+        }
       }
     }
   }
@@ -141,7 +177,7 @@ export function parseSlipText(rawText) {
     // Assume MM/DD/YYYY (US slips).
     date = `${c}-${a.padStart(2, '0')}-${b.padStart(2, '0')}`;
   }
-  const timeM = text.match(/\b(\d{1,2}):(\d{2})\s*([AP])\.?M\.?\b/);
+  const timeM = text.match(/\b(\d{1,2}):(\d{2})(?::\d{2})?\s*([AP])(?:\.?M\.?)?\b/);
   let time = null;
   if (timeM) {
     let h = parseInt(timeM[1], 10);
