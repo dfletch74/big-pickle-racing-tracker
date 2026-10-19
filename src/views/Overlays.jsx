@@ -346,7 +346,14 @@ export function TreeSimModal({ state, update, toast, onClose, roleId }) {
     };
   };
 
-  const ranked = [...state.racers].map((r) => ({ r, s: stats(r) })).sort((a, b) => (a.s.avg ?? 9) - (b.s.avg ?? 9));
+  const ranked = [...state.racers].map((r) => ({ r, s: stats(r) })).sort((a, b) => (a.s.best ?? 9) - (b.s.best ?? 9));
+  const isAdmin = roleId === 'admin';
+
+  const resetRankings = () => {
+    if (!window.confirm('Reset all racer stats? This clears every attempt for every racer.')) return;
+    update((s) => { s.racers.forEach((r) => { r.attempts = []; }); });
+    toast('Racer rankings reset.');
+  };
 
   const actionBar = (
     <>
@@ -494,6 +501,11 @@ export function TreeSimModal({ state, update, toast, onClose, roleId }) {
                 <div className="mb-2.5 flex items-center gap-2">
                   <Icon name="trophy" className="h-5 w-5 text-pickle-400" />
                 <h3 className="font-display text-[20px] font-bold uppercase tracking-[0.06em]">Racer Rankings</h3>
+                {isAdmin && ranked.some(({ s }) => s.n > 0) && (
+                  <button onClick={resetRankings} className="ml-auto shrink-0 text-xs text-red-400/70 hover:text-red-400">
+                    Reset
+                  </button>
+                )}
               </div>
               <div className="space-y-2">
                 {ranked.map(({ r, s }, i) => {
@@ -518,7 +530,7 @@ export function TreeSimModal({ state, update, toast, onClose, roleId }) {
                         ].map(([label, v, has]) => (
                           <div key={label}>
                             <div className="text-[9px] uppercase tracking-wider text-white/40">{label}</div>
-                            <div className={`text-[13px] font-bold ${label === 'AVG' && has ? 'text-pickle-300' : label === 'RL' && v > 0 ? 'text-red-400' : ''}`}>
+                            <div className={`text-[13px] font-bold ${label === 'BEST' && has ? 'text-pickle-300' : label === 'RL' && v > 0 ? 'text-red-400' : ''}`}>
                               {label === 'RL' ? v : has ? v.toFixed(3) : '—'}
                             </div>
                           </div>
