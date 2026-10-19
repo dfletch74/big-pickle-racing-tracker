@@ -81,7 +81,97 @@ export async function ocrTimeslip(file, onProgress) {
   return text;
 }
 
-const OCRSPACE_KEY = 'bpr-ocrspace-key';
+const GEMINI_KEY = 'bpr-gemini-key';
+export const getGeminiKey = () => { try { return localStorage.getItem(GEMINI_KEY) || ''; } catch { return ''; } };
+export const setGeminiKey = (t) => { try { t ? localStorage.setItem(GEMINI_KEY, t) : localStorage.removeItem(GEMINI_KEY); } catch {} };
+
+/**
+ * AI vision via Google Gemini (free tier) — reads the timeslip photo directly
+ * and returns structured JSON. Handles faded print, any layout, garbled labels.
+ * Needs a free API key from https://aistudio.google.com/app/apikey.
+ */
+export async function geminiVision(file, apiKey) {
+  // Downscale to max 1600px to keep the request small.
+  const dataUrl = await new Promise((resolve, reject) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      try {
+        const maxDim = 1600;
+        const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
+        const w = Math.round(img.width * scale);
+        const h = Math.round(img.height * scale);
+        const canvas = document.createElement('canvas');
+        canvas.width = w; canvas.height = h;
+        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+        resolve(canvas.toDataURL('image/jpeg', 0.85));
+      } catch (e) { reject(e); }
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Could not read image')); };
+    img.src = url;
+  });
+  const base64 = dataUrl.split(',')[1];
+
+  const prompt = `Read this drag racing timeslip and return ONLY valid JSON (no markdown, no explanation).
+If two lanes are shown, return both. Use null for anything unreadable.
+{
+  "lanes": [
+    {
+      "rt": "0.123 or null",
+      "sixty": "1.234 or null (60 ft)",
+      "threeThirty": "3.456 or null (330 ft)",
+      "eighthET": "5.678 or null (1/8 mile ET)",
+      "eighthMPH": "100.00 or null (1/8 mile MPH)",
+      "thousand": "7.890 or null (1000 ft ET)",
+      "et": "9.012 or null (1/4 mile ET)",
+      "mph": "130.00 or null (1/4 mile MPH)"
+    }
+  ],
+  "date": "YYYY-MM-DD or null",
+  "time": "HH:MM (24h) or null"
+}`;
+
+  const res = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${encodeURIComponent(apiKey)}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }, { inline_data: { mime_type: 'image/jpeg', data: base64 } }] }],
+        generationConfig: { temperature: 0, maxOutputTokens: 800 },
+      }),
+    }
+  );
+  if (!res.ok) {
+    const err = await res.text().catch(() => '');
+    throw new Error(`AI read failed (HTTP ${res.status})${err.includes('API key') ? ' — check your API key' : ''}`);
+  }
+  const data = await res.json();
+  const text = data.candidates?.[0]?.content?.parts?.map((p) => p.text || '').join('') || '';
+  if (!text.trim()) throw new Error('AI returned no text');
+  // Extract JSON from response (may have markdown fences).
+  const jsonM = text.match(/\{[\s\S]*\}/);
+  if (!jsonM) throw new Error('AI returned unreadable response');
+  let parsed;
+  try { parsed = JSON.parse(jsonM[0]); }
+  catch { throw new Error('AI returned invalid data'); }
+  if (!parsed.lanes || !Array.isArray(parsed.lanes) || !parsed.lanes.length) {
+    throw new Error('AI found no lanes on this slip');
+  }
+  return parsed;
+}
+
+/** Convert Gemini lane JSON to the flat field map used by the review UI. */
+export function geminiLaneToValues(lane, date, time) {
+  const out = {};
+  for (const k of ['rt', 'sixty', 'threeThirty', 'eighthET', 'eighthMPH', 'thousand', 'et', 'mph']) {
+    if (lane[k] != null && String(lane[k]).trim() !== '') out[k] = String(lane[k]).trim();
+  }
+  if (date) out.date = date;
+  if (time) out.time = time;
+  return out;
+}
 export const getOcrKey = () => { try { return localStorage.getItem(OCRSPACE_KEY) || ''; } catch { return ''; } };
 export const setOcrKey = (t) => { try { t ? localStorage.setItem(OCRSPACE_KEY, t) : localStorage.removeItem(OCRSPACE_KEY); } catch {} };
 
@@ -288,11 +378,21 @@ export function parseSlipText(rawText) {
 
   // Sequence fallback: for slips with unreadable labels (e.g. 1995 thermal),
   // detect runs of 8 numbers matching the fixed field order by range.
-  // Runs if label-based parsing found almost nothing, or found only MPH
-  // values with no ETs (a sign the labels failed).
+  // Runs if label-based parsing found almost nothing, found only MPH values,
+  // or produced implausible values (garbled labels read as numbers).
   const foundCount = Object.values(fields).reduce((n, a) => n + a.length, 0);
   const distinctFields = Object.values(fields).filter((a) => a.length > 0).length;
-  if (foundCount < 4 || distinctFields < 3) {
+  const plausible = () => {
+    // 1/4 ET must be 7-30s; 1/8 ET 4-20s; 60' 0.8-5s. If a core ET field's
+    // first-lane value falls outside that, the labels were misread.
+    // (Later lanes may be 0.000 on a BYE run — that's fine.)
+    const first = (a) => (a.length ? parseFloat(a[0]) : null);
+    const et = first(fields.et); if (et !== null && (et < 7 || et > 30)) return false;
+    const e8 = first(fields.eighthET); if (e8 !== null && (e8 < 4 || e8 > 20)) return false;
+    const s = first(fields.sixty); if (s !== null && (s < 0.8 || s > 5)) return false;
+    return true;
+  };
+  if (foundCount < 4 || distinctFields < 3 || !plausible()) {
     for (const k of Object.keys(fields)) fields[k] = [];
     usedLines.clear();
     const seqNums = [];

@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react';
 import { Modal, SectionTitle, Btn, Field, inputCls, Segmented } from './ui';
-import { ocrTimeslip, ocrCloud, getOcrKey, setOcrKey, parseSlipText, pickLane, laneCount } from '../lib/scanSlip';
+import { ocrTimeslip, ocrCloud, getOcrKey, setOcrKey, geminiVision, geminiLaneToValues, getGeminiKey, setGeminiKey, parseSlipText, pickLane, laneCount } from '../lib/scanSlip';
 
 const SCAN_FIELDS = [
   ['rt', 'R/T'],
@@ -27,12 +27,16 @@ export function ScanSlipButton({ onFill }) {
   const [error, setError] = useState('');
   const [cloudKey, setCloudKey] = useState('');
   const [showCloudSetup, setShowCloudSetup] = useState(false);
+  const [geminiKey, setGeminiKeyInput] = useState('');
+  const [showGeminiSetup, setShowGeminiSetup] = useState(false);
+  const [geminiLanes, setGeminiLanes] = useState(null);
   const [lastFile, setLastFile] = useState(null);
   const [pasteText, setPasteText] = useState('');
 
   const doPasteParse = () => {
     const p = parseSlipText(pasteText);
     setPasteText('');
+    setGeminiLanes(null);
     finishParse(p);
   };
 
@@ -41,9 +45,11 @@ export function ScanSlipButton({ onFill }) {
   const startScan = async (file) => {
     if (!file) return;
     setLastFile(file);
+    setGeminiLanes(null);
     setStage('scanning');
     setProgress('Reading image…');
     setShowCloudSetup(false);
+    setShowGeminiSetup(false);
     try {
       const text = await ocrTimeslip(file, setProgress);
       const p = parseSlipText(text);
@@ -83,15 +89,40 @@ export function ScanSlipButton({ onFill }) {
     }
   };
 
+  const tryGemini = async () => {
+    const key = getGeminiKey();
+    if (!key) { setShowGeminiSetup(true); return; }
+    if (!lastFile) return;
+    setStage('scanning');
+    setProgress('AI reading the slip…');
+    setShowGeminiSetup(false);
+    try {
+      const result = await geminiVision(lastFile, key);
+      setGeminiLanes(result.lanes);
+      setLane(0);
+      setValues(geminiLaneToValues(result.lanes[0], result.date, result.time));
+      setParsed(null); // using Gemini lanes, not parser
+      setStage('review');
+    } catch (e) {
+      setError(e.message || 'AI read failed');
+      setStage('error');
+    }
+  };
+
   const changeLane = (i) => {
     setLane(i);
-    setValues(pickLane(parsed, i));
+    if (geminiLanes) {
+      const g = geminiLanes[i] || geminiLanes[0];
+      setValues(geminiLaneToValues(g, undefined, undefined));
+    } else if (parsed) {
+      setValues(pickLane(parsed, i));
+    }
   };
 
   const setVal = (k, v) => setValues((prev) => ({ ...prev, [k]: v }));
 
-  const lanes = parsed ? laneCount(parsed) : 1;
-  const foundCount = parsed ? SCAN_FIELDS.filter(([k]) => values[k]).length : 0;
+  const lanes = geminiLanes ? geminiLanes.length : parsed ? laneCount(parsed) : 1;
+  const foundCount = SCAN_FIELDS.filter(([k]) => values[k]).length;
 
   return (
     <>
@@ -152,8 +183,35 @@ export function ScanSlipButton({ onFill }) {
         <Modal title="Couldn't read it" onClose={() => setStage('idle')}>
           <div className="text-sm text-white/70">{error}</div>
           <div className="mt-4 space-y-2">
-            <Btn kind="ghost" onClick={tryCloud} className="w-full">Try cloud reader (better on faded slips)</Btn>
+            <Btn kind="primary" onClick={tryGemini} className="w-full">🤖 Try AI read (best for faded slips)</Btn>
+            <Btn kind="ghost" onClick={tryCloud} className="w-full">Try cloud reader</Btn>
             <Btn kind="quiet" onClick={() => { setStage('idle'); fileRef.current?.click(); }} className="w-full">Try another photo</Btn>
+          </div>
+        </Modal>
+      )}
+
+      {showGeminiSetup && (
+        <Modal title="AI reader setup" onClose={() => { setShowGeminiSetup(false); setStage('idle'); }}>
+          <div className="mb-2 text-xs text-white/60">
+            The AI reader (Google Gemini) reads faded slips like a person — far better than any OCR.
+            It's free: get a key at <b>aistudio.google.com</b> → Get API Key, paste it below. Stays on this device.
+          </div>
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={geminiKey}
+              onChange={(e) => setGeminiKeyInput(e.target.value)}
+              placeholder="Gemini API key"
+              className={`${inputCls} min-w-0 flex-1 font-mono !text-xs`}
+            />
+            <Btn kind="ghost" onClick={() => {
+              const k = geminiKey.trim();
+              if (!k) return;
+              setGeminiKey(k);
+              setGeminiKeyInput('');
+              setShowGeminiSetup(false);
+              tryGemini();
+            }} className="shrink-0">Save & retry</Btn>
           </div>
         </Modal>
       )}
@@ -173,9 +231,9 @@ export function ScanSlipButton({ onFill }) {
           <div className="mb-1 text-[11px] text-white/50">
             Found {foundCount} values — fix anything the camera misread, then fill the form.
           </div>
-          {foundCount < 5 && (
-            <button onClick={tryCloud} className="mb-2 w-full rounded-xl border border-sky-500/30 bg-sky-500/10 px-3 py-2 text-xs text-sky-200">
-              Only {foundCount} read — try the cloud reader (much better on faded slips)
+          {foundCount < 5 && !geminiLanes && (
+            <button onClick={tryGemini} className="mb-2 w-full rounded-xl border border-violet-500/30 bg-violet-500/10 px-3 py-2 text-xs text-violet-200">
+              🤖 Only {foundCount} read — try AI read (best for faded slips)
             </button>
           )}
           <div className="grid grid-cols-2 gap-2">
