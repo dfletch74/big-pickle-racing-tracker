@@ -4,6 +4,7 @@ import { Toasts, Icon } from './components/ui';
 import { LOGO_DATA_URI } from './components/logo';
 import { LockScreen, CrewModal } from './components/Crew';
 import { ROLES, getSavedRole, clearRole } from './lib/roles';
+import { checkForAppUpdate, reloadForUpdate } from './lib/updater';
 import Dash from './views/Dash';
 import Runs from './views/Runs';
 import AddRun from './views/AddRun';
@@ -93,6 +94,14 @@ export default function App() {
   const handleUnlock = (newRoleId) => {
     setRoleId(newRoleId);
     setLocked(false);
+    // Auto-check for app updates after unlock — keeps crew devices current
+    // without them needing Settings access.
+    checkForAppUpdate().then((latest) => {
+      if (latest) {
+        toast(`Update available — reloading to latest version…`);
+        setTimeout(() => reloadForUpdate(), 1500);
+      }
+    }).catch(() => {});
   };
 
   const handleLock = () => {

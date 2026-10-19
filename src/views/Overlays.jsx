@@ -551,15 +551,7 @@ export function TreeSimModal({ state, update, toast, onClose }) {
 
 /* ---------------- Settings ---------------- */
 
-function bundleHash() {
-  try {
-    const src = [...document.scripts].map((x) => x.src).find((u) => /index-[A-Za-z0-9_-]+\.js/.test(u)) || '';
-    const m = src.match(/index-([A-Za-z0-9_-]+)\.js/);
-    return m ? m[1] : 'dev';
-  } catch {
-    return 'dev';
-  }
-}
+import { currentBundleHash, checkForAppUpdate, reloadForUpdate } from '../lib/updater';
 
 export function SettingsModal({ state, update, reset, toast, onClose }) {
   const [checking, setChecking] = useState(false);
@@ -567,7 +559,7 @@ export function SettingsModal({ state, update, reset, toast, onClose }) {
   const [teamUrl, setTeamUrl] = useState(teamCsvUrl(state));
   const [patInput, setPatInput] = useState('');
   const [hasPat, setHasPat] = useState(!!getPat());
-  const current = bundleHash();
+  const current = currentBundleHash();
   const loadDemo = () => {
     if (!window.confirm('Load demo data? This REPLACES everything currently in the app.')) return;
     const s = makeDemoState();
@@ -632,18 +624,13 @@ export function SettingsModal({ state, update, reset, toast, onClose }) {
   const checkForUpdate = async () => {
     setChecking(true);
     try {
-      const base = import.meta.env.BASE_URL;
-      const res = await fetch(`${base}index.html?ts=${Date.now()}`, { cache: 'no-store' });
-      const html = await res.text();
-      const m = html.match(/assets\/index-([A-Za-z0-9_-]+)\.js/);
-      if (m && m[1] !== current) {
-        if (window.confirm(`Version ${m[1].slice(0, 7)} is available (you have ${current.slice(0, 7)}). Reload now to update?`)) {
-          window.location.href = `${base}?v=${Date.now()}`;
+      const latest = await checkForAppUpdate();
+      if (latest) {
+        if (window.confirm(`Version ${latest.slice(0, 7)} is available (you have ${current.slice(0, 7)}). Reload now to update?`)) {
+          reloadForUpdate();
         }
-      } else if (m) {
-        toast('You are on the latest version.');
       } else {
-        toast('Could not read the latest version.', 'error');
+        toast('You are on the latest version.');
       }
     } catch (e) {
       toast('Update check failed — are you online?', 'error');
