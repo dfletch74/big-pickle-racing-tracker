@@ -19,7 +19,8 @@ const SCAN_FIELDS = [
  */
 export function ScanSlipButton({ onFill }) {
   const fileRef = useRef(null);
-  const [stage, setStage] = useState('idle'); // idle | choose | scanning | review | error | paste
+  const videoRef = useRef(null);
+  const [stage, setStage] = useState('idle'); // idle | choose | camera | scanning | review | error | paste
   const [progress, setProgress] = useState('');
   const [parsed, setParsed] = useState(null);
   const [lane, setLane] = useState(0);
@@ -33,6 +34,57 @@ export function ScanSlipButton({ onFill }) {
   const [lastFile, setLastFile] = useState(null);
   const [pasteText, setPasteText] = useState('');
   const [aiDirect, setAiDirect] = useState(false);
+  const [stream, setStream] = useState(null);
+
+  const stopCamera = () => {
+    if (stream) {
+      stream.getTracks().forEach((t) => t.stop());
+      setStream(null);
+    }
+    if (videoRef.current) videoRef.current.srcObject = null;
+  };
+
+  const openCamera = async () => {
+    setStage('camera');
+    setError('');
+    try {
+      const s = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 } },
+        audio: false,
+      });
+      setStream(s);
+      // Wait for video element to be ready.
+      setTimeout(() => {
+        if (videoRef.current) {
+          videoRef.current.srcObject = s;
+          videoRef.current.play().catch(() => {});
+        }
+      }, 100);
+    } catch (e) {
+      setError(e.name === 'NotAllowedError' ? 'Camera blocked — allow it in Settings.' : 'Could not open camera.');
+      setStage('error');
+    }
+  };
+
+  const captureFromCamera = () => {
+    if (!videoRef.current || !stream) return;
+    const video = videoRef.current;
+    const canvas = document.createElement('canvas');
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    canvas.getContext('2d').drawImage(video, 0, 0);
+    stopCamera();
+    canvas.toBlob((blob) => {
+      if (blob) {
+        const file = new File([blob], 'slip.jpg', { type: 'image/jpeg' });
+        // Use AI read directly (fast + accurate, no photo saved).
+        tryGeminiWithFile(file);
+      } else {
+        setError('Capture failed.');
+        setStage('error');
+      }
+    }, 'image/jpeg', 0.9);
+  };
 
   const doPasteParse = () => {
     const p = parseSlipText(pasteText);
@@ -167,7 +219,10 @@ export function ScanSlipButton({ onFill }) {
       {stage === 'choose' && (
         <Modal title="Get the numbers" onClose={() => setStage('idle')}>
           <div className="space-y-2">
-            <Btn kind="primary" onClick={() => { setAiDirect(true); setStage('idle'); fileRef.current?.click(); }} className="w-full">
+            <Btn kind="primary" onClick={() => { setStage('idle'); openCamera(); }} className="w-full">
+              <span className="mr-1">📷</span> Scan with camera
+            </Btn>
+            <Btn kind="ghost" onClick={() => { setAiDirect(true); setStage('idle'); fileRef.current?.click(); }} className="w-full">
               <span className="mr-1">🤖</span> AI read photo
             </Btn>
             <Btn kind="ghost" onClick={() => { setStage('idle'); fileRef.current?.click(); }} className="w-full">
@@ -177,8 +232,23 @@ export function ScanSlipButton({ onFill }) {
               <span className="mr-1">📋</span> Paste copied text
             </Btn>
             <div className="pt-1 text-[11px] text-white/40">
-              AI read is best for faded slips. Paste uses iPhone's text reader.
+              Camera scan uses AI — no photo saved to your library.
             </div>
+          </div>
+        </Modal>
+      )}
+
+      {stage === 'camera' && (
+        <Modal title="Point at the slip" onClose={() => { stopCamera(); setStage('idle'); }}>
+          <div className="relative overflow-hidden rounded-xl bg-black">
+            <video ref={videoRef} playsInline muted className="h-64 w-full object-cover" />
+          </div>
+          <div className="mt-3 flex gap-2">
+            <Btn kind="quiet" onClick={() => { stopCamera(); setStage('choose'); }} className="flex-1">Back</Btn>
+            <Btn kind="primary" onClick={captureFromCamera} className="flex-1">Capture</Btn>
+          </div>
+          <div className="mt-2 text-center text-[11px] text-white/40">
+            Fill the frame with the slip, hold steady, tap Capture.
           </div>
         </Modal>
       )}
