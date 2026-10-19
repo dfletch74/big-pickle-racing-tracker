@@ -81,6 +81,32 @@ export async function ocrTimeslip(file, onProgress) {
   return text;
 }
 
+const OCRSPACE_KEY = 'bpr-ocrspace-key';
+export const getOcrKey = () => { try { return localStorage.getItem(OCRSPACE_KEY) || ''; } catch { return ''; } };
+export const setOcrKey = (t) => { try { t ? localStorage.setItem(OCRSPACE_KEY, t) : localStorage.removeItem(OCRSPACE_KEY); } catch {} };
+
+/**
+ * Cloud OCR via OCR.space (free tier) — far better on faded thermal print
+ * than on-device Tesseract. Needs a free API key from https://ocr.space.
+ */
+export async function ocrCloud(file, apiKey) {
+  const form = new FormData();
+  form.append('file', file);
+  form.append('apikey', apiKey);
+  form.append('OCREngine', '2'); // better for faded/low-contrast
+  form.append('scale', 'true');
+  form.append('isTable', 'false');
+  const res = await fetch('https://api.ocr.space/parse/image', { method: 'POST', body: form });
+  if (!res.ok) throw new Error(`Cloud OCR failed (HTTP ${res.status})`);
+  const data = await res.json();
+  if (data.IsErroredOnProcessing) {
+    throw new Error(data.ErrorMessage?.[0] || 'Cloud OCR failed');
+  }
+  const text = data.ParsedResults?.map((r) => r.ParsedText).join('\n') || '';
+  if (!text.trim()) throw new Error('Cloud OCR returned no text');
+  return text;
+}
+
 // ---- Timeslip text parsing ----
 
 // Each field: list of regexes (first capture group = number). All matches are
