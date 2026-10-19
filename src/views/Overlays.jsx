@@ -7,6 +7,7 @@ import { syncTeamData, teamCsvUrl, teamSyncOnOpen, getPat, setPat, TEAM_CSV_DEFA
 import { APP_VERSION } from '../version';
 import { fmtET, fmtMPH, fmtRT, fmtTemp, fmtDA, fmtDate, isNum } from '../lib/format';
 import { ROLES } from '../lib/roles';
+import { pullRacers, publishRacers } from '../lib/teamSync';
 
 /* ---------------- Garage ---------------- */
 
@@ -242,6 +243,17 @@ export function TreeSimModal({ state, update, toast, onClose, roleId }) {
     }
     return state.racers[0]?.id || '';
   });
+
+  // Pull shared racer stats on open; publish on close (if a token is saved).
+  useEffect(() => {
+    pullRacers(state, update).catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const handleClose = () => {
+    publishRacers(state).catch(() => {});
+    onClose();
+  };
   const [showPicker, setShowPicker] = useState(true);
   const [tree, setTree] = useState('500');
   const [mode, setMode] = useState('sportsman');
@@ -291,7 +303,7 @@ export function TreeSimModal({ state, update, toast, onClose, roleId }) {
     setLastRT({ rt, red });
     update((s) => {
       const r = s.racers.find((x) => x.id === racerId);
-      if (r) r.attempts.push({ rt: Math.round(rt * 1000) / 1000, red, date: new Date().toISOString().slice(0, 10), tree, mode });
+      if (r) r.attempts.push({ id: uid(), rt: Math.round(rt * 1000) / 1000, red, date: new Date().toISOString().slice(0, 10), tree, mode });
     });
   };
 
@@ -350,8 +362,10 @@ export function TreeSimModal({ state, update, toast, onClose, roleId }) {
   const isAdmin = roleId === 'admin';
 
   const resetRankings = () => {
-    if (!window.confirm('Reset all racer stats? This clears every attempt for every racer.')) return;
+    if (!window.confirm('Reset all racer stats? This clears every attempt for every racer, on all devices.')) return;
     update((s) => { s.racers.forEach((r) => { r.attempts = []; }); });
+    // Clear the shared file too so the reset propagates.
+    publishRacers({ ...state, racers: (state.racers || []).map((r) => ({ ...r, attempts: [] })) }).catch(() => {});
     toast('Racer rankings reset.');
   };
 
@@ -407,7 +421,7 @@ export function TreeSimModal({ state, update, toast, onClose, roleId }) {
 
   return (
     <>
-      <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/75 sm:items-center" onClick={onClose}>
+      <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/75 sm:items-center" onClick={handleClose}>
         <div
           onClick={(e) => e.stopPropagation()}
           className="flex max-h-[94dvh] w-full flex-col overflow-hidden rounded-t-3xl border border-white/10 bg-coal-950 sm:max-w-md sm:rounded-3xl"
@@ -424,7 +438,7 @@ export function TreeSimModal({ state, update, toast, onClose, roleId }) {
               <Icon name="chevD" className="h-3.5 w-3.5 shrink-0" />
             </button>
             <button
-              onClick={onClose}
+              onClick={handleClose}
               aria-label="Close"
               className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl text-white/60 transition hover:bg-white/10 hover:text-white"
             >

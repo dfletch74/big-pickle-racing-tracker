@@ -286,3 +286,111 @@ export async function syncTeamData(state, update) {
   }
   return { ...pulled, published };
 }
+
+/* ---------------- Racer (Tree) sync ---------------- */
+
+const RACERS_PATH = 'data/team-racers.json';
+
+// Attempt identity: new attempts have ids; old ones fall back to a content key.
+const attemptKey = (a) => a.id || [a.rt, a.date, a.tree, a.mode].join('|');
+
+/**
+ * Pull shared racer stats and merge into local state.
+ * Racers match by name (case-insensitive); attempts merge by id.
+ */
+export async function pullRacers(state, update) {
+  const url = TEAM_CSV_DEFAULT_URL.replace('Big_Pickle_runs_2026.csv', 'team-racers.json');
+  const busted = url + '?t=' + Date.now();
+  const res = await fetch(busted, { cache: 'no-store' });
+  if (!res.ok) return { pulled: 0 };
+  const data = await res.json().catch(() => null);
+  if (!data || !Array.isArray(data.racers)) return { pulled: 0 };
+
+  let pulled = 0;
+  update((s) => {
+    s.racers = s.racers || [];
+    for (const rr of data.racers) {
+      if (!rr.name) continue;
+      let local = s.racers.find((x) => (x.name || '').toLowerCase() === rr.name.toLowerCase());
+      if (!local) {
+        local = { id: uid(), name: rr.name, attempts: [] };
+        s.racers.push(local);
+      }
+      const seen = new Set(local.attempts.map(attemptKey));
+      for (const a of rr.attempts || []) {
+        const k = attemptKey(a);
+        if (!seen.has(k)) {
+          seen.add(k);
+          local.attempts.push({ ...a, id: a.id || uid() });
+          pulled++;
+        }
+      }
+    }
+  });
+  return { pulled };
+}
+
+/**
+ * Publish merged racer stats to the shared file. Requires a PAT.
+ * Pull-then-push with SHA for optimistic concurrency (retries on 409).
+ */
+export async function publishRacers(state) {
+  const pat = getPat();
+  if (!pat) return { pushed: false, error: 'No GitHub token saved' };
+  const loc = parseRawUrl(TEAM_CSV_DEFAULT_URL);
+  if (!loc) throw new Error('Team CSV URL is not a GitHub raw URL');
+
+  for (let attempt = 0; attempt < 3; attempt++) {
+    let file = null;
+    let remote = { racers: [] };
+    try {
+      file = await ghApi(`/repos/${loc.owner}/${loc.repo}/contents/${RACERS_PATH}?ref=${loc.branch}`, pat);
+      remote = JSON.parse(b64decode(file.content || '')) || { racers: [] };
+    } catch (e) {
+      if (e.status !== 404) throw e;
+    }
+
+    // Merge: remote + local, dedupe attempts by id.
+    const merged = new Map();
+    for (const rr of remote.racers || []) {
+      if (!rr.name) continue;
+      merged.set(rr.name.toLowerCase(), { name: rr.name, attempts: [...(rr.attempts || [])] });
+    }
+    for (const lr of state.racers || []) {
+      if (!lr.name) continue;
+      const key = lr.name.toLowerCase();
+      const entry = merged.get(key) || { name: lr.name, attempts: [] };
+      const seen = new Set(entry.attempts.map(attemptKey));
+      for (const a of lr.attempts || []) {
+        const k = attemptKey(a);
+        if (!seen.has(k)) {
+          seen.add(k);
+          entry.attempts.push({ ...a, id: a.id || uid() });
+        }
+      }
+      merged.set(key, entry);
+    }
+    const payload = JSON.stringify({ updatedAt: new Date().toISOString(), racers: [...merged.values()] }, null, 2);
+
+    try {
+      const remoteText = file ? b64decode(file.content || '') : '';
+      if (payload.replace(/\s+$/, '') === remoteText.replace(/\s+$/, '')) {
+        return { pushed: false };
+      }
+      await ghApi(`/repos/${loc.owner}/${loc.repo}/contents/${RACERS_PATH}`, pat, {
+        method: 'PUT',
+        body: JSON.stringify({
+          message: `Tree racer sync via app (${new Date().toISOString().slice(0, 16).replace('T', ' ')})`,
+          content: b64encode(payload),
+          ...(file ? { sha: file.sha } : {}),
+          branch: loc.branch,
+        }),
+      });
+      return { pushed: true };
+    } catch (e) {
+      if (e.status === 409 && attempt < 2) continue;
+      throw e;
+    }
+  }
+  return { pushed: false, error: 'Conflict retries exhausted' };
+}
