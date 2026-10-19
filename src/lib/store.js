@@ -112,6 +112,7 @@ export function makeDemoState() {
       s.runs.push({
         id: uid() + n,
         carId,
+        source: 'demo',
         date: day,
         time: `${10 + i}:3${i}0`.slice(0, 5),
         track: track.name,

@@ -3,7 +3,7 @@ import { Modal, Card, SectionTitle, Btn, Field, inputCls, Badge, Icon } from '..
 import { uid, makeDemoState } from '../lib/store';
 import { runsForCar } from '../lib/stats';
 import { runsToCSV, downloadFile } from '../lib/io';
-import { syncTeamData, teamCsvUrl, teamSyncOnOpen, TEAM_CSV_DEFAULT_URL } from '../lib/teamSync';
+import { syncTeamData, teamCsvUrl, teamSyncOnOpen, getPat, setPat, TEAM_CSV_DEFAULT_URL } from '../lib/teamSync';
 import { APP_VERSION } from '../version';
 import { fmtET, fmtMPH, fmtRT, fmtTemp, fmtDA, fmtDate, isNum } from '../lib/format';
 
@@ -555,6 +555,8 @@ export function SettingsModal({ state, update, reset, toast, onClose }) {
   const [checking, setChecking] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [teamUrl, setTeamUrl] = useState(teamCsvUrl(state));
+  const [patInput, setPatInput] = useState('');
+  const [hasPat, setHasPat] = useState(!!getPat());
   const current = bundleHash();
   const loadDemo = () => {
     if (!window.confirm('Load demo data? This REPLACES everything currently in the app.')) return;
@@ -583,12 +585,23 @@ export function SettingsModal({ state, update, reset, toast, onClose }) {
     toast(`Exported ${carRuns.length} runs (${car?.name || 'car'}) to CSV.`);
   };
 
-  // Team data: pull the shared sheet from GitHub on demand.
+  // Team data: pull the shared sheet from GitHub on demand, publishing local
+  // runs back when a token is saved.
   const syncNow = async () => {
     setSyncing(true);
     try {
-      const { added, carNames } = await syncTeamData(state, update);
-      toast(`Team data synced — ${added} runs (${carNames.join(', ')}).`);
+      const { added, carNames, published } = await syncTeamData(state, update);
+      let msg = `Team data synced — ${added} runs pulled (${carNames.join(', ')}).`;
+      if (published) {
+        msg = published.error
+          ? `${msg} Publish failed: ${published.error}`
+          : published.pushed
+            ? `${msg} Published ${published.published} local run(s) to GitHub.`
+            : `${msg} GitHub sheet already up to date.`;
+      } else if (hasPat) {
+        msg = `${msg} Publish skipped (offline?).`;
+      }
+      toast(msg, published?.error ? 'error' : 'ok');
     } catch (e) {
       toast(`Team sync failed: ${e.message}`, 'error');
     }
@@ -637,9 +650,10 @@ export function SettingsModal({ state, update, reset, toast, onClose }) {
       </div>
       <SectionTitle>Team data</SectionTitle>
       <div className="mb-2 text-xs text-white/50">
-        Pulls the shared run sheet from GitHub into the Big Pickle car on every open.
-        Runs you log in the app are never touched; spreadsheet edits flow in on the next sync.
+        Two-way sync with the GitHub sheet: every sync pulls the latest sheet down, and — with a token saved —
+        publishes runs you logged in the app back up. Demo runs are never published.
         {lastSync && <span className="text-white/70"> Last synced {lastSync.toLocaleString()} ({state.settings?.lastTeamSyncCount ?? 0} runs).</span>}
+        {state.settings?.lastTeamPublish && <span className="text-white/70"> Last published {new Date(state.settings.lastTeamPublish).toLocaleString()}.</span>}
       </div>
       <div className="mb-2 flex gap-2">
         <Btn kind="ghost" onClick={syncNow} disabled={syncing}>{syncing ? 'Syncing…' : 'Sync now'}</Btn>
@@ -647,9 +661,32 @@ export function SettingsModal({ state, update, reset, toast, onClose }) {
           Auto-sync: {teamSyncOnOpen(state) ? 'on' : 'off'}
         </Btn>
       </div>
-      <div className="mb-4 flex gap-2">
+      <div className="mb-2 flex gap-2">
         <input value={teamUrl} onChange={(e) => setTeamUrl(e.target.value)} placeholder="Team CSV URL" className={`${inputCls} min-w-0 flex-1 font-mono !text-xs`} />
         <Btn kind="quiet" onClick={saveTeamUrl} className="shrink-0 !py-1.5 text-xs">Save</Btn>
+      </div>
+      <div className="mb-4 rounded-xl border border-white/[0.07] bg-white/[0.02] p-3">
+        <div className="mb-1 text-xs font-semibold text-white/70">
+          GitHub publishing {hasPat ? <span className="text-pickle-400">· enabled</span> : <span className="text-white/40">· off</span>}
+        </div>
+        {hasPat ? (
+          <div className="flex items-center justify-between gap-2">
+            <div className="text-[11px] text-white/45">Runs you log will be published to the sheet on sync.</div>
+            <Btn kind="quiet" onClick={() => { setPat(''); setHasPat(false); toast('GitHub token removed — publishing off.'); }} className="shrink-0 !py-1.5 text-xs">Remove token</Btn>
+          </div>
+        ) : (
+          <>
+            <div className="mb-2 text-[11px] text-white/45">
+              To publish, create a fine-grained token: GitHub → Settings → Developer settings → Personal access tokens →
+              Generate new token · repository access: <b>big-pickle-racing-tracker</b> · permission: <b>Contents (read &amp; write)</b>.
+              Paste it below — it stays on this device only.
+            </div>
+            <div className="flex gap-2">
+              <input type="password" value={patInput} onChange={(e) => setPatInput(e.target.value)} placeholder="github_pat_…" className={`${inputCls} min-w-0 flex-1 font-mono !text-xs`} />
+              <Btn kind="quiet" onClick={() => { const t = patInput.trim(); if (!t) return; setPat(t); setPatInput(''); setHasPat(true); toast('Token saved — publishing enabled.'); }} className="shrink-0 !py-1.5 text-xs">Save</Btn>
+            </div>
+          </>
+        )}
       </div>
       <SectionTitle>Demo data</SectionTitle>
       <div className="mb-4 rounded-xl border border-amber-500/30 bg-amber-500/5 p-3 text-xs text-amber-200/90">
@@ -662,7 +699,7 @@ export function SettingsModal({ state, update, reset, toast, onClose }) {
       <Btn kind="ghost" onClick={clearAll} className="!border-red-500/40 !text-red-300">Clear all data</Btn>
       <div className="mt-6 text-[11px] text-white/35">
         Local-first: everything lives in this browser's localStorage. No account, no server, no tracking.
-        The team sheet sync is a one-way pull from your GitHub file — the app never sends data anywhere.
+        The only exception is team publishing: with a GitHub token saved, sync sends your runs to your repo's sheet.
         Density altitude uses the standard humidity-corrected formula; ET/MPH weather correction is a simplified
         air-density-ratio model (documented in src/lib/physics.js) — directionally correct: thinner air = slower.
       </div>
