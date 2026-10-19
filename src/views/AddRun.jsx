@@ -74,7 +74,6 @@ export default function AddRun({ state, update, toast, editId, onDone }) {
   };
 
   const [clipMsg, setClipMsg] = useState('');
-  const [listening, setListening] = useState(false);
   const [quickMode, setQuickMode] = useState(true);
   const [quickNums, setQuickNums] = useState('');
 
@@ -115,87 +114,6 @@ export default function AddRun({ state, update, toast, editId, onDone }) {
     fillFromScan(vals);
   };
 
-  const dictateNumbers = () => {
-    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SR) {
-      setClipMsg('Voice input not supported in this browser.');
-      return;
-    }
-    // Stop any existing recognition first.
-    if (window._bprRec) {
-      try { window._bprRec.stop(); } catch {}
-      window._bprRec = null;
-    }
-    const rec = new SR();
-    window._bprRec = rec;
-    rec.lang = 'en-US';
-    rec.interimResults = false;
-    rec.maxAlternatives = 1;
-    setListening(true);
-    setClipMsg('Listening… say the 8 numbers in order. Tap Stop when done.');
-    const timeout = setTimeout(() => {
-      try { rec.stop(); } catch {}
-    }, 30000); // auto-stop after 30s
-    const cleanup = () => {
-      clearTimeout(timeout);
-      setListening(false);
-      if (window._bprRec === rec) window._bprRec = null;
-    };
-    rec.onresult = (e) => {
-      cleanup();
-      const transcript = e.results[0][0].transcript;
-      // Extract numbers: handles "0.366", "point three six six", "13.49", etc.
-      const nums = parseSpokenNumbers(transcript);
-      if (nums.length === 0) {
-        setClipMsg(`Heard: "${transcript}" — no numbers found. Try again.`);
-        return;
-      }
-      const keys = ['rt', 'sixty', 'threeThirty', 'eighthET', 'eighthMPH', 'thousand', 'et', 'mph'];
-      const vals = {};
-      nums.slice(0, 8).forEach((n, i) => { vals[keys[i]] = n; });
-      fillFromScan(vals);
-      if (nums.length < 8) setClipMsg(`Got ${nums.length} of 8 numbers — check and fill the rest manually.`);
-      else setClipMsg('');
-    };
-    rec.onerror = (e) => {
-      cleanup();
-      setClipMsg(e.error === 'not-allowed' ? 'Microphone blocked — allow it in Settings.' : 'Voice input failed. Try again.');
-    };
-    rec.onend = () => cleanup();
-    try { rec.start(); } catch { cleanup(); }
-  };
-
-  const stopDictation = () => {
-    if (window._bprRec) {
-      try { window._bprRec.stop(); } catch {}
-      window._bprRec = null;
-    }
-    setListening(false);
-    setClipMsg('');
-  };
-
-  // Parse spoken numbers: converts words to digits, then extracts numbers.
-  const parseSpokenNumbers = (text) => {
-    const wordNum = {
-      zero: '0', oh: '0', o: '0', one: '1', two: '2', three: '3', four: '4',
-      five: '5', six: '6', seven: '7', eight: '8', nine: '9',
-    };
-    // Replace number words with digits, "point" with ".".
-    let t = ' ' + text.toLowerCase() + ' ';
-    t = t.replace(/\bpoint\b/g, '.');
-    t = t.replace(/\bdot\b/g, '.');
-    for (const [w, d] of Object.entries(wordNum)) {
-      t = t.replace(new RegExp(`\\b${w}\\b`, 'g'), d);
-    }
-    // Now extract numbers like "0.366" or "0 . 3 6 6" (spaced digits).
-    // First, collapse spaced digits: "0 . 3 6 6" -> "0.366".
-    t = t.replace(/(\d)\s*\.\s*(\d)/g, '$1.$2'); // "0 . 3" -> "0.3"
-    t = t.replace(/(\.\d)\s+(\d)/g, '$1$2'); // ".3 6" -> ".36" (repeat to collapse all)
-    t = t.replace(/(\.\d+)\s+(\d)/g, '$1$2');
-    t = t.replace(/(\.\d+)\s+(\d)/g, '$1$2');
-    const nums = t.match(/\d+\.\d+/g) || [];
-    return nums.slice(0, 8);
-  };
   const track = state.tracks.find((t) => t.id === f.trackId);
 
   const etNum = numOrNull(f.et);
@@ -305,17 +223,8 @@ export default function AddRun({ state, update, toast, editId, onDone }) {
           <div className="text-center text-[11px] text-white/40">Type or paste the 8 slip numbers separated by spaces — fills the form in order.</div>
           <div className="flex gap-2">
             <Btn kind="ghost" onClick={fillFromClipboard} className="flex-1">
-              <span className="mr-1">📋</span> Clipboard
+              <span className="mr-1">📋</span> Fill from clipboard
             </Btn>
-            {listening ? (
-              <Btn kind="primary" onClick={stopDictation} className="flex-1">
-                <span className="mr-1">⏹</span> Stop
-              </Btn>
-            ) : (
-              <Btn kind="ghost" onClick={dictateNumbers} className="flex-1">
-                <span className="mr-1">🎤</span> Dictate
-              </Btn>
-            )}
           </div>
           {clipMsg && <div className="text-center text-xs text-amber-300/80">{clipMsg}</div>}
           <ScanSlipButton onFill={fillFromScan} />
