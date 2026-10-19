@@ -7,7 +7,7 @@
  */
 
 export const ROLES = {
-  admin: { label: 'Fletch', title: 'Admin', canDelete: true, canLog: true, canSettings: true, canSync: true },
+  admin: { label: 'Dwayne', title: 'Admin', canDelete: true, canLog: true, canSettings: true, canSync: true },
   driver: { label: 'Dean', title: 'Driver', canDelete: false, canLog: true, canSettings: false, canSync: true },
   crew: { label: 'Ethan', title: 'Crew', canDelete: false, canLog: true, canSettings: false, canSync: true },
   temp: { label: 'Temp Worker', title: 'Viewer', canDelete: false, canLog: false, canSettings: false, canSync: true },

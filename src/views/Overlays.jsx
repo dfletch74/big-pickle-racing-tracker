@@ -364,11 +364,16 @@ export function TreeSimModal({ state, update, toast, onClose, roleId }) {
   const isAdmin = roleId === 'admin';
 
   const resetRankings = () => {
-    if (!window.confirm('Reset all racer stats? This clears every attempt for every racer, on all devices.')) return;
-    update((s) => { s.racers.forEach((r) => { r.attempts = []; }); });
-    // Clear the shared file too so the reset propagates.
-    publishRacers({ ...state, racers: (state.racers || []).map((r) => ({ ...r, attempts: [] })) }).catch(() => {});
-    toast('Racer rankings reset.');
+    if (!window.confirm('Reset the leaderboard? This deletes all racers and their stats, on all devices.')) return;
+    const resetAt = Date.now();
+    update((s) => {
+      s.racers = [];
+      s.settings = s.settings || {};
+      s.settings.lastRacerReset = resetAt;
+    });
+    // Publish the wipe so other devices clear too.
+    publishRacers({ ...state, racers: [] }, true).catch(() => {});
+    toast('Leaderboard reset.');
   };
 
   const actionBar = (

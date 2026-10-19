@@ -297,6 +297,7 @@ const attemptKey = (a) => a.id || [a.rt, a.date, a.tree, a.mode].join('|');
 /**
  * Pull shared racer stats and merge into local state.
  * Racers match by name (case-insensitive); attempts merge by id.
+ * If the shared file has a newer resetAt, local racers are cleared first.
  */
 export async function pullRacers(state, update) {
   const url = TEAM_CSV_DEFAULT_URL.replace('Big_Pickle_runs_2026.csv', 'team-racers.json');
@@ -307,8 +308,17 @@ export async function pullRacers(state, update) {
   if (!data || !Array.isArray(data.racers)) return { pulled: 0 };
 
   let pulled = 0;
+  let wasReset = false;
   update((s) => {
     s.racers = s.racers || [];
+    // Admin reset: if the shared resetAt is newer, wipe local racers.
+    const lastReset = s.settings?.lastRacerReset || 0;
+    if (data.resetAt && data.resetAt > lastReset) {
+      s.racers = [];
+      s.settings = s.settings || {};
+      s.settings.lastRacerReset = data.resetAt;
+      wasReset = true;
+    }
     for (const rr of data.racers) {
       if (!rr.name) continue;
       let local = s.racers.find((x) => (x.name || '').toLowerCase() === rr.name.toLowerCase());
@@ -327,18 +337,21 @@ export async function pullRacers(state, update) {
       }
     }
   });
-  return { pulled };
+  return { pulled, wasReset };
 }
 
 /**
  * Publish merged racer stats to the shared file. Requires a PAT.
  * Pull-then-push with SHA for optimistic concurrency (retries on 409).
+ * Pass reset=true to wipe all racers (sets resetAt so devices clear local data).
  */
-export async function publishRacers(state) {
+export async function publishRacers(state, reset = false) {
   const pat = getPat();
   if (!pat) return { pushed: false, error: 'No GitHub token saved' };
   const loc = parseRawUrl(TEAM_CSV_DEFAULT_URL);
   if (!loc) throw new Error('Team CSV URL is not a GitHub raw URL');
+
+  const resetAt = reset ? Date.now() : null;
 
   for (let attempt = 0; attempt < 3; attempt++) {
     let file = null;
@@ -351,26 +364,32 @@ export async function publishRacers(state) {
     }
 
     // Merge: remote + local, dedupe attempts by id.
+    // On reset, start from empty.
     const merged = new Map();
-    for (const rr of remote.racers || []) {
-      if (!rr.name) continue;
-      merged.set(rr.name.toLowerCase(), { name: rr.name, attempts: [...(rr.attempts || [])] });
-    }
-    for (const lr of state.racers || []) {
-      if (!lr.name) continue;
-      const key = lr.name.toLowerCase();
-      const entry = merged.get(key) || { name: lr.name, attempts: [] };
-      const seen = new Set(entry.attempts.map(attemptKey));
-      for (const a of lr.attempts || []) {
-        const k = attemptKey(a);
-        if (!seen.has(k)) {
-          seen.add(k);
-          entry.attempts.push({ ...a, id: a.id || uid() });
-        }
+    if (!reset) {
+      for (const rr of remote.racers || []) {
+        if (!rr.name) continue;
+        merged.set(rr.name.toLowerCase(), { name: rr.name, attempts: [...(rr.attempts || [])] });
       }
-      merged.set(key, entry);
+      for (const lr of state.racers || []) {
+        if (!lr.name) continue;
+        const key = lr.name.toLowerCase();
+        const entry = merged.get(key) || { name: lr.name, attempts: [] };
+        const seen = new Set(entry.attempts.map(attemptKey));
+        for (const a of lr.attempts || []) {
+          const k = attemptKey(a);
+          if (!seen.has(k)) {
+            seen.add(k);
+            entry.attempts.push({ ...a, id: a.id || uid() });
+          }
+        }
+        merged.set(key, entry);
+      }
     }
-    const payload = JSON.stringify({ updatedAt: new Date().toISOString(), racers: [...merged.values()] }, null, 2);
+    const payload = JSON.stringify(
+      { updatedAt: new Date().toISOString(), ...(resetAt ? { resetAt } : {}), racers: [...merged.values()] },
+      null, 2,
+    );
 
     try {
       const remoteText = file ? b64decode(file.content || '') : '';
