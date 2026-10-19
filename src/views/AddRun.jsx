@@ -75,6 +75,23 @@ export default function AddRun({ state, update, toast, editId, onDone }) {
 
   const [clipMsg, setClipMsg] = useState('');
   const [listening, setListening] = useState(false);
+  const [quickMode, setQuickMode] = useState(true);
+  const [quickNums, setQuickNums] = useState('');
+
+  const fillFromQuickNums = () => {
+    const nums = quickNums.trim().split(/[\s,]+/).filter((n) => /^-?\d*\.?\d+$/.test(n));
+    if (nums.length === 0) {
+      setClipMsg('No numbers found — type or paste 8 numbers separated by spaces.');
+      return;
+    }
+    const keys = ['rt', 'sixty', 'threeThirty', 'eighthET', 'eighthMPH', 'thousand', 'et', 'mph'];
+    const vals = {};
+    nums.slice(0, 8).forEach((n, i) => { vals[keys[i]] = n; });
+    fillFromScan(vals);
+    setQuickNums('');
+    if (nums.length < 8) setClipMsg(`Got ${nums.length} of 8 — fill the rest manually.`);
+    else setClipMsg('');
+  };
   const fillFromClipboard = async () => {
     setClipMsg('');
     let text = '';
@@ -273,11 +290,23 @@ export default function AddRun({ state, update, toast, editId, onDone }) {
       {!editing && (
         <div className="space-y-2">
           <div className="flex gap-2">
-            <Btn kind="primary" onClick={fillFromClipboard} className="flex-1">
-              <span className="mr-1">📋</span> Fill from clipboard
+            <input
+              value={quickNums}
+              onChange={(e) => setQuickNums(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') fillFromQuickNums(); }}
+              placeholder="0.366 1.903 5.443 8.5 79.39 11.195 13.49 97.96"
+              inputMode="decimal"
+              className={`${inputCls} min-w-0 flex-1 font-mono !text-xs`}
+            />
+            <Btn kind="primary" onClick={fillFromQuickNums} className="shrink-0">Fill</Btn>
+          </div>
+          <div className="text-center text-[11px] text-white/40">Type or paste the 8 slip numbers separated by spaces — fills the form in order.</div>
+          <div className="flex gap-2">
+            <Btn kind="ghost" onClick={fillFromClipboard} className="flex-1">
+              <span className="mr-1">📋</span> Clipboard
             </Btn>
-            <Btn kind="primary" onClick={dictateNumbers} disabled={listening} className="flex-1">
-              <span className="mr-1">🎤</span> {listening ? 'Listening…' : 'Dictate numbers'}
+            <Btn kind="ghost" onClick={dictateNumbers} disabled={listening} className="flex-1">
+              <span className="mr-1">🎤</span> {listening ? 'Listening…' : 'Dictate'}
             </Btn>
           </div>
           {clipMsg && <div className="text-center text-xs text-amber-300/80">{clipMsg}</div>}
