@@ -32,6 +32,21 @@ const PATHS = {
     </>
   ),
   wrench: <path d="M14.5 6.5a4.2 4.2 0 0 0-5.6 5.6L4 17l3 3 4.9-4.9a4.2 4.2 0 0 0 5.6-5.6L14 13l-2.5-2.5 3-4z" />,
+  users: (
+    <>
+      <circle cx="9" cy="8" r="3.2" />
+      <path d="M3.5 19c.6-3 2.8-4.5 5.5-4.5s4.9 1.5 5.5 4.5" />
+      <circle cx="16.5" cy="9" r="2.4" />
+      <path d="M16 14.6c2.2.2 3.9 1.5 4.4 3.9" />
+    </>
+  ),
+  lock: (
+    <>
+      <rect x="5" y="10.5" width="14" height="9.5" rx="2" />
+      <path d="M8 10.5V7.5a4 4 0 0 1 8 0v3" />
+      <circle cx="12" cy="15.2" r="1.2" fill="currentColor" stroke="none" />
+    </>
+  ),
   gear: (
     <>
       <circle cx="12" cy="12" r="3" />

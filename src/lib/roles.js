@@ -1,0 +1,54 @@
+/**
+ * Team roles & PIN lock.
+ * Simple honor-system access control for a trusted crew:
+ * - A team PIN keeps random people out (set by Fletch in Settings).
+ * - After PIN, pick who you are; the role gates UI (no delete for non-admins, etc.).
+ * This is NOT server-side security — it's accident prevention for a local-first app.
+ */
+
+export const ROLES = {
+  admin: { label: 'Fletch', title: 'Admin', canDelete: true, canLog: true, canSettings: true, canSync: true },
+  driver: { label: 'Dean', title: 'Driver', canDelete: false, canLog: true, canSettings: false, canSync: true },
+  crew: { label: 'Ethan', title: 'Crew', canDelete: false, canLog: true, canSettings: false, canSync: true },
+  temp: { label: 'Temp Worker', title: 'Temp Crew', canDelete: false, canLog: true, canSettings: false, canSync: true },
+  viewer: { label: 'Hughie', title: 'Viewer', canDelete: false, canLog: false, canSettings: false, canSync: true },
+};
+
+export const ROLE_IDS = Object.keys(ROLES);
+
+// Simple (non-crypto) hash for the PIN — keeps it out of plaintext in storage.
+// This is a deterrent, not real security.
+export function hashPin(pin) {
+  let h = 0x811c9dc5;
+  const s = String(pin);
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = Math.imul(h, 0x01000193) >>> 0;
+  }
+  return 'p' + h.toString(36);
+}
+
+export function verifyPin(pin, hash) {
+  if (!hash) return false;
+  return hashPin(pin) === hash;
+}
+
+const ROLE_KEY = 'bpr-crew-role';
+
+export function getSavedRole() {
+  try {
+    const r = localStorage.getItem(ROLE_KEY);
+    return r && ROLES[r] ? r : null;
+  } catch { return null; }
+}
+
+export function saveRole(roleId) {
+  try {
+    if (roleId && ROLES[roleId]) localStorage.setItem(ROLE_KEY, roleId);
+    else localStorage.removeItem(ROLE_KEY);
+  } catch {}
+}
+
+export function clearRole() {
+  try { localStorage.removeItem(ROLE_KEY); } catch {}
+}
