@@ -32,6 +32,7 @@ export function ScanSlipButton({ onFill }) {
   const [geminiLanes, setGeminiLanes] = useState(null);
   const [lastFile, setLastFile] = useState(null);
   const [pasteText, setPasteText] = useState('');
+  const [aiDirect, setAiDirect] = useState(false);
 
   const doPasteParse = () => {
     const p = parseSlipText(pasteText);
@@ -42,8 +43,34 @@ export function ScanSlipButton({ onFill }) {
 
   const fieldCount = (p) => p ? SCAN_FIELDS.filter(([k]) => pickLane(p, 0)[k]).length : 0;
 
+  const tryGeminiWithFile = async (file) => {
+    const key = getGeminiKey();
+    if (!key) { setLastFile(file); setShowGeminiSetup(true); setStage('idle'); return; }
+    setLastFile(file);
+    setGeminiLanes(null);
+    setStage('scanning');
+    setProgress('AI reading the slip…');
+    setShowGeminiSetup(false);
+    try {
+      const result = await geminiVision(file, key);
+      setGeminiLanes(result.lanes);
+      setLane(0);
+      setValues(geminiLaneToValues(result.lanes[0], result.date, result.time));
+      setParsed(null);
+      setStage('review');
+    } catch (e) {
+      setError(e.message || 'AI read failed');
+      setStage('error');
+    }
+  };
+
   const startScan = async (file) => {
     if (!file) return;
+    if (aiDirect) {
+      setAiDirect(false);
+      tryGeminiWithFile(file);
+      return;
+    }
     setLastFile(file);
     setGeminiLanes(null);
     setStage('scanning');
@@ -140,14 +167,17 @@ export function ScanSlipButton({ onFill }) {
       {stage === 'choose' && (
         <Modal title="Get the numbers" onClose={() => setStage('idle')}>
           <div className="space-y-2">
+            <Btn kind="primary" onClick={() => { setAiDirect(true); setStage('idle'); fileRef.current?.click(); }} className="w-full">
+              <span className="mr-1">🤖</span> AI read photo
+            </Btn>
             <Btn kind="ghost" onClick={() => { setStage('idle'); fileRef.current?.click(); }} className="w-full">
-              <span className="mr-1">📷</span> Take / choose photo
+              <span className="mr-1">📷</span> Quick scan (on-device)
             </Btn>
             <Btn kind="ghost" onClick={() => setStage('paste')} className="w-full">
               <span className="mr-1">📋</span> Paste copied text
             </Btn>
             <div className="pt-1 text-[11px] text-white/40">
-              Tip: in Photos, long-press the slip → Select All → Copy, then paste here. iPhone reads faded slips better than any scanner.
+              AI read is best for faded slips. Paste uses iPhone's text reader.
             </div>
           </div>
         </Modal>
@@ -210,7 +240,8 @@ export function ScanSlipButton({ onFill }) {
               setGeminiKey(k);
               setGeminiKeyInput('');
               setShowGeminiSetup(false);
-              tryGemini();
+              if (lastFile) tryGeminiWithFile(lastFile);
+              else setStage('idle');
             }} className="shrink-0">Save & retry</Btn>
           </div>
         </Modal>
