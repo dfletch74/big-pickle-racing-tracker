@@ -1,2 +1,2 @@
-// Human-readable app version — bump on notable releases.
-export const APP_VERSION = '1.5';
+// Human-readable app version — bump on EVERY user-visible update.
+export const APP_VERSION = '1.6';
