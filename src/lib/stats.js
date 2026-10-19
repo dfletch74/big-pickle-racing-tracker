@@ -54,22 +54,33 @@ export function personalBests(runs) {
   };
 }
 
-/** Consistency panel: grade, streak, % within ±0.05s of avg ET, spread. */
-export function consistency(runs) {
-  const ets = runs.map((r) => r.et).filter(isNum);
+/** Consistency panel: grade, streak, % within ±0.05s of avg ET, spread.
+ *  Uses weather-corrected ET when DA data is available (so air variation
+ *  doesn't tank the grade — measures driver consistency, not weather luck).
+ */
+export function consistency(runs, baseline) {
+  // Prefer corrected ETs when we have DA data; fall back to raw.
+  const useCorrected = baseline != null && runs.some((r) => isNum(r.daFt));
+  const ets = runs
+    .map((r) => (useCorrected && isNum(r.daFt) ? correctET(r.et, r.daFt, baseline) : r.et))
+    .filter(isNum);
   if (ets.length < 3) return null;
   const a = avg(ets);
   const within = ets.filter((e) => Math.abs(e - a) <= 0.05).length;
   const score = (within / ets.length) * 100;
   const spread = Math.max(...ets) - Math.min(...ets);
-  const ordered = [...runs].filter((r) => isNum(r.et)).sort((x, y) => runDateTime(x) - runDateTime(y));
+  const ordered = [...runs]
+    .filter((r) => isNum(r.et))
+    .sort((x, y) => runDateTime(x) - runDateTime(y));
+  const corrOf = (r) => (useCorrected && isNum(r.daFt) ? correctET(r.et, r.daFt, baseline) : r.et);
   let streak = 0;
   for (let i = ordered.length - 1; i >= 0; i--) {
-    if (Math.abs(ordered[i].et - a) <= 0.05) streak++;
+    const c = corrOf(ordered[i]);
+    if (isNum(c) && Math.abs(c - a) <= 0.05) streak++;
     else break;
   }
   const grade = score >= 80 ? 'A' : score >= 65 ? 'B' : score >= 50 ? 'C' : score >= 35 ? 'D' : 'F';
-  return { avgET: a, score, spread, streak, grade, n: ets.length };
+  return { avgET: a, score, spread, streak, grade, n: ets.length, corrected: useCorrected };
 }
 
 /** Rank of a run's value within a list (1 = best). `lowerIsBetter` for ET-like. */

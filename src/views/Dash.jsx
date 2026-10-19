@@ -53,7 +53,7 @@ export default function Dash({ state, onAddRun, onImport, onSeeRuns }) {
       .sort((a, b) => (b.date || '').localeCompare(a.date || '') || b.createdAt - a.createdAt)
       .slice(0, 5);
   }, [runs, conMode]);
-  const con = useMemo(() => consistency(conRuns), [conRuns]);
+  const con = useMemo(() => consistency(conRuns, state.settings.daBaseline), [conRuns, state.settings.daBaseline]);
 
   // ET improvement: avg of first 3 vs avg of last 3.
   const etImprovement = useMemo(() => {
@@ -221,6 +221,7 @@ export default function Dash({ state, onAddRun, onImport, onSeeRuns }) {
                 </div>
                 <div className="mt-2 text-[11px] text-white/40">
                   {conMode === 'last5' ? 'Last 5 runs' : `${timeScope === 'all' ? 'All runs' : curYear} season`} · {dist} mi · avg ET {con.avgET.toFixed(3)}s over {con.n} runs.
+                  {con.corrected && <span className="text-pickle-400/70"> · Weather-corrected</span>}
                 </div>
               </>
             ) : (
