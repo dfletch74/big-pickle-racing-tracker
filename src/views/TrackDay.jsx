@@ -215,6 +215,7 @@ function ManageTracks({ state, update, toast, selectedId, onSelectTrack }) {
         id: uid(), name: n,
         lat: coords?.lat ?? null, lon: coords?.lon ?? null,
         elevationFt: coords?.elevationFt ?? null,
+        locationLabel: coords?.label ?? null, heading: null,
       });
     });
     setNewName('');
@@ -230,30 +231,56 @@ function ManageTracks({ state, update, toast, selectedId, onSelectTrack }) {
     const n = name.trim();
     if (!n) { toast('Give the track a name.', 'error'); return; }
     const oldName = t.name;
+    // If another track already has this name, merge this one into it
+    // (runs, events, notes follow; missing settings are filled in).
+    const existing = state.tracks.find((x) => x.id !== t.id && x.name.toLowerCase() === n.toLowerCase());
     setLocBusy(true);
     let coords = null;
     const q = editLoc.trim();
     if (q) {
       try { coords = await geocode(q); } catch { /* keep existing coords */ }
     }
+    let moved = 0;
     update((s) => {
-      const tr = s.tracks.find((x) => x.id === t.id);
-      if (tr) {
-        tr.name = n;
-        const hd = editHeading.trim() === '' ? null : Math.round(Number(editHeading));
-        tr.heading = hd != null && !Number.isNaN(hd) ? ((hd % 360) + 360) % 360 : null;
-        if (coords) { tr.lat = coords.lat; tr.lon = coords.lon; tr.elevationFt = coords.elevationFt; }
+      if (existing) {
+        const tr = s.tracks.find((x) => x.id === existing.id);
+        if (tr) {
+          if (tr.heading == null && t.heading != null) tr.heading = t.heading;
+          if (tr.lat == null && t.lat != null) {
+            tr.lat = t.lat; tr.lon = t.lon;
+            tr.elevationFt = t.elevationFt; tr.locationLabel = t.locationLabel ?? null;
+          }
+        }
+        s.runs.forEach((r) => {
+          if (r.trackId === t.id || (r.trackId == null && r.track === oldName)) { r.track = existing.name; r.trackId = existing.id; moved++; }
+        });
+        s.events.forEach((e) => {
+          if (e.trackId === t.id || (e.trackId == null && e.track === oldName)) { e.track = existing.name; e.trackId = existing.id; }
+        });
+        s.trackNotes.forEach((x) => { if (x.trackId === t.id) x.trackId = existing.id; });
+        s.tracks = s.tracks.filter((x) => x.id !== t.id);
+      } else {
+        const tr = s.tracks.find((x) => x.id === t.id);
+        if (tr) {
+          tr.name = n;
+          const hd = editHeading.trim() === '' ? null : Math.round(Number(editHeading));
+          tr.heading = hd != null && !Number.isNaN(hd) ? ((hd % 360) + 360) % 360 : null;
+          if (coords) { tr.lat = coords.lat; tr.lon = coords.lon; tr.elevationFt = coords.elevationFt; tr.locationLabel = coords.label; }
+        }
+        // Keep history together: runs/events logged at this track follow the rename.
+        s.runs.forEach((r) => { if (r.trackId === t.id || (r.trackId == null && r.track === oldName)) r.track = n; });
+        s.events.forEach((e) => { if (e.trackId === t.id || (e.trackId == null && e.track === oldName)) e.track = n; });
       }
-      // Keep history together: runs/events logged at this track follow the rename.
-      s.runs.forEach((r) => { if (r.trackId === t.id || (r.trackId == null && r.track === oldName)) r.track = n; });
-      s.events.forEach((e) => { if (e.trackId === t.id || (e.trackId == null && e.track === oldName)) e.track = n; });
     });
+    if (existing && selectedId === t.id) onSelectTrack(existing.id);
     setEditingId(null);
     setName('');
     setEditLoc('');
     setEditHeading('');
     setLocBusy(false);
-    toast(coords ? `Track renamed to "${n}" — near ${coords.label}.` : `Track renamed to "${n}".`);
+    toast(existing
+      ? `Merged into "${existing.name}" — ${moved} run${moved === 1 ? '' : 's'} moved.`
+      : coords ? `Track renamed to "${n}" — near ${coords.label}.` : `Track renamed to "${n}".`);
   };
 
   const delTrack = (t) => {
@@ -281,15 +308,17 @@ function ManageTracks({ state, update, toast, selectedId, onSelectTrack }) {
                 <Btn kind="ghost" onClick={() => saveEdit(t)} disabled={locBusy} className="!py-1.5 text-xs">{locBusy ? '…' : 'Save'}</Btn>
                 <Btn kind="quiet" onClick={() => { setEditingId(null); setName(''); setEditLoc(''); setEditHeading(''); }} className="!py-1.5 text-xs">Cancel</Btn>
               </div>
-              <input value={editLoc} onChange={(e) => setEditLoc(e.target.value)} placeholder="Update location — city or address (for live weather)…" className={inputCls} />
+              <input value={editLoc} onChange={(e) => setEditLoc(e.target.value)} placeholder="New location — city or address (leave blank to keep current)…" className={inputCls} />
               <input
                 value={editHeading} onChange={(e) => setEditHeading(e.target.value.replace(/[^\d]/g, '').slice(0, 3))}
                 placeholder="Strip heading ° — compass direction cars travel (for head-wind)…" inputMode="numeric" className={inputCls}
               />
-              <div className="text-[11px] text-white/35">
-                {t.lat != null
-                  ? `Located: ${t.lat.toFixed(2)}, ${t.lon.toFixed(2)}${t.elevationFt != null ? ` · ${t.elevationFt} ft` : ''}`
-                  : 'No location saved — live weather unavailable for this track.'}
+              <div className="rounded-lg bg-white/[0.04] px-2.5 py-2 text-[11px] leading-relaxed text-white/50">
+                <span className="font-semibold text-white/70">Currently saved:</span>{' '}
+                {t.locationLabel || (t.lat != null ? `${t.lat.toFixed(2)}, ${t.lon.toFixed(2)}` : 'no location')}
+                {t.elevationFt != null ? ` · ${t.elevationFt} ft` : ''}
+                {t.lat != null ? ' · live weather on' : ' · live weather off'}
+                {t.heading != null ? ` · heading ${t.heading}°` : ' · no heading saved'}
               </div>
             </div>
           ) : (

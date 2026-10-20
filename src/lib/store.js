@@ -8,9 +8,9 @@ export const uid = () =>
 /** Seed tracks with approximate coordinates for live weather. */
 function seedTracks() {
   return [
-    { id: uid(), name: 'RAD Torque Raceway', lat: 53.49, lon: -113.52, elevationFt: 2300 },
-    { id: uid(), name: 'Medicine Hat Raceway', lat: 50.02, lon: -110.71, elevationFt: 2350 },
-    { id: uid(), name: 'Central Alberta Raceway', lat: 52.4, lon: -113.9, elevationFt: 3000 },
+    { id: uid(), name: 'RAD Torque Raceway', lat: 53.49, lon: -113.52, elevationFt: 2300, locationLabel: null, heading: null },
+    { id: uid(), name: 'Medicine Hat Raceway', lat: 50.02, lon: -110.71, elevationFt: 2350, locationLabel: null, heading: null },
+    { id: uid(), name: 'Central Alberta Raceway', lat: 52.4, lon: -113.9, elevationFt: 3000, locationLabel: null, heading: null },
   ];
 }
 
