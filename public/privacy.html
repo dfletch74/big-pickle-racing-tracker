@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Privacy Policy &amp; Team Terms — Big Pickle Racing Tracker</title>
+<meta name="description" content="How the Big Pickle Racing Tracker stores, shares, and protects your data." />
+<link rel="icon" type="image/svg+xml" href="favicon.svg" />
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #060806; color: #e8f0e4; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, sans-serif; line-height: 1.6; }
+  .wrap { max-width: 720px; margin: 0 auto; padding: 24px 20px 64px; }
+  h1 { font-size: 1.6rem; margin: 0 0 4px; }
+  .updated { color: rgba(255,255,255,.45); font-size: .85rem; margin-bottom: 24px; }
+  h2 { font-size: 1.15rem; color: #b5e048; margin: 28px 0 8px; }
+  p, li { font-size: .95rem; color: rgba(255,255,255,.82); }
+  ul { padding-left: 20px; }
+  li { margin-bottom: 6px; }
+  a { color: #b5e048; }
+  .card { border: 1px solid rgba(255,255,255,.12); border-radius: 14px; padding: 16px; background: rgba(255,255,255,.03); margin: 16px 0; }
+  .card p { margin: 0 0 8px; }
+  .card p:last-child { margin-bottom: 0; }
+  .back { display: inline-block; margin-bottom: 20px; font-size: .9rem; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <a class="back" href="./">← Back to the app</a>
+  <h1>Privacy Policy &amp; Team Terms</h1>
+  <div class="updated">Big Pickle Racing Tracker · Last updated October 19, 2026</div>
+
+  <div class="card">
+    <p><strong>The short version:</strong> your data lives on your phone. It leaves your phone only when you ask it to — when you publish to your team's own private sync folder, or when you request weather for a track. There are no accounts, no ads, no analytics, and nothing is sold.</p>
+  </div>
+
+  <h2>1. What we store on your device</h2>
+  <p>Everything you enter is stored locally on your device (in the browser's on-device storage):</p>
+  <ul>
+    <li>Run logs, timeslips, weather entries, and setup notes</li>
+    <li>Track lists, locations, elevations, and strip headings</li>
+    <li>Racer profiles and tree-practice attempts</li>
+    <li>Maintenance parts, checklists, crew roles, and PIN codes (stored as one-way hashes, not as the PINs themselves)</li>
+    <li>Your GitHub sync token, if you save one — it never leaves your device</li>
+  </ul>
+  <p>This data is not sent anywhere by the app unless you turn on team sync (below).</p>
+
+  <h2>2. Team sync (optional, you control it)</h2>
+  <p>If you save a team sync token, the app can push your data to a shared folder your team controls (a private repository you set up). This is how run sheets, track info, and racer stats are shared between crew phones. Sharing is initiated by you — the app never syncs on its own, demo data is never published, and you can turn syncing off at any time in Settings → Team data.</p>
+
+  <h2>3. Weather</h2>
+  <p>When you request weather for a track, the app sends that track's saved coordinates to Open-Meteo (a public weather service) to get the forecast. If a track has no saved coordinates, the app asks your permission first and may use your device's current location instead. Location is used only for that weather request and is not stored or shared by the app.</p>
+
+  <h2>4. Fonts and other requests</h2>
+  <p>The app loads its fonts from Google Fonts, which means your IP address is shared with Google when the page loads, the same as visiting any site that uses Google Fonts. No other third-party services receive data. There are no advertising, analytics, or tracking SDKs in the app.</p>
+
+  <h2>5. Data retention and deletion</h2>
+  <ul>
+    <li><strong>On your device:</strong> "Clear all data" in Settings wipes everything the app stores on that phone. This does not touch the shared team folder.</li>
+    <li><strong>Team folder:</strong> runs and notes removed from the shared folder stay removed — deletions are recorded so other phones don't re-add them.</li>
+  </ul>
+
+  <h2>6. Team terms</h2>
+  <p>The team folder is shared by your race crew only. By publishing to it, you agree that:</p>
+  <ul>
+    <li>Content you share is visible to the whole crew.</li>
+    <li>You won't share anything abusive, harassing, or unrelated to the team.</li>
+    <li>Anyone can flag a run for review; the team admin can remove anything that doesn't belong.</li>
+  </ul>
+
+  <h2>7. Children</h2>
+  <p>The app is a racing logbook for the Big Pickle Racing crew and is not directed at children.</p>
+
+  <h2>8. Changes to this policy</h2>
+  <p>If this policy changes in a meaningful way, the version number in the app changes with it so the crew can see an update happened.</p>
+
+  <h2>9. Contact</h2>
+  <p>Questions about privacy or your data: <a href="https://github.com/dfletch74/big-pickle-racing-tracker/issues">open an issue on the app's repository</a>.</p>
+</div>
+</body>
+</html>

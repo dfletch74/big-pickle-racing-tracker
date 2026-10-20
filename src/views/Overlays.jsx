@@ -844,6 +844,14 @@ export function SettingsModal({ state, update, reset, toast, onClose }) {
       <SectionTitle>Danger zone</SectionTitle>
       <div className="mb-2 text-xs text-white/50">Clear all data wipes this device's local data only — the GitHub team sheet is never touched.</div>
       <Btn kind="ghost" onClick={clearAll} className="!border-red-500/40 !text-red-300">Clear all data</Btn>
+      <SectionTitle>About &amp; legal</SectionTitle>
+      <div className="mb-2 text-xs text-white/50">
+        Local-first: everything lives on this phone until you publish it to the team folder.
+        Weather goes to Open-Meteo only when you request it. No accounts, no ads, no analytics.
+      </div>
+      <Btn kind="ghost" onClick={() => { window.location.href = `${import.meta.env.BASE_URL}privacy.html`; }}>
+        Privacy policy &amp; team terms
+      </Btn>
       <div className="mt-6 text-[11px] text-white/35">
         Local-first: everything lives in this browser's localStorage. No account, no server, no tracking.
         The only exception is team publishing: with a GitHub token saved, sync sends your runs to your repo's sheet.

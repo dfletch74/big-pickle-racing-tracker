@@ -155,6 +155,7 @@ export default function AddRun({ state, update, toast, editId, onDone }) {
       let lat = track?.lat, lon = track?.lon;
       const elev = track?.elevationFt || 0;
       if (lat == null || lon == null) {
+        if (!window.confirm('This track has no saved location. Use your device location to fetch the weather?')) return null;
         const pos = await new Promise((res, rej) =>
           navigator.geolocation.getCurrentPosition(res, rej, { timeout: 9000 }));
         lat = pos.coords.latitude;
@@ -208,6 +209,7 @@ export default function AddRun({ state, update, toast, editId, onDone }) {
       date: f.date, time: f.time || '12:00',
       track: track?.name || editing?.track || 'Unknown track', trackId: f.trackId || editing?.trackId || null,
       distance: f.distance, runType: f.runType, backup: backup || undefined,
+      flagged: editing?.flagged || undefined,
       rt: numOrNull(f.rt), sixty: numOrNull(f.sixty), threeThirty: numOrNull(f.threeThirty),
       eighthET: numOrNull(f.eighthET), eighthMPH: numOrNull(f.eighthMPH),
       thousand: numOrNull(f.thousand), et: etNum, mph: numOrNull(f.mph),

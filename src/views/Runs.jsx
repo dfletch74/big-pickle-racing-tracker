@@ -124,6 +124,16 @@ export default function Runs({ state, update, toast, dist, setDist, onPrint, onA
     }
   };
 
+  // Flag/unflag a run for admin review (team content moderation). The flag
+  // syncs through the sheet's Flagged column so the whole crew sees it.
+  const doFlag = (run) => {
+    update((s) => {
+      const r = s.runs.find((x) => x.id === run.id);
+      if (r) r.flagged = r.flagged ? undefined : true;
+    });
+    toast(run.flagged ? 'Flag removed.' : 'Flagged for review.');
+  };
+
   // Deleting tombstones the run so the team sync doesn't resurrect it —
   // the tombstone propagates to the sheet on the next sync.
   const doDelete = (id) => update((s) => {
@@ -184,7 +194,7 @@ export default function Runs({ state, update, toast, dist, setDist, onPrint, onA
         <div className="space-y-2">
           {filtered.map((r) => (
             <RunCard key={r.id} run={r} ctx={ctx} baseline={baseline}
-              onEdit={role?.canLog ? (run) => onAddRun(run.id) : null} onDelete={role?.canDelete ? doDelete : null} onPrint={onPrint} />
+              onEdit={role?.canLog ? (run) => onAddRun(run.id) : null} onDelete={role?.canDelete ? doDelete : null} onPrint={onPrint} onFlag={doFlag} />
           ))}
         </div>
       )}

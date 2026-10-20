@@ -8,7 +8,7 @@ const SETUP_LABELS = [
   ['comp', 'Comp'], ['rebound', 'Rebound'], ['revLim', 'Rev Lim'],
 ];
 
-export default function RunCard({ run, ctx, baseline, onEdit, onDelete, defaultOpen }) {
+export default function RunCard({ run, ctx, baseline, onEdit, onDelete, onFlag, defaultOpen }) {
   const [open, setOpen] = useState(!!defaultOpen);
   const issues = detectIssues(run, ctx);
   const segs = segmentSplits(run);
@@ -21,6 +21,7 @@ export default function RunCard({ run, ctx, baseline, onEdit, onDelete, defaultO
           <Badge tone={run.distance === '1/4' ? 'blue' : 'neutral'}>{run.distance} mi</Badge>
           <Badge>{run.runType}</Badge>
           {run.backup && <Badge tone="amber">BACKUP</Badge>}
+          {run.flagged && <Badge tone="red">FLAGGED</Badge>}
           {run.wl === 'W' && <Badge tone="green">W</Badge>}
           {run.wl === 'L' && <Badge tone="red">L</Badge>}
           {issues.map((i) => (
@@ -81,6 +82,11 @@ export default function RunCard({ run, ctx, baseline, onEdit, onDelete, defaultO
           <div className="mt-4 flex gap-2">
             {onEdit && (
               <Btn kind="ghost" onClick={() => onEdit(run)} className="flex-1">Edit</Btn>
+            )}
+            {onFlag && (
+              <Btn kind="quiet" onClick={() => onFlag(run)} className={run.flagged ? 'text-red-300' : 'text-white/50'}>
+                {run.flagged ? 'Unflag' : 'Flag'}
+              </Btn>
             )}
             {onDelete && (
               <Btn kind="quiet" onClick={() => { if (window.confirm('Delete this run?')) onDelete(run.id); }} className="text-red-400/80">Delete</Btn>

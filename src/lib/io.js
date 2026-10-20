@@ -43,6 +43,7 @@ const COLUMNS = {
   rebound: ['rebound', 'reb'],
   revLim: ['revlim', 'rev', 'revlimit', 'revlimiter'],
   backup: ['backup', 'backuprun', 'isbackup'],
+  flagged: ['flagged', 'flag', 'report', 'reported'],
   windMph: ['windmph', 'wind', 'windspeed'],
   windDir: ['winddir', 'winddirection'],
   headwindMph: ['headwindmph', 'headwind'],
@@ -191,6 +192,10 @@ export async function parseImportFile(file, carId, fallbackTrack) {
         const v = String(get('backup') ?? '').trim().toLowerCase();
         return ['y', 'yes', 'true', '1'].includes(v) ? true : undefined;
       })(),
+      flagged: (() => {
+        const v = String(get('flagged') ?? '').trim().toLowerCase();
+        return ['y', 'yes', 'true', '1'].includes(v) ? true : undefined;
+      })(),
       windMph: num(get('windMph')),
       windDir: num(get('windDir')),
       headwindMph: num(get('headwindMph')),
@@ -205,7 +210,7 @@ export async function parseImportFile(file, carId, fallbackTrack) {
 
 const CSV_COLS = [
   ['carName', 'Car'], ['date', 'Date'], ['time', 'Time'], ['track', 'Track'], ['distance', 'Distance'],
-  ['runType', 'Run Type'], ['backup', 'Backup'], ['rt', 'R/T'], ['sixty', '60ft'], ['threeThirty', '330ft'],
+  ['runType', 'Run Type'], ['backup', 'Backup'], ['flagged', 'Flagged'], ['rt', 'R/T'], ['sixty', '60ft'], ['threeThirty', '330ft'],
   ['eighthET', '1/8 ET'], ['eighthMPH', '1/8 MPH'], ['thousand', '1000ft'],
   ['et', 'E.T.'], ['mph', 'MPH'], ['tempF', 'Temp F'], ['humidity', 'Humidity %'],
   ['altitudeFt', 'Altitude ft'], ['daFt', 'DA ft'],
@@ -225,6 +230,7 @@ export function runsToCSV(runs, carNameOf = () => '') {
   const val = (r, k) => {
     if (k === 'carName') return r.carName || carNameOf(r.carId);
     if (k === 'backup') return r.backup ? 'Y' : '';
+    if (k === 'flagged') return r.flagged ? 'Y' : '';
     return r[k];
   };
   const head = CSV_COLS.map(([, label]) => label).join(',');
