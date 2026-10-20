@@ -7,7 +7,7 @@ import { useWeatherEntry, WeatherEntryCard } from '../components/WeatherEntry';
 
 export default function Insight({ state, toast, dist, setDist }) {
   const [trackId, setTrackId] = useState(state.tracks[0]?.id || '');
-  const [subTab, setSubTab] = useState('overview'); // overview | segments | ai
+  const [subTab, setSubTab] = useState('overview'); // overview | setup | crew | segments | ai
   const baseline = state.settings.daBaseline;
 
   const track = state.tracks.find((t) => t.id === trackId) || state.tracks[0];
@@ -73,7 +73,7 @@ export default function Insight({ state, toast, dist, setDist }) {
       </div>
 
       <div className="flex gap-2 overflow-x-auto pb-1">
-        {[['overview', 'Overview'], ['segments', 'Segments'], ['ai', 'AI Tuner']].map(([id, label]) => (
+        {[['overview', 'Overview'], ['setup', 'Ideal Setup'], ['crew', 'Crew Chief'], ['segments', 'Segments'], ['ai', 'AI Tuner']].map(([id, label]) => (
           <button
             key={id}
             onClick={() => setSubTab(id)}
@@ -112,7 +112,28 @@ export default function Insight({ state, toast, dist, setDist }) {
         )}
       </Card>
 
-      {/* ideal setup — same ranking function as the crew chief below */}
+      {/* similar past runs */}
+      <Card>
+        <SectionTitle>Similar past runs</SectionTitle>
+        {target.daFt == null ? (
+          <div className="text-sm text-white/50">Enter conditions to find similar runs.</div>
+        ) : similarSorted.length === 0 ? (
+          <div className="text-sm text-white/50">No runs within DA ±750 ft / temp ±12°F yet.</div>
+        ) : (
+          similarSorted.map(({ r, pct }) => (
+            <div key={r.id} className="flex items-center justify-between border-t border-white/5 py-1.5 text-sm first:border-0">
+              <span><b className="font-mono text-pickle-400">{pct}%</b> <span className="text-white/60">{r.track} · {fmtDate(r.date)}</span></span>
+              <span className="font-mono"><b>{fmtET(r.et)}</b> <span className="text-white/45">@ {r.mph?.toFixed(1)}</span></span>
+            </div>
+          ))
+        )}
+      </Card>
+      </>
+      )}
+
+      {subTab === 'setup' && (
+      <>
+{/* ideal setup — same ranking function as the crew chief below */}
       <Card>
         <SectionTitle>Ideal setup</SectionTitle>
         <div className="mb-2 text-[11px] text-white/40">Ranked by mean weather-corrected ET (baseline {baseline.toLocaleString()} ft DA).</div>
@@ -138,8 +159,11 @@ export default function Insight({ state, toast, dist, setDist }) {
         ))}
         {top && last && <SetupDeltas top={top} last={last} />}
       </Card>
-
-      {/* crew chief's call — data-driven with structured explanations */}
+      </>
+      )}
+      {subTab === 'crew' && (
+      <>
+{/* crew chief's call — data-driven with structured explanations */}
       <Card>
         <SectionTitle>Crew chief's call</SectionTitle>
         {!call ? (
@@ -192,26 +216,8 @@ export default function Insight({ state, toast, dist, setDist }) {
           </div>
         )}
       </Card>
-
-      {/* similar past runs */}
-      <Card>
-        <SectionTitle>Similar past runs</SectionTitle>
-        {target.daFt == null ? (
-          <div className="text-sm text-white/50">Enter conditions to find similar runs.</div>
-        ) : similarSorted.length === 0 ? (
-          <div className="text-sm text-white/50">No runs within DA ±750 ft / temp ±12°F yet.</div>
-        ) : (
-          similarSorted.map(({ r, pct }) => (
-            <div key={r.id} className="flex items-center justify-between border-t border-white/5 py-1.5 text-sm first:border-0">
-              <span><b className="font-mono text-pickle-400">{pct}%</b> <span className="text-white/60">{r.track} · {fmtDate(r.date)}</span></span>
-              <span className="font-mono"><b>{fmtET(r.et)}</b> <span className="text-white/45">@ {r.mph?.toFixed(1)}</span></span>
-            </div>
-          ))
-        )}
-      </Card>
       </>
       )}
-
       {subTab === 'segments' && <SegmentAnalysis state={state} />}
       {subTab === 'ai' && (
       <>

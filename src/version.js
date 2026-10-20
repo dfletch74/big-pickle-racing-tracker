@@ -1,2 +1,2 @@
 // Human-readable app version — bump on EVERY user-visible update.
-export const APP_VERSION = '4.0';
+export const APP_VERSION = '4.1';

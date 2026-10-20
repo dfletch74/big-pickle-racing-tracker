@@ -231,7 +231,7 @@ export default function App() {
           {view === 'insight' && (
             <Insight state={state} toast={toast} dist={dist} setDist={setDist} />
           )}
-          {view === 'garage' && roleId === 'admin' && (
+          {view === 'garage' && (roleId === 'admin' || roleId === 'driver') && (
             <Garage state={state} update={update} toast={toast} role={role} />
           )}
         </div>
@@ -242,7 +242,7 @@ export default function App() {
         <div className={`mx-auto grid max-w-3xl items-end px-2 ${role.canLog ? (roleId === 'admin' ? 'grid-cols-6' : 'grid-cols-5') : 'grid-cols-4'}`}>
           {NAV.filter((n) => {
             if (n.id === 'add' && !role.canLog) return false;
-            if (n.id === 'garage' && roleId !== 'admin') return false;
+            if (n.id === 'garage' && roleId !== 'admin' && roleId !== 'driver') return false;
             return true;
           }).map((n) =>
             n.fab ? (
