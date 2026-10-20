@@ -179,6 +179,8 @@ function ManageTracks({ state, update, toast, selectedId, onSelectTrack }) {
   const [name, setName] = useState('');
   const [newName, setNewName] = useState('');
   const [newLoc, setNewLoc] = useState('');
+  const [newElev, setNewElev] = useState('');
+  const [newHeading, setNewHeading] = useState('');
   const [editLoc, setEditLoc] = useState('');
   const [editHeading, setEditHeading] = useState('');
   const [locBusy, setLocBusy] = useState(false);
@@ -210,16 +212,23 @@ function ManageTracks({ state, update, toast, selectedId, onSelectTrack }) {
     if (q) {
       try { coords = await geocode(q); } catch { /* no coords — manual weather still works */ }
     }
+    // Manual entries win: typed elevation beats the geocoded one, typed heading is used as-is.
+    const elevIn = newElev.trim() === '' ? null : Math.round(Number(newElev));
+    const hdIn = newHeading.trim() === '' ? null : Math.round(Number(newHeading));
+    const headingVal = hdIn != null && !Number.isNaN(hdIn) ? ((hdIn % 360) + 360) % 360 : null;
     update((s) => {
       s.tracks.push({
         id: uid(), name: n,
         lat: coords?.lat ?? null, lon: coords?.lon ?? null,
-        elevationFt: coords?.elevationFt ?? null,
-        locationLabel: coords?.label ?? null, heading: null,
+        elevationFt: elevIn != null && !Number.isNaN(elevIn) ? elevIn : (coords?.elevationFt ?? null),
+        locationLabel: coords?.label ?? (q || null),
+        heading: headingVal,
       });
     });
     setNewName('');
     setNewLoc('');
+    setNewElev('');
+    setNewHeading('');
     setLocBusy(false);
     toast(coords
       ? `Track "${n}" added — near ${coords.label}.`
@@ -338,6 +347,10 @@ function ManageTracks({ state, update, toast, selectedId, onSelectTrack }) {
         <div className="flex gap-2">
           <input value={newLoc} onChange={(e) => setNewLoc(e.target.value)} placeholder="Location — city or address (for live weather)…" className={`${inputCls} min-w-0 flex-1`} />
           <Btn kind="ghost" onClick={addTrack} disabled={locBusy} className="shrink-0">{locBusy ? '…' : 'Add track'}</Btn>
+        </div>
+        <div className="flex gap-2">
+          <input value={newElev} onChange={(e) => setNewElev(e.target.value.replace(/[^\d]/g, '').slice(0, 5))} placeholder="Elevation ft (optional — beats lookup)…" inputMode="numeric" className={`${inputCls} min-w-0 flex-1`} />
+          <input value={newHeading} onChange={(e) => setNewHeading(e.target.value.replace(/[^\d]/g, '').slice(0, 3))} placeholder="Heading ° (optional — for head-wind)…" inputMode="numeric" className={`${inputCls} min-w-0 flex-1`} />
         </div>
       </div>
     </div>
