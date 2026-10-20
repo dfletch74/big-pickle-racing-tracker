@@ -143,14 +143,14 @@ export default function App() {
     );
   }
 
-  // Bottom-nav items for this role; the grid gets exactly one column per
-  // item (a hardcoded count wrapped Dean's 6 items onto two lines).
-  const visibleNav = NAV.filter((n) => {
-    if (n.id === 'add' && !role.canLog) return false;
-    if (n.id === 'garage' && roleId !== 'admin' && roleId !== 'driver') return false;
-    return true;
-  });
-  const navColsClass = { 4: 'grid-cols-4', 5: 'grid-cols-5', 6: 'grid-cols-6' }[visibleNav.length] || 'grid-cols-6';
+  // Bottom nav: every role sees the same six items in the same order.
+  // Items the role can't use are greyed out, not hidden — so the menu
+  // never changes shape between users.
+  const navDisabled = (n) => {
+    if (n.id === 'add' && !role.canLog) return true;
+    if (n.id === 'garage' && roleId !== 'admin' && roleId !== 'driver') return true;
+    return false;
+  };
 
   return (
     <div className="min-h-screen bg-coal-950 text-white">
@@ -249,14 +249,19 @@ export default function App() {
 
       {/* bottom nav */}
       <nav className="app-chrome fixed inset-x-0 bottom-0 z-40 border-t border-white/10 bg-coal-950/95 pb-[env(safe-area-inset-bottom)] backdrop-blur">
-        <div className={`mx-auto grid max-w-3xl items-end px-2 ${navColsClass}`}>
-          {visibleNav.map((n) =>
-            n.fab ? (
+        <div className="mx-auto grid max-w-3xl grid-cols-6 items-end px-2">
+          {NAV.map((n) => {
+            const off = navDisabled(n);
+            return n.fab ? (
               <button
                 key={n.id}
                 onClick={() => goAdd()}
                 aria-label="Log a run"
-                className="relative mx-auto -mt-7 flex h-16 w-16 items-center justify-center rounded-full bg-pickle-400 text-black shadow-glow transition hover:bg-pickle-300 active:scale-95"
+                title={off ? 'Not available for your role' : 'Log a run'}
+                disabled={off}
+                className={`relative mx-auto -mt-7 flex h-16 w-16 items-center justify-center rounded-full shadow-glow transition active:scale-95 ${
+                  off ? 'cursor-not-allowed bg-coal-700 text-white/25' : 'bg-pickle-400 text-black hover:bg-pickle-300'
+                }`}
               >
                 <Icon name="plus" className="h-7 w-7" strokeWidth={2.4} />
                 <span className="sr-only">{n.label}</span>
@@ -265,18 +270,20 @@ export default function App() {
               <button
                 key={n.id}
                 onClick={() => setView(n.id)}
+                title={off ? 'Not available for your role' : n.label}
+                disabled={off}
                 className={`relative flex flex-col items-center py-2.5 font-display text-[15px] font-semibold uppercase tracking-[0.12em] transition ${
-                  view === n.id ? 'text-pickle-400' : 'text-white/40 hover:text-white/75'
+                  off ? 'cursor-not-allowed text-white/20' : view === n.id ? 'text-pickle-400' : 'text-white/40 hover:text-white/75'
                 }`}
               >
-                {view === n.id && (
+                {view === n.id && !off && (
                   <span className="absolute -top-px h-0.5 w-10 rounded-full bg-pickle-400 shadow-glow" />
                 )}
                 <Icon name={n.icon} className="h-[22px] w-[22px]" />
                 <span className="mt-0.5">{n.label}</span>
               </button>
-            ),
-          )}
+            );
+          })}
         </div>
       </nav>
 
