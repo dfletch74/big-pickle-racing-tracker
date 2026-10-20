@@ -52,6 +52,12 @@ export default function AddRun({ state, update, toast, editId, onDone }) {
         const v = editing[k];
         f[k] = v == null ? '' : String(v);
       }
+      // Runs from imports/sync may have no trackId — match by name so the
+      // dropdown shows the run's actual track instead of a misleading default.
+      if (!f.trackId && editing.track) {
+        const m = state.tracks.find((t) => t.name === editing.track);
+        if (m) f.trackId = m.id;
+      }
       return f;
     }
     const now = new Date();
@@ -127,7 +133,9 @@ export default function AddRun({ state, update, toast, editId, onDone }) {
 
   const etNum = numOrNull(f.et);
   // A backup (DNF/lifted) run may have no ET — the flag is what makes it savable.
-  const canSave = ((isNum(etNum) && etNum > 0) || backup) && f.date && f.trackId;
+  // When editing, the run's existing track also satisfies the track requirement
+  // (synced/imported runs may have no trackId stored).
+  const canSave = ((isNum(etNum) && etNum > 0) || backup) && f.date && (f.trackId || editing?.track);
 
   const applyPreset = (id) => {
     set('presetId', id);
@@ -198,7 +206,7 @@ export default function AddRun({ state, update, toast, editId, onDone }) {
       id: editing ? editing.id : uid(),
       carId: state.activeCarId,
       date: f.date, time: f.time || '12:00',
-      track: track?.name || 'Unknown track', trackId: f.trackId || null,
+      track: track?.name || editing?.track || 'Unknown track', trackId: f.trackId || editing?.trackId || null,
       distance: f.distance, runType: f.runType, backup: backup || undefined,
       rt: numOrNull(f.rt), sixty: numOrNull(f.sixty), threeThirty: numOrNull(f.threeThirty),
       eighthET: numOrNull(f.eighthET), eighthMPH: numOrNull(f.eighthMPH),
