@@ -126,7 +126,8 @@ export default function AddRun({ state, update, toast, editId, onDone }) {
   const track = state.tracks.find((t) => t.id === f.trackId);
 
   const etNum = numOrNull(f.et);
-  const canSave = isNum(etNum) && etNum > 0 && f.date && f.trackId;
+  // A backup (DNF/lifted) run may have no ET — the flag is what makes it savable.
+  const canSave = ((isNum(etNum) && etNum > 0) || backup) && f.date && f.trackId;
 
   const applyPreset = (id) => {
     set('presetId', id);
@@ -214,7 +215,7 @@ export default function AddRun({ state, update, toast, editId, onDone }) {
       if (editing) s.runs = s.runs.map((r) => (r.id === editing.id ? run : r));
       else s.runs.push(run);
     });
-    toast(editing ? 'Run updated.' : `Run saved: ${etNum.toFixed(3)}s.`);
+    toast(editing ? 'Run updated.' : (etNum != null ? `Run saved: ${etNum.toFixed(3)}s.` : 'Backup run saved.'));
     onDone();
   };
 
@@ -353,7 +354,7 @@ export default function AddRun({ state, update, toast, editId, onDone }) {
         </Btn>
         <Btn kind="ghost" onClick={onDone}>Cancel</Btn>
       </div>
-      {!canSave && <div className="pb-4 text-center text-xs text-white/40">Enter an E.T. (plus date and track) to save.</div>}
+      {!canSave && <div className="pb-4 text-center text-xs text-white/40">Enter an E.T. (plus date and track) to save — or tick "Backup run" for a DNF with no ET.</div>}
     </div>
   );
 }
