@@ -12,6 +12,7 @@ export const ROLES = {
   crew: { label: 'Ethan', title: 'Crew', canDelete: false, canLog: true, canSettings: false, canSync: true },
   temp: { label: 'Temp Worker', title: 'Viewer', canDelete: false, canLog: false, canSettings: false, canSync: true },
   viewer: { label: 'Hughie', title: 'Viewer', canDelete: false, canLog: false, canSettings: false, canSync: true },
+  grog: { label: 'Grog', title: 'Viewer', canDelete: false, canLog: false, canSettings: false, canSync: true },
 };
 
 

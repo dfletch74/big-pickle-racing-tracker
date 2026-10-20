@@ -8,14 +8,14 @@ const PIN_ROLES = {
   pinHashAdmin: ['admin'],
   pinHashDriver: ['driver'],
   pinHashCrew: ['crew'],
-  pinHashViewer: ['viewer', 'temp'],
+  pinHashViewer: ['viewer', 'temp', 'grog'],
 };
 
 const PIN_LABELS = {
   pinHashAdmin: 'Admin PIN (Fletch)',
   pinHashDriver: 'Driver PIN (Dean)',
   pinHashCrew: 'Crew PIN (Ethan)',
-  pinHashViewer: 'Viewer PIN (Hughie, Temp)',
+  pinHashViewer: 'Viewer PIN (Hughie, Temp, Grog)',
 };
 
 const PIN_KEYS = Object.keys(PIN_ROLES);
