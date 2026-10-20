@@ -143,6 +143,15 @@ export default function App() {
     );
   }
 
+  // Bottom-nav items for this role; the grid gets exactly one column per
+  // item (a hardcoded count wrapped Dean's 6 items onto two lines).
+  const visibleNav = NAV.filter((n) => {
+    if (n.id === 'add' && !role.canLog) return false;
+    if (n.id === 'garage' && roleId !== 'admin' && roleId !== 'driver') return false;
+    return true;
+  });
+  const navColsClass = { 4: 'grid-cols-4', 5: 'grid-cols-5', 6: 'grid-cols-6' }[visibleNav.length] || 'grid-cols-6';
+
   return (
     <div className="min-h-screen bg-coal-950 text-white">
       {/* header */}
@@ -240,12 +249,8 @@ export default function App() {
 
       {/* bottom nav */}
       <nav className="app-chrome fixed inset-x-0 bottom-0 z-40 border-t border-white/10 bg-coal-950/95 pb-[env(safe-area-inset-bottom)] backdrop-blur">
-        <div className={`mx-auto grid max-w-3xl items-end px-2 ${role.canLog ? (roleId === 'admin' ? 'grid-cols-6' : 'grid-cols-5') : 'grid-cols-4'}`}>
-          {NAV.filter((n) => {
-            if (n.id === 'add' && !role.canLog) return false;
-            if (n.id === 'garage' && roleId !== 'admin' && roleId !== 'driver') return false;
-            return true;
-          }).map((n) =>
+        <div className={`mx-auto grid max-w-3xl items-end px-2 ${navColsClass}`}>
+          {visibleNav.map((n) =>
             n.fab ? (
               <button
                 key={n.id}
