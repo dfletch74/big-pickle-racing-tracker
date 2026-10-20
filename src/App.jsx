@@ -14,7 +14,7 @@ import TrackDay from './views/TrackDay';
 import Insight from './views/Insight';
 import Garage from './views/Garage';
 import { GarageModal, TreeSimModal, SettingsModal, PrintSheet } from './views/Overlays';
-import { syncTeamData, teamSyncOnOpen } from './lib/teamSync';
+import { syncTeamData, teamSyncOnOpen, pullTracks } from './lib/teamSync';
 
 const NAV = [
   { id: 'dash', label: 'DASH', icon: 'gauge' },
@@ -72,6 +72,7 @@ export default function App() {
   useEffect(() => {
     if (!teamSyncOnOpen(state)) return;
     syncTeamData(state, update).catch(() => {});
+    pullTracks(state, update).catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

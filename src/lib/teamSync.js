@@ -400,3 +400,150 @@ export async function publishRacers(state, reset = false) {
   }
   return { pushed: false, error: 'Conflict retries exhausted' };
 }
+
+// ---------------------------------------------------------------------------
+// Team tracks — shared track info (location, elevation, heading), so a
+// heading or location entered on one phone is available on every crew phone.
+// Tracks match by name (case-insensitive). Fields shared per track:
+// name, lat, lon, elevationFt, locationLabel, heading, updatedAt.
+// Deletions propagate as tombstones {name, at}, same pattern as run deletes.
+// ---------------------------------------------------------------------------
+const TRACKS_PATH = 'data/team-tracks.json';
+const TRACK_TOMBSTONE_CAP = 200;
+
+const trackKey = (t) => (t.name || '').toLowerCase();
+
+const trackShared = (t) => ({
+  name: t.name,
+  lat: t.lat ?? null,
+  lon: t.lon ?? null,
+  elevationFt: t.elevationFt ?? null,
+  locationLabel: t.locationLabel ?? null,
+  heading: t.heading ?? null,
+  updatedAt: t.updatedAt ?? 0,
+});
+
+/**
+ * Merge local tracks with a remote list plus tombstones.
+ * Per name: the record with the later updatedAt wins wholesale (ties keep local).
+ * A tombstone newer than both copies removes the track entirely.
+ * Returns { tracks, deleted } — local ids are preserved for matched names.
+ */
+export function mergeTeamTracks(localTracks, remoteTracks, deleted) {
+  const tomb = new Map();
+  for (const d of deleted || []) {
+    if (!d?.name) continue;
+    const k = d.name.toLowerCase();
+    const cur = tomb.get(k);
+    if (!cur || (d.at || 0) > cur.at) tomb.set(k, { name: d.name, at: d.at || 0 });
+  }
+  const remote = new Map();
+  for (const rt of remoteTracks || []) {
+    if (!rt?.name) continue;
+    const k = rt.name.toLowerCase();
+    const cur = remote.get(k);
+    if (!cur || (rt.updatedAt || 0) > (cur.updatedAt || 0)) remote.set(k, rt);
+  }
+  const tracks = [];
+  const seen = new Set();
+  for (const lt of localTracks || []) {
+    if (!lt?.name) continue;
+    const k = trackKey(lt);
+    if (seen.has(k)) continue;
+    seen.add(k);
+    const r = remote.get(k);
+    const lu = lt.updatedAt || 0, ru = r ? r.updatedAt || 0 : 0;
+    const t = tomb.get(k);
+    if (t && t.at >= lu && t.at >= ru) continue; // deleted everywhere
+    const src = r && ru > lu ? r : lt;
+    tracks.push({ ...trackShared(src), id: lt.id || uid() });
+  }
+  for (const [k, r] of remote) {
+    if (seen.has(k)) continue;
+    const t = tomb.get(k);
+    if (t && t.at >= (r.updatedAt || 0)) continue;
+    tracks.push({ ...trackShared(r), id: uid() });
+  }
+  const outTomb = [];
+  for (const [k, t] of tomb) {
+    const live = tracks.find((x) => trackKey(x) === k);
+    if (!live || t.at > (live.updatedAt || 0)) outTomb.push(t);
+  }
+  return { tracks, deleted: outTomb.slice(0, TRACK_TOMBSTONE_CAP) };
+}
+
+/** Pull the shared track file and merge into local state. */
+export async function pullTracks(state, update) {
+  const url = TEAM_CSV_DEFAULT_URL.replace('Big_Pickle_runs_2026.csv', 'team-tracks.json');
+  const busted = url + '?t=' + Date.now();
+  const res = await fetch(busted, { cache: 'no-store' });
+  if (!res.ok) return { pulled: 0 };
+  const data = await res.json().catch(() => null);
+  if (!data || !Array.isArray(data.tracks)) return { pulled: 0 };
+
+  let pulled = 0;
+  update((s) => {
+    s.tracks = s.tracks || [];
+    s.deletedTracks = Array.isArray(s.deletedTracks) ? s.deletedTracks : [];
+    const before = new Map(s.tracks.map((t) => [trackKey(t), trackShared(t)]));
+    const merged = mergeTeamTracks(s.tracks, data.tracks, [...(s.deletedTracks || []), ...(data.deleted || [])]);
+    s.tracks = merged.tracks;
+    s.deletedTracks = merged.deleted;
+    for (const t of merged.tracks) {
+      const b = before.get(trackKey(t));
+      const changed = !b || ['lat', 'lon', 'elevationFt', 'locationLabel', 'heading', 'updatedAt']
+        .some((f) => b[f] !== t[f]);
+      if (changed) pulled++;
+    }
+  });
+  return { pulled };
+}
+
+/**
+ * Publish merged tracks to the shared file. Requires a PAT.
+ * Pull-then-push with SHA for optimistic concurrency (retries on 409).
+ */
+export async function publishTracks(state) {
+  const pat = getPat();
+  if (!pat) return { pushed: false, error: 'No GitHub token saved' };
+  const loc = parseRawUrl(TEAM_CSV_DEFAULT_URL);
+  if (!loc) throw new Error('Team CSV URL is not a GitHub raw URL');
+
+  for (let attempt = 0; attempt < 3; attempt++) {
+    let file = null;
+    let remote = { tracks: [], deleted: [] };
+    try {
+      file = await ghApi(`/repos/${loc.owner}/${loc.repo}/contents/${TRACKS_PATH}?ref=${loc.branch}`, pat);
+      remote = JSON.parse(b64decode(file.content || '')) || { tracks: [], deleted: [] };
+    } catch (e) {
+      if (e.status !== 404) throw e;
+    }
+
+    const merged = mergeTeamTracks(state.tracks, remote.tracks, [...(state.deletedTracks || []), ...(remote.deleted || [])]);
+    const payload = JSON.stringify(
+      { updatedAt: new Date().toISOString(), tracks: merged.tracks.map(trackShared), deleted: merged.deleted },
+      null, 2,
+    );
+
+    try {
+      const remoteText = file ? b64decode(file.content || '') : '';
+      if (payload.replace(/\s+$/, '') === remoteText.replace(/\s+$/, '')) {
+        return { pushed: false };
+      }
+      await ghApi(`/repos/${loc.owner}/${loc.repo}/contents/${TRACKS_PATH}`, pat, {
+        method: 'PUT',
+        body: JSON.stringify({
+          message: `Team track sync via app (${new Date().toISOString().slice(0, 16).replace('T', ' ')})`,
+          content: b64encode(payload),
+          ...(file ? { sha: file.sha } : {}),
+          branch: loc.branch,
+        }),
+      });
+      return { pushed: true };
+    } catch (e) {
+      if (e.status === 409 && attempt < 2) continue;
+      throw e;
+    }
+  }
+  return { pushed: false, error: 'Conflict retries exhausted' };
+}

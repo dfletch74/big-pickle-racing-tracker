@@ -1,10 +1,11 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect, useRef } from 'react';
 import { Card, SectionTitle, Btn, inputCls, Segmented, Badge, EmptyState } from '../components/ui';
 import { fmtET, fmtMPH, fmtTemp, fmtDA, fmtDate, isNum } from '../lib/format';
 import { runsForCar, raceRuns, filterDistance, latestRun, segmentSplits, bestSegments, predictET, cheatSheet } from '../lib/stats';
 import { DA_BANDS, TEMP_BANDS, airTrendLabel } from '../lib/physics';
 import { useWeatherEntry, WeatherEntryCard } from '../components/WeatherEntry';
 import { uid } from '../lib/store';
+import { publishTracks } from '../lib/teamSync';
 
 export default function TrackDay({ state, update, toast, dist, setDist, onAddRun, role }) {
   const canEdit = role?.canLog ?? true;
@@ -184,6 +185,15 @@ function ManageTracks({ state, update, toast, selectedId, onSelectTrack }) {
   const [editLoc, setEditLoc] = useState('');
   const [editHeading, setEditHeading] = useState('');
   const [locBusy, setLocBusy] = useState(false);
+  // Set after any local track change; the effect below publishes the fresh
+  // state to the shared team file once React has re-rendered with it.
+  const publishDirty = useRef(false);
+  useEffect(() => {
+    if (!publishDirty.current) return;
+    publishDirty.current = false;
+    publishTracks(state).catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.tracks]);
 
   const runCount = (t) => state.runs.filter((r) => r.trackId === t.id || (r.trackId == null && r.track === t.name)).length;
 
@@ -223,6 +233,7 @@ function ManageTracks({ state, update, toast, selectedId, onSelectTrack }) {
         elevationFt: elevIn != null && !Number.isNaN(elevIn) ? elevIn : (coords?.elevationFt ?? null),
         locationLabel: coords?.label ?? (q || null),
         heading: headingVal,
+        updatedAt: Date.now(),
       });
     });
     setNewName('');
@@ -230,6 +241,7 @@ function ManageTracks({ state, update, toast, selectedId, onSelectTrack }) {
     setNewElev('');
     setNewHeading('');
     setLocBusy(false);
+    publishDirty.current = true;
     toast(coords
       ? `Track "${n}" added — near ${coords.label}.`
       : q ? `Track "${n}" added — couldn't locate "${q}", weather can be entered manually.`
@@ -259,6 +271,7 @@ function ManageTracks({ state, update, toast, selectedId, onSelectTrack }) {
             tr.lat = t.lat; tr.lon = t.lon;
             tr.elevationFt = t.elevationFt; tr.locationLabel = t.locationLabel ?? null;
           }
+          tr.updatedAt = Date.now();
         }
         s.runs.forEach((r) => {
           if (r.trackId === t.id || (r.trackId == null && r.track === oldName)) { r.track = existing.name; r.trackId = existing.id; moved++; }
@@ -275,6 +288,7 @@ function ManageTracks({ state, update, toast, selectedId, onSelectTrack }) {
           const hd = editHeading.trim() === '' ? null : Math.round(Number(editHeading));
           tr.heading = hd != null && !Number.isNaN(hd) ? ((hd % 360) + 360) % 360 : null;
           if (coords) { tr.lat = coords.lat; tr.lon = coords.lon; tr.elevationFt = coords.elevationFt; tr.locationLabel = coords.label; }
+          tr.updatedAt = Date.now();
         }
         // Keep history together: runs/events logged at this track follow the rename.
         s.runs.forEach((r) => { if (r.trackId === t.id || (r.trackId == null && r.track === oldName)) r.track = n; });
@@ -287,6 +301,7 @@ function ManageTracks({ state, update, toast, selectedId, onSelectTrack }) {
     setEditLoc('');
     setEditHeading('');
     setLocBusy(false);
+    publishDirty.current = true;
     toast(existing
       ? `Merged into "${existing.name}" — ${moved} run${moved === 1 ? '' : 's'} moved.`
       : coords ? `Track renamed to "${n}" — near ${coords.label}.` : `Track renamed to "${n}".`);
@@ -300,9 +315,13 @@ function ManageTracks({ state, update, toast, selectedId, onSelectTrack }) {
     update((s) => {
       s.tracks = s.tracks.filter((x) => x.id !== t.id);
       s.trackNotes = s.trackNotes.filter((x) => x.trackId !== t.id);
+      s.deletedTracks = Array.isArray(s.deletedTracks) ? s.deletedTracks : [];
+      s.deletedTracks.push({ name: t.name, at: Date.now() });
+      if (s.deletedTracks.length > 200) s.deletedTracks = s.deletedTracks.slice(-200);
       nextId = s.tracks[0]?.id || '';
     });
     if (t.id === selectedId) onSelectTrack(nextId);
+    publishDirty.current = true;
     toast(`Track "${t.name}" deleted.`);
   };
 
