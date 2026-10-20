@@ -278,6 +278,20 @@ export async function syncTeamData(state, update) {
 
 const RACERS_PATH = 'data/team-racers.json';
 
+// First-name-only rule for the racer standings (Dwayne's rule, 2026-10-20):
+// known crew full names canonicalize to their first name so an old profile
+// on someone's phone merges into the first-name profile instead of
+// resurrecting a full-name duplicate in the standings.
+const RACER_NAME_ALIASES = {
+  'dwayne fletcher': 'Dwayne',
+  'ethan fletcher': 'Ethan',
+  'dean moffatt': 'Dean',
+};
+export function canonRacerName(name) {
+  if (!name) return name;
+  return RACER_NAME_ALIASES[String(name).trim().toLowerCase()] || name;
+}
+
 // Attempt identity: new attempts have ids; old ones fall back to a content key.
 const attemptKey = (a) => a.id || [a.rt, a.date, a.tree, a.mode].join('|');
 
@@ -308,10 +322,13 @@ export async function pullRacers(state, update) {
     }
     for (const rr of data.racers) {
       if (!rr.name) continue;
-      let local = s.racers.find((x) => (x.name || '').toLowerCase() === rr.name.toLowerCase());
+      const canon = canonRacerName(rr.name);
+      let local = s.racers.find((x) => canonRacerName(x.name || '').toLowerCase() === canon.toLowerCase());
       if (!local) {
-        local = { id: uid(), name: rr.name, attempts: [] };
+        local = { id: uid(), name: canon, attempts: [] };
         s.racers.push(local);
+      } else if (local.name !== canon) {
+        local.name = canon; // first-name-only rule: rename old full-name profile in place
       }
       const seen = new Set(local.attempts.map(attemptKey));
       for (const a of rr.attempts || []) {
@@ -356,12 +373,24 @@ export async function publishRacers(state, reset = false) {
     if (!reset) {
       for (const rr of remote.racers || []) {
         if (!rr.name) continue;
-        merged.set(rr.name.toLowerCase(), { name: rr.name, attempts: [...(rr.attempts || [])] });
+        const canon = canonRacerName(rr.name);
+        const key = canon.toLowerCase();
+        const existing = merged.get(key);
+        if (existing) {
+          const seen = new Set(existing.attempts.map(attemptKey));
+          for (const a of rr.attempts || []) {
+            const k = attemptKey(a);
+            if (!seen.has(k)) { seen.add(k); existing.attempts.push(a); }
+          }
+        } else {
+          merged.set(key, { name: canon, attempts: [...(rr.attempts || [])] });
+        }
       }
       for (const lr of state.racers || []) {
         if (!lr.name) continue;
-        const key = lr.name.toLowerCase();
-        const entry = merged.get(key) || { name: lr.name, attempts: [] };
+        const canon = canonRacerName(lr.name);
+        const key = canon.toLowerCase();
+        const entry = merged.get(key) || { name: canon, attempts: [] };
         const seen = new Set(entry.attempts.map(attemptKey));
         for (const a of lr.attempts || []) {
           const k = attemptKey(a);
