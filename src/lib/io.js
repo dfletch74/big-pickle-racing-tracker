@@ -42,6 +42,10 @@ const COLUMNS = {
   comp: ['comp', 'compress', 'compression'],
   rebound: ['rebound', 'reb'],
   revLim: ['revlim', 'rev', 'revlimit', 'revlimiter'],
+  backup: ['backup', 'backuprun', 'isbackup'],
+  windMph: ['windmph', 'wind', 'windspeed'],
+  windDir: ['winddir', 'winddirection'],
+  headwindMph: ['headwindmph', 'headwind'],
   notes: ['notes'],
 };
 
@@ -49,6 +53,7 @@ const norm = (h) => String(h ?? '').toLowerCase().replace(/[^a-z0-9]/g, '');
 
 function parseDate(v) {
   if (v == null || v === '') return null;
+  // Excel/SheetJS dates are UTC-midnight calendar dates — UTC components are correct here.
   if (v instanceof Date && !Number.isNaN(v.getTime())) return v.toISOString().slice(0, 10);
   if (typeof v === 'number') {
     // Excel serial date
@@ -182,6 +187,13 @@ export async function parseImportFile(file, carId, fallbackTrack) {
       comp: num(get('comp')),
       rebound: num(get('rebound')),
       revLim: num(get('revLim')),
+      backup: (() => {
+        const v = String(get('backup') ?? '').trim().toLowerCase();
+        return ['y', 'yes', 'true', '1'].includes(v) ? true : undefined;
+      })(),
+      windMph: num(get('windMph')),
+      windDir: num(get('windDir')),
+      headwindMph: num(get('headwindMph')),
       wl: null,
       notes: String(get('notes') ?? '').trim(),
       createdAt: Date.now(),
@@ -193,10 +205,12 @@ export async function parseImportFile(file, carId, fallbackTrack) {
 
 const CSV_COLS = [
   ['carName', 'Car'], ['date', 'Date'], ['time', 'Time'], ['track', 'Track'], ['distance', 'Distance'],
-  ['runType', 'Run Type'], ['rt', 'R/T'], ['sixty', '60ft'], ['threeThirty', '330ft'],
+  ['runType', 'Run Type'], ['backup', 'Backup'], ['rt', 'R/T'], ['sixty', '60ft'], ['threeThirty', '330ft'],
   ['eighthET', '1/8 ET'], ['eighthMPH', '1/8 MPH'], ['thousand', '1000ft'],
   ['et', 'E.T.'], ['mph', 'MPH'], ['tempF', 'Temp F'], ['humidity', 'Humidity %'],
-  ['altitudeFt', 'Altitude ft'], ['daFt', 'DA ft'], ['jet', 'Jet'],
+  ['altitudeFt', 'Altitude ft'], ['daFt', 'DA ft'],
+  ['windMph', 'Wind mph'], ['windDir', 'Wind dir'], ['headwindMph', 'Headwind mph'],
+  ['jet', 'Jet'],
   ['lPsi', 'L PSI'], ['rPsi', 'R PSI'], ['lBar', 'L Bar'], ['rBar', 'R Bar'],
   ['comp', 'Comp'], ['rebound', 'Rebound'], ['revLim', 'Rev Lim'],
   ['wl', 'W/L'], ['notes', 'Notes'],
@@ -208,8 +222,13 @@ export function runsToCSV(runs, carNameOf = () => '') {
     const s = String(v);
     return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
   };
+  const val = (r, k) => {
+    if (k === 'carName') return r.carName || carNameOf(r.carId);
+    if (k === 'backup') return r.backup ? 'Y' : '';
+    return r[k];
+  };
   const head = CSV_COLS.map(([, label]) => label).join(',');
-  const lines = runs.map((r) => CSV_COLS.map(([k]) => esc(k === 'carName' ? (r.carName || carNameOf(r.carId)) : r[k])).join(',')).join('\n');
+  const lines = runs.map((r) => CSV_COLS.map(([k]) => esc(val(r, k))).join(',')).join('\n');
   return `${head}\n${lines}\n`;
 }
 

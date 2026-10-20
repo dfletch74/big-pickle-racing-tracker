@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Card, SectionTitle, Btn, inputCls, Segmented, Badge, EmptyState } from '../components/ui';
 import { fmtET, fmtMPH, fmtTemp, fmtDA, fmtDate, isNum } from '../lib/format';
-import { runsForCar, filterDistance, latestRun, segmentSplits, bestSegments, predictET, cheatSheet } from '../lib/stats';
+import { runsForCar, raceRuns, filterDistance, latestRun, segmentSplits, bestSegments, predictET, cheatSheet } from '../lib/stats';
 import { DA_BANDS, TEMP_BANDS, airTrendLabel } from '../lib/physics';
 import { useWeatherEntry, WeatherEntryCard } from '../components/WeatherEntry';
 import { uid } from '../lib/store';
@@ -15,7 +15,7 @@ export default function TrackDay({ state, update, toast, dist, setDist, onAddRun
   const [showTracks, setShowTracks] = useState(false);
 
   const track = state.tracks.find((t) => t.id === trackId) || state.tracks[0];
-  const carRuns = useMemo(() => runsForCar(state, state.activeCarId), [state]);
+  const carRuns = useMemo(() => raceRuns(runsForCar(state, state.activeCarId)), [state]);
   const runs = useMemo(() => filterDistance(carRuns, dist), [carRuns, dist]);
   const last = useMemo(() => latestRun(runs), [runs]);
 
@@ -180,6 +180,7 @@ function ManageTracks({ state, update, toast, selectedId, onSelectTrack }) {
   const [newName, setNewName] = useState('');
   const [newLoc, setNewLoc] = useState('');
   const [editLoc, setEditLoc] = useState('');
+  const [editHeading, setEditHeading] = useState('');
   const [locBusy, setLocBusy] = useState(false);
 
   const runCount = (t) => state.runs.filter((r) => r.trackId === t.id || (r.trackId == null && r.track === t.name)).length;
@@ -239,6 +240,8 @@ function ManageTracks({ state, update, toast, selectedId, onSelectTrack }) {
       const tr = s.tracks.find((x) => x.id === t.id);
       if (tr) {
         tr.name = n;
+        const hd = editHeading.trim() === '' ? null : Math.round(Number(editHeading));
+        tr.heading = hd != null && !Number.isNaN(hd) ? ((hd % 360) + 360) % 360 : null;
         if (coords) { tr.lat = coords.lat; tr.lon = coords.lon; tr.elevationFt = coords.elevationFt; }
       }
       // Keep history together: runs/events logged at this track follow the rename.
@@ -248,6 +251,7 @@ function ManageTracks({ state, update, toast, selectedId, onSelectTrack }) {
     setEditingId(null);
     setName('');
     setEditLoc('');
+    setEditHeading('');
     setLocBusy(false);
     toast(coords ? `Track renamed to "${n}" — near ${coords.label}.` : `Track renamed to "${n}".`);
   };
@@ -275,9 +279,13 @@ function ManageTracks({ state, update, toast, selectedId, onSelectTrack }) {
               <div className="flex gap-2">
                 <input value={name} onChange={(e) => setName(e.target.value)} className={`${inputCls} min-w-0 flex-1`} autoFocus />
                 <Btn kind="ghost" onClick={() => saveEdit(t)} disabled={locBusy} className="!py-1.5 text-xs">{locBusy ? '…' : 'Save'}</Btn>
-                <Btn kind="quiet" onClick={() => { setEditingId(null); setName(''); setEditLoc(''); }} className="!py-1.5 text-xs">Cancel</Btn>
+                <Btn kind="quiet" onClick={() => { setEditingId(null); setName(''); setEditLoc(''); setEditHeading(''); }} className="!py-1.5 text-xs">Cancel</Btn>
               </div>
               <input value={editLoc} onChange={(e) => setEditLoc(e.target.value)} placeholder="Update location — city or address (for live weather)…" className={inputCls} />
+              <input
+                value={editHeading} onChange={(e) => setEditHeading(e.target.value.replace(/[^\d]/g, '').slice(0, 3))}
+                placeholder="Strip heading ° — compass direction cars travel (for head-wind)…" inputMode="numeric" className={inputCls}
+              />
               <div className="text-[11px] text-white/35">
                 {t.lat != null
                   ? `Located: ${t.lat.toFixed(2)}, ${t.lon.toFixed(2)}${t.elevationFt != null ? ` · ${t.elevationFt} ft` : ''}`
@@ -290,7 +298,7 @@ function ManageTracks({ state, update, toast, selectedId, onSelectTrack }) {
                 <div className="truncate text-sm font-bold">{t.name}</div>
                 <div className="text-xs text-white/40">{runCount(t)} runs{t.lat != null ? ' · live weather' : ''}</div>
               </div>
-              <Btn kind="quiet" onClick={() => { setEditingId(t.id); setName(t.name); setEditLoc(''); }} className="!py-1.5 text-xs">Edit</Btn>
+              <Btn kind="quiet" onClick={() => { setEditingId(t.id); setName(t.name); setEditLoc(''); setEditHeading(t.heading != null ? String(t.heading) : ''); }} className="!py-1.5 text-xs">Edit</Btn>
               <button onClick={() => delTrack(t)} className="shrink-0 px-1 text-xs text-red-400/70">Delete</button>
             </div>
           )}

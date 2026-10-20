@@ -11,7 +11,7 @@ export async function fetchTrackWeather(track) {
   }
   const url =
     `https://api.open-meteo.com/v1/forecast?latitude=${track.lat}&longitude=${track.lon}` +
-    `&current=temperature_2m,relative_humidity_2m,pressure_msl` +
+    `&current=temperature_2m,relative_humidity_2m,pressure_msl,wind_speed_10m,wind_direction_10m` +
     `&hourly=temperature_2m,relative_humidity_2m,pressure_msl` +
     `&temperature_unit=fahrenheit&timezone=auto&forecast_days=2`;
   const res = await fetch(url);
@@ -24,6 +24,8 @@ export async function fetchTrackWeather(track) {
     tempF: c.temperature_2m,
     humidity: c.relative_humidity_2m,
     mslpHpa: c.pressure_msl,
+    windMph: c.wind_speed_10m != null ? Math.round(c.wind_speed_10m * 0.621371) : null,
+    windDir: c.wind_direction_10m ?? null,
     daFt: densityAltitudeFromMslp({
       tempF: c.temperature_2m,
       humidityPct: c.relative_humidity_2m,

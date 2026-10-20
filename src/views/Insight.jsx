@@ -1,18 +1,19 @@
 import { useMemo, useState, useRef, useEffect } from 'react';
-import { Card, SectionTitle, Btn, inputCls, Segmented, Badge, EmptyState } from '../components/ui';
+import { Card, SectionTitle, Btn, inputCls, Segmented, Badge, EmptyState, Field } from '../components/ui';
+import { ScatterPlot } from '../components/charts';
 import { fmtET, fmtDate, isNum } from '../lib/format';
-import { correctET } from '../lib/physics';
-import { runsForCar, filterDistance, latestRun, findSimilar, dialIn, rankSetups, crewChiefCall, similarityPct, predictET, avg } from '../lib/stats';
+import { correctET, waterGrains, stationPressureHpa } from '../lib/physics';
+import { runsForCar, raceRuns, filterDistance, latestRun, findSimilar, dialIn, rankSetups, crewChiefCall, similarityPct, predictET, avg, pearsonR } from '../lib/stats';
 import { useWeatherEntry, WeatherEntryCard } from '../components/WeatherEntry';
 
 export default function Insight({ state, dist, setDist }) {
   const [trackId, setTrackId] = useState(state.tracks[0]?.id || '');
-  const [subTab, setSubTab] = useState('overview'); // overview | setup | crew | segments | ai
+  const [subTab, setSubTab] = useState('overview'); // overview | setup | crew | segments | graphs | ai
   const baseline = state.settings.daBaseline;
 
   const track = state.tracks.find((t) => t.id === trackId) || state.tracks[0];
   const weather = useWeatherEntry(track);
-  const carRuns = useMemo(() => runsForCar(state, state.activeCarId), [state]);
+  const carRuns = useMemo(() => raceRuns(runsForCar(state, state.activeCarId)), [state]);
   const runs = useMemo(() => filterDistance(carRuns, dist), [carRuns, dist]);
   const last = useMemo(() => latestRun(runs), [runs]);
 
@@ -72,7 +73,7 @@ export default function Insight({ state, dist, setDist }) {
       </div>
 
       <div className="flex gap-2 overflow-x-auto pb-1">
-        {[['overview', 'Overview'], ['setup', 'Ideal Setup'], ['crew', 'Crew Chief'], ['segments', 'Segments'], ['ai', 'AI Tuner']].map(([id, label]) => (
+        {[['overview', 'Overview'], ['setup', 'Ideal Setup'], ['crew', 'Crew Chief'], ['segments', 'Segments'], ['graphs', 'Graphs'], ['ai', 'AI Tuner']].map(([id, label]) => (
           <button
             key={id}
             onClick={() => setSubTab(id)}
@@ -218,6 +219,7 @@ export default function Insight({ state, dist, setDist }) {
       </>
       )}
       {subTab === 'segments' && <SegmentAnalysis state={state} />}
+      {subTab === 'graphs' && <CorrelationGraphs runs={runs} dist={dist} />}
       {subTab === 'ai' && (
       <>
       <AiTuner runs={runs} />
@@ -225,6 +227,101 @@ export default function Insight({ state, dist, setDist }) {
       </>
       )}
     </div>
+  );
+}
+
+/** Grains of water per lb of air for a run (needs temp + humidity + altitude). */
+const grainsOf = (r) => {
+  if (!isNum(r.tempF) || !isNum(r.altitudeFt)) return null;
+  return waterGrains({
+    tempF: r.tempF,
+    humidityPct: r.humidity ?? 0,
+    pressureHpa: stationPressureHpa(1013.25, r.altitudeFt),
+  });
+};
+
+const GRAPH_VARS = [
+  { id: 'sixty', label: '60-ft', get: (r) => r.sixty },
+  { id: 'threeThirty', label: '330-ft', get: (r) => r.threeThirty },
+  { id: 'et', label: 'ET', get: (r, dist) => (dist === '1/8' ? r.eighthET : r.et) },
+  { id: 'mph', label: 'MPH', get: (r, dist) => (dist === '1/8' ? r.eighthMPH : r.mph) },
+  { id: 'rt', label: 'Reaction time', get: (r) => r.rt },
+  { id: 'tempF', label: 'Temp °F', get: (r) => r.tempF },
+  { id: 'daFt', label: 'DA (ft)', get: (r) => r.daFt },
+  { id: 'humidity', label: 'Humidity %', get: (r) => r.humidity },
+  { id: 'grains', label: 'Water grains', get: grainsOf },
+  { id: 'jet', label: 'Jet', get: (r) => r.jet },
+  { id: 'tirePsi', label: 'Tire PSI (avg)', get: (r) => avg([r.lPsi, r.rPsi]) },
+  { id: 'revLim', label: 'Rev limiter', get: (r) => r.revLim },
+  { id: 'windMph', label: 'Wind (mph)', get: (r) => r.windMph },
+  { id: 'headwindMph', label: 'Headwind (mph)', get: (r) => r.headwindMph },
+];
+
+/** Scatter plot of any two run variables with Pearson correlation. */
+function CorrelationGraphs({ runs, dist }) {
+  const [xId, setXId] = useState('tirePsi');
+  const [yId, setYId] = useState('sixty');
+  const xv = GRAPH_VARS.find((v) => v.id === xId) || GRAPH_VARS[0];
+  const yv = GRAPH_VARS.find((v) => v.id === yId) || GRAPH_VARS[0];
+
+  const points = useMemo(() => runs
+    .map((r) => ({ x: xv.get(r, dist), y: yv.get(r, dist) }))
+    .filter((p) => isNum(p.x) && isNum(p.y)), [runs, xv, yv, dist]);
+  const stat = useMemo(() => pearsonR(points), [points]);
+
+  const strength = stat == null ? null
+    : Math.abs(stat.r) >= 0.7 ? 'strong'
+    : Math.abs(stat.r) >= 0.4 ? 'moderate'
+    : Math.abs(stat.r) >= 0.2 ? 'weak' : 'little to no';
+
+  return (
+    <Card>
+      <SectionTitle>Correlation graphs</SectionTitle>
+      <div className="mb-1 text-[11px] text-white/40">
+        Plot any variable against any other. Backup runs are excluded.
+      </div>
+      <div className="mb-3 grid grid-cols-2 gap-3">
+        <Field label="Across (X)">
+          <select value={xId} onChange={(e) => setXId(e.target.value)} className={inputCls}>
+            {GRAPH_VARS.map((v) => <option key={v.id} value={v.id}>{v.label}</option>)}
+          </select>
+        </Field>
+        <Field label="Up (Y)">
+          <select value={yId} onChange={(e) => setYId(e.target.value)} className={inputCls}>
+            {GRAPH_VARS.map((v) => <option key={v.id} value={v.id}>{v.label}</option>)}
+          </select>
+        </Field>
+      </div>
+      {points.length === 0 ? (
+        <div className="py-8 text-center text-sm text-white/40">
+          No runs have both {xv.label} and {yv.label} recorded yet.
+        </div>
+      ) : (
+        <div>
+          <div className="mb-2 flex items-center gap-2">
+            {stat ? (
+              <Badge tone={Math.abs(stat.r) >= 0.4 ? 'green' : 'neutral'}>
+                r = {stat.r >= 0 ? '+' : ''}{stat.r.toFixed(2)}
+              </Badge>
+            ) : (
+              <Badge tone="neutral">r = n/a</Badge>
+            )}
+            <span className="text-xs text-white/50">{points.length} runs</span>
+          </div>
+          <ScatterPlot
+            points={points}
+            xLabel={xv.label}
+            yLabel={yv.label}
+            trend={stat ? { slope: stat.slope, intercept: stat.intercept } : null}
+          />
+          <div className="mt-2 text-xs text-white/55">
+            {stat == null
+              ? 'Need at least 3 runs with both values and some spread to compute a correlation.'
+              : `${strength} linear relationship${strength === 'little to no' ? '' : ` — as ${xv.label} rises, ${yv.label} tends to ${stat.r > 0 ? 'rise' : 'fall'}`}.`}
+          </div>
+        </div>
+      )}
+    </Card>
   );
 }
 
@@ -573,7 +670,7 @@ function SetupRecommendations({ runs: propRuns, baseline }) {
 
 function SegmentAnalysis({ state }) {
   const runs = (state.runs || [])
-    .filter((r) => r.source !== 'demo' && r.distance === '1/4')
+    .filter((r) => r.source !== 'demo' && !r.backup && r.distance === '1/4')
     .sort((a, b) => String(b.date).localeCompare(String(a.date)))
     .slice(0, 10);
 

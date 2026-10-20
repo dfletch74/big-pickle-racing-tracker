@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { Card, SectionTitle, Btn, Field, inputCls, Segmented } from '../components/ui';
 import { uid } from '../lib/store';
 import { runsForCar, latestRun } from '../lib/stats';
-import { densityAltitudeFt, stationPressureHpa } from '../lib/physics';
+import { densityAltitudeFt, stationPressureHpa, headwindMph } from '../lib/physics';
 import { fetchTrackWeather } from '../lib/weather';
 import { fmtDA } from '../lib/format';
 import { isNum } from '../lib/format';
@@ -26,6 +26,7 @@ const EMPTY = {
   distance: '1/4', date: '', time: '', trackId: '', runType: 'T/T',
   rt: '', sixty: '', threeThirty: '', eighthET: '', eighthMPH: '', thousand: '',
   et: '', mph: '', tempF: '', humidity: '', altitudeFt: '',
+  windMph: '', windDir: '',
   notes: '', wl: '',
   setupMode: 'previous', presetId: '',
   jet: '', lPsi: '', rPsi: '', lBar: '', rBar: '', comp: '', rebound: '', revLim: '',
@@ -63,6 +64,7 @@ export default function AddRun({ state, update, toast, editId, onDone }) {
   }, [editing, state.tracks]);
 
   const [f, setF] = useState(initial);
+  const [backup, setBackup] = useState(!!editing?.backup);
   const [newTrack, setNewTrack] = useState('');
   const [presetName, setPresetName] = useState('');
   const [wxBusy, setWxBusy] = useState(false);
@@ -154,6 +156,8 @@ export default function AddRun({ state, update, toast, editId, onDone }) {
       set('tempF', w.current.tempF.toFixed(1));
       set('humidity', String(Math.round(w.current.humidity)));
       if (elev) set('altitudeFt', String(elev));
+      if (w.current.windMph != null) set('windMph', String(w.current.windMph));
+      if (w.current.windDir != null) set('windDir', String(Math.round(w.current.windDir)));
       toast(`Live: ${w.current.tempF.toFixed(1)}°F, DA ${fmtDA(w.current.daFt)}.`);
     } catch (e) {
       toast(`Weather fetch failed: ${e.message}`);
@@ -187,16 +191,19 @@ export default function AddRun({ state, update, toast, editId, onDone }) {
       const p = stationPressureHpa(1013.25, altitudeFt);
       daFt = Math.round(densityAltitudeFt({ tempF, humidityPct: humidity ?? 0, pressureHpa: p }));
     }
+    const windMph = numOrNull(f.windMph), windDir = numOrNull(f.windDir);
+    const headwindMph = headwindMph(windMph, windDir, track?.heading);
     const run = {
       id: editing ? editing.id : uid(),
       carId: state.activeCarId,
       date: f.date, time: f.time || '12:00',
       track: track?.name || 'Unknown track', trackId: f.trackId || null,
-      distance: f.distance, runType: f.runType,
+      distance: f.distance, runType: f.runType, backup: backup || undefined,
       rt: numOrNull(f.rt), sixty: numOrNull(f.sixty), threeThirty: numOrNull(f.threeThirty),
       eighthET: numOrNull(f.eighthET), eighthMPH: numOrNull(f.eighthMPH),
       thousand: numOrNull(f.thousand), et: etNum, mph: numOrNull(f.mph),
       tempF, humidity: isNum(humidity) ? Math.round(humidity) : null, altitudeFt, daFt,
+      windMph, windDir, headwindMph,
       jet: numOrNull(f.jet), lPsi: numOrNull(f.lPsi), rPsi: numOrNull(f.rPsi),
       lBar: numOrNull(f.lBar), rBar: numOrNull(f.rBar),
       comp: numOrNull(f.comp), rebound: numOrNull(f.rebound), revLim: numOrNull(f.revLim),
@@ -253,6 +260,18 @@ export default function AddRun({ state, update, toast, editId, onDone }) {
             </Field>
           )}
         </div>
+        <label className="flex cursor-pointer items-center gap-3 rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2.5">
+          <input
+            type="checkbox"
+            checked={backup}
+            onChange={(e) => setBackup(e.target.checked)}
+            className="h-5 w-5 accent-lime-400"
+          />
+          <div>
+            <div className="text-sm font-semibold text-white/90">Backup run</div>
+            <div className="text-[11px] text-white/45">Lifted, braked, or aborted — kept in the log but excluded from predictions and stats.</div>
+          </div>
+        </label>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
           <Field label="Date"><input type="date" value={f.date} onChange={(e) => set('date', e.target.value)} className={inputCls} /></Field>
           <Field label="Time"><input type="time" value={f.time} onChange={(e) => set('time', e.target.value)} className={inputCls} /></Field>

@@ -95,7 +95,7 @@ export default function Runs({ state, update, toast, dist, setDist, onPrint, onA
         if (y > 720) { doc.addPage(); y = 50; drawHeaders(); }
         let x = startX;
         const cells = [
-          r.date || '',
+          (r.date || '') + (r.backup ? '*' : ''),
           (r.track || '').slice(0, 14),
           r.distance || '',
           r.rt != null ? Number(r.rt).toFixed(3) : '',
@@ -108,6 +108,13 @@ export default function Runs({ state, update, toast, dist, setDist, onPrint, onA
         ];
         cells.forEach((c, i) => { doc.text(String(c), x, y); x += colW[i]; });
         y += 12;
+      }
+      if (filtered.some((r) => r.backup)) {
+        y += 6;
+        doc.setFontSize(8);
+        doc.setTextColor(100);
+        doc.text('* = backup run (lifted/braked/aborted — excluded from predictions)', 40, y);
+        doc.setTextColor(0);
       }
       const stamp = new Date().toISOString().slice(0, 10);
       doc.save(`big-pickle-runs-${dist === 'all' ? 'all' : dist.replace('/', '-')}-${stamp}.pdf`);
@@ -191,7 +198,7 @@ function SimilarAirSearch({ runs }) {
   const [open, setOpen] = useState(false);
   const [targetDA, setTargetDA] = useState('');
   const [band, setBand] = useState('500');
-  const pool = (runs || []).filter((r) => r.source !== 'demo' && r.daFt != null);
+  const pool = (runs || []).filter((r) => r.source !== 'demo' && !r.backup && r.daFt != null);
 
   const tda = parseFloat(targetDA);
   const b = parseFloat(band) || 500;

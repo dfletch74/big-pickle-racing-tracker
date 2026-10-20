@@ -3,6 +3,9 @@ import { correctET, correctMPH } from './physics';
 
 export const runsForCar = (state, carId) => state.runs.filter((r) => r.carId === carId);
 
+/** Full passes only — backup (lifted/braked/aborted) runs are excluded from all predictions and stats. */
+export const raceRuns = (runs) => runs.filter((r) => !r.backup);
+
 export const filterDistance = (runs, dist) =>
   dist === 'all' ? runs : runs.filter((r) => r.distance === dist);
 
@@ -23,6 +26,27 @@ export const avg = (xs) => {
   const n = xs.filter(isNum);
   return n.length ? n.reduce((a, b) => a + b, 0) / n.length : null;
 };
+
+/**
+ * Pearson correlation r for [{x, y}] plus least-squares trend line.
+ * Returns null when fewer than 3 points or no variance.
+ */
+export function pearsonR(pts) {
+  const n = pts.length;
+  if (n < 3) return null;
+  const mx = avg(pts.map((p) => p.x));
+  const my = avg(pts.map((p) => p.y));
+  let num = 0, dx = 0, dy = 0;
+  for (const p of pts) {
+    num += (p.x - mx) * (p.y - my);
+    dx += (p.x - mx) ** 2;
+    dy += (p.y - my) ** 2;
+  }
+  if (!dx || !dy) return null;
+  const r = num / Math.sqrt(dx * dy);
+  const slope = num / dx;
+  return { r, slope, intercept: my - slope * mx, n };
+}
 
 function minRun(runs, key) {
   const c = runs.filter((r) => isNum(r[key]));

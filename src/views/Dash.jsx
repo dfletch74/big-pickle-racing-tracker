@@ -3,13 +3,15 @@ import { Card, SectionTitle, Badge, Segmented, EmptyState, Btn, Icon } from '../
 import { LineChart, WinBar } from '../components/charts';
 import { fmtET, fmtMPH, fmtRT, fmtDate, isNum } from '../lib/format';
 import {
-  runsForCar, filterDistance, latestRun, personalBests, consistency,
+  runsForCar, raceRuns, filterDistance, latestRun, personalBests, consistency,
   rankOf, avg,
 } from '../lib/stats';
 
 export default function Dash({ state, onAddRun, onImport, onSeeRuns }) {
   const car = state.cars.find((c) => c.id === state.activeCarId);
   const allRuns = useMemo(() => runsForCar(state, state.activeCarId), [state]);
+  // Backup (lifted/braked/aborted) runs stay in the log but never feed stats.
+  const fullRuns = useMemo(() => raceRuns(allRuns), [allRuns]);
 
   const curYear = String(new Date().getFullYear());
   const prevYear = String(new Date().getFullYear() - 1);
@@ -20,9 +22,9 @@ export default function Dash({ state, onAddRun, onImport, onSeeRuns }) {
   const [dist, setDist] = useState('1/4');
 
   const runs = useMemo(() => {
-    const scoped = filterDistance(allRuns, dist);
+    const scoped = filterDistance(fullRuns, dist);
     return timeScope === 'all' ? scoped : scoped.filter((r) => (r.date || '').startsWith(timeScope));
-  }, [allRuns, dist, timeScope]);
+  }, [fullRuns, dist, timeScope]);
 
   const scopeLabel = `${dist} mi · ${timeScope === 'all' ? 'All runs' : timeScope}`;
   const distLabel = `${dist} mi`;
@@ -47,7 +49,7 @@ export default function Dash({ state, onAddRun, onImport, onSeeRuns }) {
   const showWinRate = elimWL.w + elimWL.l > 0;
 
   // Consistency: per-year or last N runs. Options below the card title.
-  const distRuns = useMemo(() => filterDistance(allRuns, dist), [allRuns, dist]);
+  const distRuns = useMemo(() => filterDistance(fullRuns, dist), [fullRuns, dist]);
   const conYears = useMemo(() => {
     const ys = new Set();
     for (const r of distRuns) {

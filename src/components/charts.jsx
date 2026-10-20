@@ -4,6 +4,60 @@ import { isNum, fmtDate } from '../lib/format';
 const TRACK_COLORS = ['#a3e635', '#38bdf8', '#f472b6', '#fbbf24', '#c084fc', '#fb7185'];
 
 /**
+ * Scatter plot for correlation: one dot per run at (x, y), optional
+ * least-squares trend line. points = [{ x, y }].
+ */
+export function ScatterPlot({ points, xLabel, yLabel, trend, height = 260 }) {
+  const W = 360;
+  const H = height;
+  const pad = { l: 46, r: 10, t: 12, b: 30 };
+  const xs = points.map((p) => p.x);
+  const ys = points.map((p) => p.y);
+  const minX = Math.min(...xs), maxX = Math.max(...xs);
+  const minY = Math.min(...ys), maxY = Math.max(...ys);
+  const padX = (maxX - minX || Math.abs(minX) * 0.05 || 1) * 0.12;
+  const padY = (maxY - minY || Math.abs(minY) * 0.05 || 1) * 0.12;
+  const loX = minX - padX, hiX = maxX + padX;
+  const loY = minY - padY, hiY = maxY + padY;
+  const X = (v) => pad.l + ((v - loX) / (hiX - loX || 1)) * (W - pad.l - pad.r);
+  const Y = (v) => pad.t + (1 - (v - loY) / (hiY - loY || 1)) * (H - pad.t - pad.b);
+
+  const fmtTick = (v) => {
+    const a = Math.abs(v);
+    if (a !== 0 && (a >= 1000 || a < 0.01)) return v.toExponential(1);
+    return String(Math.round(v * 1000) / 1000);
+  };
+  const xTicks = [0, 0.5, 1].map((f) => loX + f * (hiX - loX));
+  const yTicks = [0, 0.5, 1].map((f) => loY + f * (hiY - loY));
+
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} className="w-full" role="img">
+      {yTicks.map((t, i) => (
+        <g key={i}>
+          <line x1={pad.l} x2={W - pad.r} y1={Y(t)} y2={Y(t)} stroke="#ffffff" strokeOpacity="0.08" strokeDasharray="3 3" />
+          <text x={pad.l - 6} y={Y(t) + 3.5} textAnchor="end" fontSize="9" fill="#ffffff" opacity="0.45">{fmtTick(t)}</text>
+        </g>
+      ))}
+      {xTicks.map((t, i) => (
+        <text key={i} x={X(t)} y={H - 8} textAnchor="middle" fontSize="9" fill="#ffffff" opacity="0.45">{fmtTick(t)}</text>
+      ))}
+      <text x={(pad.l + W - pad.r) / 2} y={H - 22} textAnchor="middle" fontSize="10" fill="#ffffff" opacity="0.6">{xLabel}</text>
+      <text x={12} y={(pad.t + H - pad.b) / 2} textAnchor="middle" fontSize="10" fill="#ffffff" opacity="0.6" transform={`rotate(-90 12 ${(pad.t + H - pad.b) / 2})`}>{yLabel}</text>
+      {trend && (
+        <line
+          x1={X(loX)} x2={X(hiX)}
+          y1={Y(trend.slope * loX + trend.intercept)} y2={Y(trend.slope * hiX + trend.intercept)}
+          stroke="#a3e635" strokeOpacity="0.6" strokeWidth="1.5" strokeDasharray="5 4"
+        />
+      )}
+      {points.map((p, i) => (
+        <circle key={i} cx={X(p.x)} cy={Y(p.y)} r="4" fill="#a3e635" fillOpacity="0.75" />
+      ))}
+    </svg>
+  );
+}
+
+/**
  * Season-style chart: one dot per run in RUN ORDER (evenly spaced — no
  * timeline gaps), dashed connector, dashed y gridlines, solid axes,
  * date labels sampled across the runs. `invert` puts higher numbers at

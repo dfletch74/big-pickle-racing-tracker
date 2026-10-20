@@ -20,6 +20,7 @@ export default function RunCard({ run, ctx, baseline, onEdit, onDelete, defaultO
           <span className="font-bold">{run.track}</span>
           <Badge tone={run.distance === '1/4' ? 'blue' : 'neutral'}>{run.distance} mi</Badge>
           <Badge>{run.runType}</Badge>
+          {run.backup && <Badge tone="amber">BACKUP</Badge>}
           {run.wl === 'W' && <Badge tone="green">W</Badge>}
           {run.wl === 'L' && <Badge tone="red">L</Badge>}
           {issues.map((i) => (
@@ -55,6 +56,8 @@ export default function RunCard({ run, ctx, baseline, onEdit, onDelete, defaultO
             <div><div className="text-white/40">ALT</div>{isNum(run.altitudeFt) ? `${Math.round(run.altitudeFt).toLocaleString()} ft` : '—'}</div>
             <div><div className="text-white/40">D/A</div>{fmtDA(run.daFt)}</div>
             <div><div className="text-white/40">ET CORR*</div>{fmtET(correctedETOf(run, baseline))}</div>
+            <div><div className="text-white/40">WIND</div>{isNum(run.windMph) ? `${run.windMph} mph${isNum(run.windDir) ? ` @ ${Math.round(run.windDir)}°` : ''}` : '—'}</div>
+            <div><div className="text-white/40">HEADWIND</div>{isNum(run.headwindMph) ? `${run.headwindMph > 0 ? '+' : ''}${run.headwindMph.toFixed(1)} mph` : '—'}</div>
           </div>
           <div className="mb-1 text-[10px] text-white/35">*Weather-corrected to {baseline.toLocaleString()} ft DA baseline. Higher DA = thinner air = slower.</div>
 

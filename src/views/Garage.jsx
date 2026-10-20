@@ -548,7 +548,7 @@ function ReportCard({ state }) {
   // 1/8-mile runs store their ET in eighthET (et is blank) — use the right field.
   const etOf = (r) => (dist === '1/8' ? r.eighthET : r.et);
   const runs = (state.runs || [])
-    .filter((r) => r.source !== 'demo' && etOf(r) != null && r.daFt != null && r.distance === dist)
+    .filter((r) => r.source !== 'demo' && !r.backup && etOf(r) != null && r.daFt != null && r.distance === dist)
     .sort((a, b) => String(a.date).localeCompare(String(b.date)));
 
   // Back-test: for each run (after the first 3), predict ET using prior runs
