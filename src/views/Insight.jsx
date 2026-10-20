@@ -1,6 +1,7 @@
-import { useMemo, useState } from 'react';
-import { Card, SectionTitle, inputCls, Segmented, Badge, EmptyState } from '../components/ui';
+import { useMemo, useState, useRef, useEffect } from 'react';
+import { Card, SectionTitle, Btn, inputCls, Segmented, Badge, EmptyState } from '../components/ui';
 import { fmtET, fmtTemp, fmtDA, fmtDate, isNum } from '../lib/format';
+import { correctET } from '../lib/physics';
 import { runsForCar, filterDistance, latestRun, findSimilar, dialIn, rankSetups, crewChief, crewChiefCall, similarityPct, predictET } from '../lib/stats';
 import { useWeatherEntry, WeatherEntryCard } from '../components/WeatherEntry';
 
@@ -191,6 +192,9 @@ export default function Insight({ state, toast, dist, setDist }) {
           ))
         )}
       </Card>
+
+      <AiTuner runs={runs} />
+      <SetupRecommendations runs={runs} baseline={baseline} />
     </div>
   );
 }
@@ -229,5 +233,311 @@ function SetupDeltas({ top, last }) {
       <div className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-white/45">Changes vs your latest run ({fmtDate(last.date)})</div>
       {rows.map((r) => <div key={r} className="font-mono text-xs text-amber-200">{r}</div>)}
     </div>
+  );
+}
+function AiTuner({ runs: propRuns }) {
+  const [question, setQuestion] = useState('');
+  const [answer, setAnswer] = useState(null);
+  const answerRef = useRef(null);
+  const runs = (propRuns || []).filter((r) => r.source !== 'demo').sort((a, b) => String(a.date).localeCompare(String(b.date)));
+
+  const suggestions = [
+    'Why did my 60-ft fall off?',
+    'How consistent am I?',
+    'How does weather affect my ET?',
+    'How are my reaction times?',
+    'What should I dial?',
+    "What's my best pass?",
+    "How's my trap speed trending?",
+    'What launch RPM works best?',
+    'Where do I run quickest?',
+    'Am I red-lighting too much?',
+  ];
+
+  const ask = (q) => {
+    const ql = q.toLowerCase();
+    let ans = null;
+
+    if (ql.includes('dial')) {
+      const withDA = runs.filter((r) => r.daFt != null && r.et != null);
+      const lastDA = [...runs].reverse().find((r) => r.daFt != null)?.daFt;
+      if (lastDA != null && withDA.length >= 3) {
+        const p = predictET(withDA, lastDA);
+        ans = p?.et != null
+          ? `Based on your last recorded air (${Math.round(lastDA).toLocaleString()} ft DA), dial ${Math.floor(p.et * 100) / 100} — predicted ET ${p.et.toFixed(3)} (${p.basis}).`
+          : 'Not enough data to predict a dial-in yet.';
+      } else {
+        ans = 'Need at least 3 runs with DA to predict a dial-in. Log temp on your runs or pull live weather.';
+      }
+    } else if (ql.includes('best pass') || ql.includes('best run') || ql.includes('quickest pass')) {
+      const withET = runs.filter((r) => r.et != null);
+      if (withET.length) {
+        const b = withET.reduce((m, r) => (r.et < m.et ? r : m), withET[0]);
+        ans = `Your best pass is ${Number(b.et).toFixed(3)}${b.mph != null ? ` @ ${Number(b.mph).toFixed(2)} mph` : ''} — ${b.date} at ${b.track}${b.daFt != null ? ` (${Math.round(b.daFt).toLocaleString()} ft DA)` : ''}.`;
+      } else {
+        ans = 'No runs with ET logged yet.';
+      }
+    } else if (ql.includes('trap') || ql.includes('mph') || ql.includes('speed')) {
+      const withMph = runs.filter((r) => r.mph != null).slice(-10);
+      if (withMph.length >= 3) {
+        const first3 = withMph.slice(0, 3).reduce((a, r) => a + r.mph, 0) / 3;
+        const last3 = withMph.slice(-3).reduce((a, r) => a + r.mph, 0) / 3;
+        const diff = last3 - first3;
+        ans = diff > 1
+          ? `Trap speed is UP ${diff.toFixed(1)} mph (from ${first3.toFixed(1)} to ${last3.toFixed(1)} over the last ${withMph.length} passes). The car is making power — if ET isn't following, look at the launch.`
+          : diff < -1
+            ? `Trap speed is DOWN ${Math.abs(diff).toFixed(1)} mph (from ${first3.toFixed(1)} to ${last3.toFixed(1)}). That smells like lost power — check plugs, fuel, valve springs, and air.`
+            : `Trap speed is steady around ${last3.toFixed(1)} mph. Power is consistent.`;
+      } else {
+        ans = 'Need at least 3 runs with MPH to read trap-speed trend.';
+      }
+    } else if (ql.includes('launch') || ql.includes('rpm')) {
+      const withRev = runs.filter((r) => r.revLim != null && r.sixty != null);
+      if (withRev.length >= 4) {
+        const byRev = {};
+        for (const r of withRev) {
+          const v = r.revLim;
+          if (!byRev[v]) byRev[v] = [];
+          byRev[v].push(r.sixty);
+        }
+        const revs = Object.keys(byRev).map(Number).sort((a, b) => a - b);
+        if (revs.length >= 2) {
+          const rows = revs.map((v) => ({ v, avg: byRev[v].reduce((a, c) => a + c, 0) / byRev[v].length, n: byRev[v].length }));
+          rows.sort((a, b) => a.avg - b.avg);
+          ans = `Best 60-ft comes at ${rows[0].v} rpm (${rows[0].avg.toFixed(3)} avg over ${rows[0].n} runs). Full picture: ${rows.map((x) => `${x.v}: ${x.avg.toFixed(3)}`).join(' · ')}.`;
+        } else {
+          ans = `You've only launched at one RPM (${revs[0]}) — try varying it to find what the car likes.`;
+        }
+      } else {
+        ans = 'Need runs with both launch RPM and 60-ft logged to compare.';
+      }
+    } else if (ql.includes('where') || ql.includes('which track')) {
+      const withET = runs.filter((r) => r.et != null && r.track);
+      if (withET.length >= 3) {
+        const byTrack = {};
+        for (const r of withET) {
+          if (!byTrack[r.track]) byTrack[r.track] = [];
+          byTrack[r.track].push(r.et);
+        }
+        const rows = Object.entries(byTrack)
+          .map(([t, ets]) => ({ t, best: Math.min(...ets), n: ets.length }))
+          .sort((a, b) => a.best - b.best);
+        ans = `Quickest at ${rows[0].t} — best ${rows[0].best.toFixed(3)} over ${rows[0].n} passes. ${rows.map((x) => `${x.t}: ${x.best.toFixed(3)}`).join(' · ')}`;
+      } else {
+        ans = 'Need at least 3 runs with track names to compare.';
+      }
+    } else if (ql.includes('red')) {
+      const rts = runs.filter((r) => r.rt != null);
+      const reds = rts.filter((r) => r.rt < 0);
+      if (rts.length >= 5) {
+        const pct = Math.round((reds.length / rts.length) * 100);
+        const avgRed = reds.length ? reds.reduce((a, r) => a + r.rt, 0) / reds.length : null;
+        ans = reds.length === 0
+          ? `Zero red-lights in ${rts.length} runs — disciplined. If your average RT is above 0.080 you might have room to get more aggressive.`
+          : `${reds.length} red-lights in ${rts.length} runs (${pct}%), averaging ${avgRed.toFixed(3)}. ${pct > 15 ? 'That is a lot — consider adding delay to the box or staging shallower.' : 'Occasional reds are the cost of cutting close lights.'}`;
+      } else {
+        ans = 'Need at least 5 runs with reaction times to judge red-light rate.';
+      }
+    } else if (ql.includes('60') && (ql.includes('fall') || ql.includes('drop') || ql.includes('worse') || ql.includes('slow'))) {
+      const with60 = runs.filter((r) => r.sixty != null).slice(-10);
+      if (with60.length >= 3) {
+        const first3 = with60.slice(0, 3).reduce((a, r) => a + r.sixty, 0) / 3;
+        const last3 = with60.slice(-3).reduce((a, r) => a + r.sixty, 0) / 3;
+        const diff = last3 - first3;
+        if (diff > 0.02) {
+          ans = `Your 60-ft has fallen off by ${diff.toFixed(3)}s (from ${first3.toFixed(3)} to ${last3.toFixed(3)} over the last ${with60.length} passes). Common causes: track temp dropping, tire pressure too high, or worn tires. Check your tire pressure logs and compare to when the 60-ft was good.`;
+        } else if (diff < -0.02) {
+          ans = `Actually your 60-ft has IMPROVED by ${Math.abs(diff).toFixed(3)}s recently. Whatever changed is working — check what setup was different.`;
+        } else {
+          ans = `Your 60-ft is stable (within 0.02s). If it felt off in a specific round, check that run's tire pressure and track temp vs. your baseline.`;
+        }
+      } else {
+        ans = 'Need at least 3 runs with 60-ft data to analyze the trend.';
+      }
+    } else if (ql.includes('consistent') || ql.includes('consistency')) {
+      const ets = runs.filter((r) => r.et != null).slice(-10).map((r) => r.et);
+      if (ets.length >= 5) {
+        const avg = ets.reduce((a, c) => a + c, 0) / ets.length;
+        const variance = ets.reduce((a, c) => a + Math.pow(c - avg, 2), 0) / ets.length;
+        const std = Math.sqrt(variance);
+        ans = `Over your last ${ets.length} passes, ET standard deviation is ${std.toFixed(4)}s. ${std < 0.02 ? "That's excellent bracket-racing consistency." : std < 0.05 ? "That's decent — focus on launch repeatability." : "That's high variance — check for setup changes, weather swings, or driving inconsistencies."} Average ET: ${avg.toFixed(3)}.`;
+      } else {
+        ans = 'Need at least 5 runs to assess consistency.';
+      }
+    } else if (ql.includes('weather') || ql.includes('da ') || ql.includes('density')) {
+      const withDA = runs.filter((r) => r.daFt != null && r.et != null);
+      if (withDA.length >= 5) {
+        const sorted = [...withDA].sort((a, b) => a.daFt - b.daFt);
+        const lowDA = sorted.slice(0, 3);
+        const highDA = sorted.slice(-3);
+        const lowAvg = lowDA.reduce((a, r) => a + r.et, 0) / lowDA.length;
+        const highAvg = highDA.reduce((a, r) => a + r.et, 0) / highDA.length;
+        const daDiff = highDA[0].daFt - lowDA[0].daFt;
+        const etDiff = highAvg - lowAvg;
+        ans = `Weather impact: your ET slows by ~${(etDiff / daDiff * 1000).toFixed(4)}s per 1000 ft DA. In dense air (${Math.round(lowDA[0].daFt)} ft) you average ${lowAvg.toFixed(3)}; in thin air (${Math.round(highDA[0].daFt)} ft) it's ${highAvg.toFixed(3)}. Use this to adjust your dial when conditions change.`;
+      } else {
+        ans = 'Need at least 5 runs with DA data to analyze weather impact.';
+      }
+    } else if (ql.includes('reaction') || ql.includes('rt ') || ql.includes('tree') || ql.includes('light')) {
+      const rts = runs.filter((r) => r.rt != null).map((r) => r.rt);
+      if (rts.length >= 5) {
+        const avg = rts.reduce((a, c) => a + c, 0) / rts.length;
+        const reds = rts.filter((rt) => rt < 0).length;
+        ans = `Your average reaction time is ${avg.toFixed(3)}s over ${rts.length} runs with ${reds} red-lights (${Math.round((reds / rts.length) * 100)}%). ${avg < 0.05 ? "You're cutting it close — great for bracket racing but risky." : avg < 0.1 ? 'Solid, competitive RTs.' : "There's room to improve — practice on the Tree simulator."}`;
+      } else {
+        ans = 'Need at least 5 runs with reaction times to analyze.';
+      }
+    } else {
+      ans = 'Try one of the suggested questions below — I answer from your logged runs: 60-ft, consistency, weather, reaction times, dial-in, best pass, trap speed, launch RPM, tracks, and red-lights.';
+    }
+
+    setAnswer({ q, a: ans });
+  };
+
+  useEffect(() => {
+    if (answer && answerRef.current) answerRef.current.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }, [answer]);
+
+  const doAsk = () => {
+    if (question.trim()) ask(question.trim());
+  };
+
+  return (
+    <div className="space-y-3">
+      <Card>
+        <SectionTitle>AI Tuner</SectionTitle>
+        <div className="mb-3 text-xs text-white/40">
+          Ask about your passes — answers are generated from your actual run data.
+        </div>
+        <div className="flex gap-2">
+          <input
+            value={question}
+            onChange={(e) => setQuestion(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') doAsk(); }}
+            placeholder="Ask about your runs…"
+            className={`${inputCls} flex-1`}
+          />
+          <Btn kind="primary" onClick={doAsk} disabled={!question.trim()} className="shrink-0">Ask</Btn>
+        </div>
+        <div className="mt-3 flex flex-wrap gap-2">
+          {suggestions.map((s) => (
+            <button
+              key={s}
+              onClick={() => { setQuestion(s); ask(s); }}
+              className="rounded-full bg-white/5 px-3 py-1.5 text-xs text-white/60 hover:bg-white/10"
+            >
+              {s}
+            </button>
+          ))}
+        </div>
+      </Card>
+
+      {answer && (
+        <Card>
+          <div ref={answerRef} className="mb-2 text-sm font-semibold text-white/80">Q: {answer.q}</div>
+          <div className="text-sm leading-relaxed text-white/70">{answer.a}</div>
+        </Card>
+      )}
+    </div>
+  );
+}
+
+function SetupRecommendations({ runs: propRuns, baseline }) {
+  const runs = (propRuns || []).filter((r) => r.source !== 'demo').sort((a, b) => String(a.date).localeCompare(String(b.date)));
+  const [recs, setRecs] = useState(null);
+
+  const generate = () => {
+    const out = [];
+    const base = baseline || 2500;
+    const withJet = runs.filter((r) => r.jet != null && r.et != null && r.daFt != null);
+    const withPsi = runs.filter((r) => (r.lPsi != null || r.rPsi != null) && r.sixty != null);
+    const withRev = runs.filter((r) => r.revLim != null && r.sixty != null);
+
+    // Jet analysis: compare DA-CORRECTED ET at different jet settings,
+    // so weather differences don't skew the comparison.
+    if (withJet.length >= 6) {
+      const byJet = {};
+      for (const r of withJet) {
+        const j = r.jet;
+        if (!byJet[j]) byJet[j] = [];
+        byJet[j].push(correctET(r.et, r.daFt, base));
+      }
+      const jets = Object.keys(byJet).map(Number).sort((a, b) => a - b);
+      if (jets.length >= 2) {
+        let bestJet = null, bestAvg = Infinity;
+        const avgs = {};
+        for (const j of jets) {
+          const rs = byJet[j];
+          avgs[j] = rs.reduce((a, c) => a + c, 0) / rs.length;
+          if (avgs[j] < bestAvg) { bestAvg = avgs[j]; bestJet = j; }
+        }
+        const latestJet = withJet[withJet.length - 1].jet;
+        const detail = jets.map((j) => `${j} (${byJet[j].length}n): ${avgs[j].toFixed(3)}`).join(' · ');
+        if (bestJet !== latestJet) {
+          out.push(`Jet: DA-corrected, jet ${bestJet} averages ${bestAvg.toFixed(3)} — best of what you've tried. You're currently on ${latestJet}. Worth testing ${bestJet} again. (${detail})`);
+        } else {
+          out.push(`Jet: ${bestJet} looks optimal on DA-corrected ET (${bestAvg.toFixed(3)} avg). (${detail})`);
+        }
+      } else {
+        out.push(`Jet: you've only run one jet size (${jets[0]}) with complete data — no comparison possible yet.`);
+      }
+    } else if (runs.filter((r) => r.jet != null && r.et != null).length >= 6) {
+      out.push('Jet: several runs are missing DA, so a fair weather-corrected comparison isn\'t possible yet.');
+    }
+
+    // Tire pressure analysis: compare 60-ft at different pressures
+    if (withPsi.length >= 6) {
+      const pressures = withPsi.map((r) => ({ psi: (r.lPsi + r.rPsi) / 2, sixty: r.sixty }));
+      pressures.sort((a, b) => a.psi - b.psi);
+      const low = pressures.slice(0, Math.ceil(pressures.length / 2));
+      const high = pressures.slice(Math.floor(pressures.length / 2));
+      const lowAvg = low.reduce((a, p) => a + p.sixty, 0) / low.length;
+      const highAvg = high.reduce((a, p) => a + p.sixty, 0) / high.length;
+      if (Math.abs(lowAvg - highAvg) > 0.01) {
+        const better = lowAvg < highAvg ? 'lower' : 'higher';
+        out.push(`Tire pressure: ${better} pressures average ${Math.min(lowAvg, highAvg).toFixed(3)} 60-ft vs ${Math.max(lowAvg, highAvg).toFixed(3)}. Consider ${better === 'lower' ? 'dropping' : 'raising'} PSI by 0.5 and testing.`);
+      } else {
+        out.push('Tire pressure: 60-ft is flat across the pressures you\'ve tried — current PSI range looks fine.');
+      }
+    }
+
+    // Rev limiter analysis: does a higher launch RPM help 60-ft?
+    if (withRev.length >= 6) {
+      const byRev = {};
+      for (const r of withRev) {
+        const v = r.revLim;
+        if (!byRev[v]) byRev[v] = [];
+        byRev[v].push(r.sixty);
+      }
+      const revs = Object.keys(byRev).map(Number).sort((a, b) => a - b);
+      if (revs.length >= 2) {
+        const avgs = revs.map((v) => ({ v, avg: byRev[v].reduce((a, c) => a + c, 0) / byRev[v].length, n: byRev[v].length }));
+        avgs.sort((a, b) => a.avg - b.avg);
+        const best = avgs[0];
+        out.push(`Rev limiter: ${best.v} rpm gives your best 60-ft (${best.avg.toFixed(3)} avg over ${best.n} runs). ${avgs.map((a) => `${a.v}: ${a.avg.toFixed(3)}`).join(' · ')}`);
+      }
+    }
+
+    if (out.length === 0) {
+      out.push('Not enough setup data yet. Log runs with jet, tire pressure, and rev limiter to get recommendations.');
+    }
+    setRecs(out);
+  };
+
+  return (
+    <Card>
+      <SectionTitle>Setup Recommendations</SectionTitle>
+      <div className="mb-3 text-xs text-white/40">
+        Analyzes your jet and tire pressure history to suggest changes. Advisory only — trust your crew chief.
+      </div>
+      <Btn kind="primary" onClick={generate} className="w-full mb-3">Generate recommendations</Btn>
+      {recs && (
+        <div className="space-y-2">
+          {recs.map((r, i) => (
+            <div key={i} className="rounded-xl bg-white/5 p-3 text-sm text-white/70">{r}</div>
+          ))}
+        </div>
+      )}
+    </Card>
   );
 }

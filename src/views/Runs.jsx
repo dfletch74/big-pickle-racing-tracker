@@ -5,6 +5,7 @@ import { fmtET, fmtMPH, fmtRT, fmtDate, isNum, runDateTime } from '../lib/format
 import { runsForCar, filterDistance, latestRun, avg, detectIssues, bestSegments, correctedETOf } from '../lib/stats';
 import { parseImportFile, runsToCSV, downloadFile } from '../lib/io';
 import { tombstoneKey } from '../lib/teamSync';
+import { jsPDF } from 'jspdf';
 
 const SORTS = [
   ['date', 'Date'], ['rt', 'R/T'], ['sixty', '60ft'], ['threeThirty', '330ft'],
@@ -62,6 +63,60 @@ export default function Runs({ state, update, toast, dist, setDist, onPrint, onA
     toast(`Exported ${filtered.length} run${filtered.length === 1 ? '' : 's'} to CSV.`);
   };
 
+  const doExportPdf = () => {
+    // PDF export of the CURRENT filter selection (same list as CSV).
+    try {
+      const doc = new jsPDF({ unit: 'pt', format: 'letter' });
+      let y = 50;
+      doc.setFontSize(18);
+      const distLabel = dist === 'all' ? 'All distances' : dist === '1/4' ? '1/4 mile' : '1/8 mile';
+      doc.text(`Big Pickle Racing — Runs (${distLabel})`, 40, y);
+      y += 20;
+      doc.setFontSize(10);
+      doc.setTextColor(100);
+      doc.text(`${filtered.length} runs · exported ${new Date().toLocaleDateString()}`, 40, y);
+      doc.setTextColor(0);
+      y += 25;
+
+      const headers = ['Date', 'Track', 'Dist', 'R/T', '60ft', '1/8 ET', '1/8 MPH', 'ET', 'MPH', 'DA'];
+      const colW = [60, 90, 40, 45, 45, 55, 60, 55, 55, 55];
+      const startX = 40;
+      const drawHeaders = () => {
+        doc.setFontSize(8);
+        doc.setFont(undefined, 'bold');
+        let x = startX;
+        headers.forEach((h, i) => { doc.text(h, x, y); x += colW[i]; });
+        doc.setFont(undefined, 'normal');
+        y += 14;
+      };
+      drawHeaders();
+      doc.setFontSize(8);
+      for (const r of filtered) {
+        if (y > 720) { doc.addPage(); y = 50; drawHeaders(); }
+        let x = startX;
+        const cells = [
+          r.date || '',
+          (r.track || '').slice(0, 14),
+          r.distance || '',
+          r.rt != null ? Number(r.rt).toFixed(3) : '',
+          r.sixty != null ? Number(r.sixty).toFixed(3) : '',
+          r.eighthET != null ? Number(r.eighthET).toFixed(3) : '',
+          r.eighthMPH != null ? Number(r.eighthMPH).toFixed(2) : '',
+          r.et != null ? Number(r.et).toFixed(3) : '',
+          r.mph != null ? Number(r.mph).toFixed(2) : '',
+          r.daFt != null ? String(Math.round(r.daFt)) : '',
+        ];
+        cells.forEach((c, i) => { doc.text(String(c), x, y); x += colW[i]; });
+        y += 12;
+      }
+      const stamp = new Date().toISOString().slice(0, 10);
+      doc.save(`big-pickle-runs-${dist === 'all' ? 'all' : dist.replace('/', '-')}-${stamp}.pdf`);
+      toast(`Exported ${filtered.length} run${filtered.length === 1 ? '' : 's'} to PDF.`);
+    } catch (e) {
+      toast('PDF export failed: ' + (e.message || e), 'error');
+    }
+  };
+
   // Deleting tombstones the run so the team sync doesn't resurrect it —
   // the tombstone propagates to the sheet on the next sync.
   const doDelete = (id) => update((s) => {
@@ -82,6 +137,7 @@ export default function Runs({ state, update, toast, dist, setDist, onPrint, onA
 
   return (
     <div className="space-y-3">
+      <SimilarAirSearch runs={carRuns} />
       <div className="flex flex-wrap items-center gap-2">
         <Segmented value={dist} onChange={setDist} options={[
           { value: 'all', label: 'All' }, { value: '1/4', label: '1/4 mi' }, { value: '1/8', label: '1/8 mi' },
@@ -106,6 +162,7 @@ export default function Runs({ state, update, toast, dist, setDist, onPrint, onA
         <Btn kind="ghost" onClick={() => setMode('compare')}><span className="flex items-center gap-2"><Icon name="chart" className="h-4 w-4" />Compare</span></Btn>
         <Btn kind="ghost" onClick={() => setMode('import')}><span className="flex items-center gap-2"><Icon name="upload" className="h-4 w-4" />Import</span></Btn>
         <Btn kind="ghost" onClick={doExport}><span className="flex items-center gap-2"><Icon name="download" className="h-4 w-4" />Export CSV</span></Btn>
+        <Btn kind="ghost" onClick={doExportPdf}><span className="flex items-center gap-2"><Icon name="download" className="h-4 w-4" />Export PDF</span></Btn>
       </div>
 
       <div className="text-xs text-white/40">{filtered.length} of {carRuns.length} runs</div>
@@ -125,6 +182,79 @@ export default function Runs({ state, update, toast, dist, setDist, onPrint, onA
         </div>
       )}
     </div>
+  );
+}
+
+/* ---------------- Similar-air search ---------------- */
+
+function SimilarAirSearch({ runs }) {
+  const [open, setOpen] = useState(false);
+  const [targetDA, setTargetDA] = useState('');
+  const [band, setBand] = useState('500');
+  const pool = (runs || []).filter((r) => r.source !== 'demo' && r.daFt != null);
+
+  const tda = parseFloat(targetDA);
+  const b = parseFloat(band) || 500;
+  const matches = !isNaN(tda)
+    ? pool
+        .filter((r) => Math.abs(r.daFt - tda) <= b)
+        .sort((a, b2) => Math.abs(a.daFt - tda) - Math.abs(b2.daFt - tda))
+    : [];
+  const ets = matches.map((r) => (r.distance === '1/8' ? r.eighthET : r.et)).filter((v) => v != null);
+  const avgET = ets.length ? ets.reduce((a, c) => a + c, 0) / ets.length : null;
+
+  return (
+    <Card>
+      <button onClick={() => setOpen((o) => !o)} className="flex w-full items-center justify-between">
+        <SectionTitle>Similar air search</SectionTitle>
+        <span className="text-xs text-white/40">{open ? '▲' : '▼'}</span>
+      </button>
+      {open && (
+        <div className="pt-2">
+          <div className="grid grid-cols-2 gap-2">
+            <input value={targetDA} onChange={(e) => setTargetDA(e.target.value.replace(/[^0-9.-]/g, ''))} inputMode="numeric" placeholder="Target DA (ft)" className={inputCls} />
+            <select value={band} onChange={(e) => setBand(e.target.value)} className={inputCls}>
+              <option value="250">±250 ft</option>
+              <option value="500">±500 ft</option>
+              <option value="1000">±1000 ft</option>
+            </select>
+          </div>
+          <div className="mt-1 text-xs text-white/40">What did we run last time conditions were like this?</div>
+          {!isNaN(tda) && (
+            <div className="mt-2">
+              <div className="mb-1 flex items-center justify-between">
+                <span className="text-xs font-semibold text-white/60">{matches.length} match{matches.length === 1 ? '' : 'es'}</span>
+                {avgET != null && <Badge tone="green">Avg ET {avgET.toFixed(3)}</Badge>}
+              </div>
+              {matches.length === 0 ? (
+                <div className="text-sm text-white/40">No runs within ±{b} ft of {tda} ft DA.</div>
+              ) : (
+                <div className="space-y-1.5">
+                  {matches.slice(0, 20).map((r) => {
+                    const et = r.distance === '1/8' ? r.eighthET : r.et;
+                    return (
+                      <div key={r.id} className="flex items-center justify-between rounded-lg bg-white/5 px-3 py-2 text-sm">
+                        <div>
+                          <span className="text-white/40">{r.date}</span>{' '}
+                          <span className="font-semibold">{et != null ? Number(et).toFixed(3) : '—'}</span>
+                          <span className="text-white/40"> · {r.track} · {r.distance}</span>
+                        </div>
+                        <div className="font-mono text-xs text-white/50">
+                          DA {Math.round(r.daFt)} ({r.daFt >= tda ? '+' : ''}{Math.round(r.daFt - tda)})
+                        </div>
+                      </div>
+                    );
+                  })}
+                  {matches.length > 20 && (
+                    <div className="text-center text-xs text-white/40">+{matches.length - 20} more</div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+    </Card>
   );
 }
 
