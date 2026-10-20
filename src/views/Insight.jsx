@@ -1,11 +1,11 @@
 import { useMemo, useState, useRef, useEffect } from 'react';
 import { Card, SectionTitle, Btn, inputCls, Segmented, Badge, EmptyState } from '../components/ui';
-import { fmtET, fmtTemp, fmtDA, fmtDate, isNum } from '../lib/format';
+import { fmtET, fmtDate, isNum } from '../lib/format';
 import { correctET } from '../lib/physics';
-import { runsForCar, filterDistance, latestRun, findSimilar, dialIn, rankSetups, crewChief, crewChiefCall, similarityPct, predictET } from '../lib/stats';
+import { runsForCar, filterDistance, latestRun, findSimilar, dialIn, rankSetups, crewChiefCall, similarityPct, predictET, avg } from '../lib/stats';
 import { useWeatherEntry, WeatherEntryCard } from '../components/WeatherEntry';
 
-export default function Insight({ state, toast, dist, setDist }) {
+export default function Insight({ state, dist, setDist }) {
   const [trackId, setTrackId] = useState(state.tracks[0]?.id || '');
   const [subTab, setSubTab] = useState('overview'); // overview | setup | crew | segments | ai
   const baseline = state.settings.daBaseline;
@@ -44,7 +44,6 @@ export default function Insight({ state, toast, dist, setDist }) {
     detail: dialFallback.detail,
   } : null;
   const ranked = useMemo(() => rankSetups(runs, baseline), [runs, baseline]);
-  const chief = useMemo(() => crewChief(runs, baseline, null), [runs, baseline]);
   const call = useMemo(
     () => (target.daFt != null ? crewChiefCall(runs, target, baseline, last) : null),
     [runs, target.daFt, target.tempF, baseline, last],
@@ -589,7 +588,6 @@ function SegmentAnalysis({ state }) {
     };
   }).filter((s) => s.to330 != null || s.toEighth != null);
 
-  const avg = (arr) => arr.length ? arr.reduce((a, c) => a + c, 0) / arr.length : null;
   const avg330 = avg(segments.map((s) => s.to330).filter((v) => v != null));
   const avgEighth = avg(segments.map((s) => s.toEighth).filter((v) => v != null));
 

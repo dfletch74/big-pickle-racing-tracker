@@ -14,7 +14,6 @@ export const ROLES = {
   viewer: { label: 'Hughie', title: 'Viewer', canDelete: false, canLog: false, canSettings: false, canSync: true },
 };
 
-export const ROLE_IDS = Object.keys(ROLES);
 
 // Simple (non-crypto) hash for the PIN — keeps it out of plaintext in storage.
 // This is a deterrent, not real security.
@@ -34,13 +33,6 @@ export function verifyPin(pin, hash) {
 }
 
 const ROLE_KEY = 'bpr-crew-role';
-
-export function getSavedRole() {
-  try {
-    const r = localStorage.getItem(ROLE_KEY);
-    return r && ROLES[r] ? r : null;
-  } catch { return null; }
-}
 
 export function saveRole(roleId) {
   try {

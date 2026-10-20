@@ -8,7 +8,7 @@ const SETUP_LABELS = [
   ['comp', 'Comp'], ['rebound', 'Rebound'], ['revLim', 'Rev Lim'],
 ];
 
-export default function RunCard({ run, ctx, baseline, onEdit, onDelete, onPrint, defaultOpen }) {
+export default function RunCard({ run, ctx, baseline, onEdit, onDelete, defaultOpen }) {
   const [open, setOpen] = useState(!!defaultOpen);
   const issues = detectIssues(run, ctx);
   const segs = segmentSplits(run);
@@ -58,7 +58,7 @@ export default function RunCard({ run, ctx, baseline, onEdit, onDelete, onPrint,
           </div>
           <div className="mb-1 text-[10px] text-white/35">*Weather-corrected to {baseline.toLocaleString()} ft DA baseline. Higher DA = thinner air = slower.</div>
 
-          <SplitTable run={run} segs={segs} bests={ctx.bestSegs} />
+          <SplitTable segs={segs} bests={ctx.bestSegs} />
 
           {(SETUP_LABELS.some(([k]) => isNum(run[k]))) && (
             <div className="mt-3">
@@ -90,7 +90,7 @@ export default function RunCard({ run, ctx, baseline, onEdit, onDelete, onPrint,
 }
 
 /** Split analysis: segment durations with deltas vs best (labeled, no misleading '+'). */
-function SplitTable({ run, segs, bests }) {
+function SplitTable({ segs, bests }) {
   const rows = segs.map((s, i) => {
     const best = bests?.[i]?.best;
     const delta = isNum(s.dur) && isNum(best) ? s.dur - best : null;

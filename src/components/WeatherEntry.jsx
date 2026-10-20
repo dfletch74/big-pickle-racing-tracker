@@ -59,10 +59,11 @@ export function WeatherEntryCard({ title, weather, children }) {
       </div>
       {wxErr && <div className="mb-2 text-xs text-amber-300">Live weather unavailable ({wxErr}).</div>}
       {live && (
-        <div className="mb-2 grid grid-cols-3 gap-2 text-center">
+        <div className="mb-2 grid grid-cols-4 gap-2 text-center">
           <div><div className="font-mono text-xl font-bold">{fmtTemp(live.tempF)}</div><div className="text-[10px] text-white/45">TEMP</div></div>
           <div><div className="font-mono text-xl font-bold">{Math.round(live.humidity)}%</div><div className="text-[10px] text-white/45">HUMIDITY</div></div>
           <div><div className="font-mono text-xl font-bold text-pickle-400">{fmtDA(live.daFt)}</div><div className="text-[10px] text-white/45">DENSITY ALT</div></div>
+          <div><div className="font-mono text-xl font-bold">{live.grains ?? '—'}</div><div className="text-[10px] text-white/45">GRAINS</div></div>
         </div>
       )}
       <div className="grid grid-cols-3 gap-2">

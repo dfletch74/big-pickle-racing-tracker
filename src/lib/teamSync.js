@@ -147,18 +147,6 @@ function mergePull(s, teamRuns) {
   return { added, carNames };
 }
 
-/** Pull the sheet into the app. Returns { added, carNames }. */
-export async function pullTeamData(state, update) {
-  const teamRuns = await fetchTeamRuns(teamCsvUrl(state));
-  let result;
-  update((s) => { result = mergePull(s, teamRuns); });
-  return result;
-}
-
-/**
- * Publish a state draft's local runs to the sheet. Pulls the remote first so
- * the merge starts current; pushes only when the CSV actually changed.
- */
 /** Fetch the shared tombstone list (runs deleted on any device). 404 → empty. */
 async function fetchTombstones(loc, pat) {
   try {
@@ -210,7 +198,6 @@ async function publishDraft(draft, pat) {
     );
     const csv = runsToCSV(all);
 
-    const tombJson = JSON.stringify([...tombstoned].sort());
     let pushed = false;
     try {
       if (csv.replace(/\n$/, '') !== remoteText.replace(/\n$/, '')) {

@@ -1,4 +1,4 @@
-import { useMemo, useState, useRef } from 'react';
+import { useMemo, useState } from 'react';
 import { Card, SectionTitle, Btn, Field, inputCls, Segmented } from '../components/ui';
 import { uid } from '../lib/store';
 import { runsForCar, latestRun } from '../lib/stats';
@@ -82,54 +82,7 @@ export default function AddRun({ state, update, toast, editId, onDone }) {
   };
 
   const [clipMsg, setClipMsg] = useState('');
-  const [quickMode, setQuickMode] = useState(true);
   const [quickNums, setQuickNums] = useState('');
-  const [scanBusy, setScanBusy] = useState(false);
-  const [scanMsg, setScanMsg] = useState('');
-  const fileRef = useRef(null);
-
-  // Timeslip photo scan: capture -> preprocess (grayscale + contrast boost +
-  // threshold for faded thermal slips) -> Tesseract OCR -> parseSlipText.
-  const scanPhoto = async (file) => {
-    if (!file) return;
-    setScanBusy(true);
-    setScanMsg('Reading slip…');
-    try {
-      const { createWorker } = await import('tesseract.js');
-      const img = await createImageBitmap(file);
-      const scale = Math.min(2, 1600 / Math.max(img.width, img.height));
-      const canvas = document.createElement('canvas');
-      canvas.width = Math.round(img.width * scale);
-      canvas.height = Math.round(img.height * scale);
-      const ctx = canvas.getContext('2d');
-      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-      // Preprocess: grayscale, boost contrast, threshold — helps faded slips.
-      const d = ctx.getImageData(0, 0, canvas.width, canvas.height);
-      const px = d.data;
-      for (let i = 0; i < px.length; i += 4) {
-        const g = 0.299 * px[i] + 0.587 * px[i + 1] + 0.114 * px[i + 2];
-        const boosted = Math.min(255, Math.max(0, (g - 110) * 2.2));
-        const v = boosted < 150 ? 0 : 255;
-        px[i] = px[i + 1] = px[i + 2] = v;
-      }
-      ctx.putImageData(d, 0, 0);
-      const worker = await createWorker('eng');
-      const { data: { text } } = await worker.recognize(canvas);
-      await worker.terminate();
-      const p = parseSlipText(text);
-      const vals = pickLane(p, 0);
-      const n = Object.keys(vals).filter((k) => k !== 'date' && k !== 'time' && vals[k]).length;
-      if (n === 0) {
-        setScanMsg('Could not read any numbers — try better light, or use quick-type.');
-      } else {
-        fillFromScan(vals);
-        setScanMsg(`Read ${n} numbers from the slip. Check them before saving.`);
-      }
-    } catch (e) {
-      setScanMsg('Scan failed — try quick-type instead.');
-    }
-    setScanBusy(false);
-  };
 
   const fillFromQuickNums = () => {
     const nums = quickNums.trim().split(/[\s,]+/).filter((n) => /^-?\d*\.?\d+$/.test(n));
@@ -278,15 +231,8 @@ export default function AddRun({ state, update, toast, editId, onDone }) {
           <Btn kind="ghost" onClick={fillFromClipboard} className="w-full">
             <span className="mr-1">📋</span> Fill from clipboard
           </Btn>
-          <input
-            ref={fileRef} type="file" accept="image/*" capture="environment"
-            className="hidden" onChange={(e) => { scanPhoto(e.target.files[0]); e.target.value = ''; }}
-          />
-          <Btn kind="ghost" onClick={() => fileRef.current?.click()} disabled={scanBusy} className="w-full">
-            <span className="mr-1">📷</span> {scanBusy ? 'Scanning…' : 'Scan timeslip photo'}
-          </Btn>
-          {scanMsg && <div className="text-center text-xs text-amber-300/80">{scanMsg}</div>}
           {clipMsg && <div className="text-center text-xs text-amber-300/80">{clipMsg}</div>}
+          <div className="text-center text-[11px] text-white/35">Tip: iPhone Photos can copy text off a slip (Live Text) — paste it with "Fill from clipboard".</div>
         </div>
       )}
 

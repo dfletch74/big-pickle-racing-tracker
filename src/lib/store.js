@@ -43,7 +43,15 @@ export function loadState() {
     if (!raw) return seedState();
     const s = JSON.parse(raw);
     if (!s || s.version !== 1) return seedState();
-    return { ...seedState(), ...s };
+    const seed = seedState();
+    const merged = { ...seed, ...s };
+    // Guard against corrupted collections (a non-array here would crash renders).
+    for (const k of ['cars', 'runs', 'tracks', 'racers', 'trackNotes', 'presets', 'events', 'maintenance', 'deletedKeys']) {
+      if (!Array.isArray(merged[k])) merged[k] = seed[k];
+    }
+    if (!merged.settings || typeof merged.settings !== 'object') merged.settings = seed.settings;
+    if (!merged.checklists || typeof merged.checklists !== 'object') merged.checklists = seed.checklists;
+    return merged;
   } catch {
     return seedState();
   }

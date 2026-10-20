@@ -3,7 +3,7 @@ import { useStore, uid } from './lib/store';
 import { Toasts, Icon } from './components/ui';
 import { LOGO_DATA_URI } from './components/logo';
 import { LockScreen, CrewModal, hasAnyPin } from './components/Crew';
-import { ROLES, getSavedRole, clearRole, hashPin } from './lib/roles';
+import { ROLES, clearRole, hashPin } from './lib/roles';
 import { checkForAppUpdate, reloadForUpdate } from './lib/updater';
 import { parseSetupLink, clearSetupLink } from './lib/setupLink';
 import { setPat } from './lib/teamSync';

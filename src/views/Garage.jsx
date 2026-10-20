@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Card, SectionTitle, Btn, inputCls, Badge, Segmented } from '../components/ui';
 import { predictET } from '../lib/stats';
 
@@ -275,6 +275,10 @@ function VideoOverlay({ state, toast }) {
   const [launchAt, setLaunchAt] = useState('0');
   const [currentSplit, setCurrentSplit] = useState(null);
   const videoRef = useRef(null);
+  const urlRef = useRef(null);
+
+  // Revoke the blob URL when the component unmounts (avoids leaking memory).
+  useEffect(() => () => { if (urlRef.current) URL.revokeObjectURL(urlRef.current); }, []);
 
   const runs = (state.runs || [])
     .filter((r) => r.source !== 'demo' && r.et != null)
@@ -292,8 +296,10 @@ function VideoOverlay({ state, toast }) {
   const handleFile = (e) => {
     const f = e.target.files[0];
     if (f) {
-      if (videoUrl) URL.revokeObjectURL(videoUrl);
-      setVideoUrl(URL.createObjectURL(f));
+      if (f.size > 500 * 1024 * 1024) { toast('Video is too large (500 MB max).'); e.target.value = ''; return; }
+      if (urlRef.current) URL.revokeObjectURL(urlRef.current);
+      urlRef.current = URL.createObjectURL(f);
+      setVideoUrl(urlRef.current);
       setCurrentSplit(null);
     }
   };
@@ -362,7 +368,6 @@ function VideoOverlay({ state, toast }) {
 
       const launch = parseFloat(launchAt) || 0;
       const ext = mime.includes('mp4') ? 'mp4' : 'webm';
-      const pad = (n, w = 2) => String(n).padStart(w, '0');
       const drawOverlay = () => {
         ctx.drawImage(video, 0, 0, vw, vh);
         const runTime = video.currentTime - launch;

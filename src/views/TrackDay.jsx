@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Card, SectionTitle, Btn, inputCls, Segmented, Badge, EmptyState } from '../components/ui';
 import { fmtET, fmtMPH, fmtTemp, fmtDA, fmtDate, isNum } from '../lib/format';
-import { runsForCar, filterDistance, latestRun, segmentSplits, bestSegments, predictET, cheatSheet, avg } from '../lib/stats';
+import { runsForCar, filterDistance, latestRun, segmentSplits, bestSegments, predictET, cheatSheet } from '../lib/stats';
 import { DA_BANDS, TEMP_BANDS, airTrendLabel } from '../lib/physics';
 import { useWeatherEntry, WeatherEntryCard } from '../components/WeatherEntry';
 import { uid } from '../lib/store';
@@ -18,7 +18,6 @@ export default function TrackDay({ state, update, toast, dist, setDist, onAddRun
   const carRuns = useMemo(() => runsForCar(state, state.activeCarId), [state]);
   const runs = useMemo(() => filterDistance(carRuns, dist), [carRuns, dist]);
   const last = useMemo(() => latestRun(runs), [runs]);
-  const baseline = state.settings.daBaseline;
 
   const weather = useWeatherEntry(track);
   const { live, effDA } = weather;

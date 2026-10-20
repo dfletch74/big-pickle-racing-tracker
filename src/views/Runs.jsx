@@ -369,6 +369,11 @@ function ImportView({ state, update, toast, onBack, onDone }) {
   const onFile = async (e) => {
     const f = e.target.files[0];
     if (!f) return;
+    if (f.size > 25 * 1024 * 1024) {
+      setResult({ runs: [], errors: ['File is too large (25 MB max).'], name: f.name });
+      e.target.value = '';
+      return;
+    }
     setBusy(true);
     try {
       const { runs, errors } = await parseImportFile(f, state.activeCarId, state.tracks[0]?.name);

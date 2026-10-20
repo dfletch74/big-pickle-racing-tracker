@@ -22,13 +22,6 @@ export const fmtDA = (v) => (isNum(v) ? `${Math.round(v).toLocaleString('en-US')
 /** Humidity, whole percent: 50% */
 export const fmtRH = (v) => (isNum(v) ? `${Math.round(v)}%` : '—');
 
-/** Generic 2-decimal for small deltas: +0.094 */
-export const fmtDelta = (v, digits = 3) => {
-  if (!isNum(v)) return '—';
-  const sign = v > 0 ? '+' : v < 0 ? '−' : '';
-  return `${sign}${Math.abs(v).toFixed(digits)}`;
-};
-
 /** ISO date -> short display: Oct 17, 2026 */
 export const fmtDate = (iso) => {
   if (!iso) return '—';

@@ -232,16 +232,6 @@ export const Btn = ({ children, onClick, kind = 'primary', className = '', disab
   );
 };
 
-export const IconBtn = ({ icon, label, onClick, className = '' }) => (
-  <button
-    onClick={onClick}
-    title={label}
-    aria-label={label}
-    className={`flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 text-white/70 transition hover:bg-white/5 hover:text-white active:scale-95 ${className}`}
-  >
-    <Icon name={icon} className="h-5 w-5" />
-  </button>
-);
 
 export const Badge = ({ children, tone = 'neutral' }) => {
   const tones = {

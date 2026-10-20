@@ -51,15 +51,28 @@ export function LockScreen({ settings, onUnlock }) {
   const [error, setError] = useState('');
   const [stage, setStage] = useState('pin'); // pin | role
   const [allowedRoles, setAllowedRoles] = useState([]);
+  const [failCount, setFailCount] = useState(0);
+  const [lockUntil, setLockUntil] = useState(0);
 
   const submitPin = () => {
+    if (Date.now() < lockUntil) return;
     const roles = rolesForPin(pin, settings);
     if (roles.length > 0) {
       setError('');
+      setFailCount(0);
       setAllowedRoles(roles);
       setStage('role');
     } else {
-      setError('Wrong PIN. Try again.');
+      const fails = failCount + 1;
+      setFailCount(fails);
+      // Progressive lockout: 30s after 5 failures, doubling each time (cap 5 min).
+      if (fails >= 5) {
+        const secs = Math.min(300, 30 * 2 ** (fails - 5));
+        setLockUntil(Date.now() + secs * 1000);
+        setError(`Too many wrong attempts. Try again in ${secs}s.`);
+      } else {
+        setError('Wrong PIN. Try again.');
+      }
       setPin('');
     }
   };
@@ -110,7 +123,7 @@ export function LockScreen({ settings, onUnlock }) {
           className={`${inputCls} text-center font-mono text-2xl tracking-[0.5em]`}
         />
         {error && <div className="text-center text-sm text-red-400">{error}</div>}
-        <Btn kind="primary" onClick={submitPin} className="w-full" disabled={!pin}>
+        <Btn kind="primary" onClick={submitPin} className="w-full" disabled={!pin || Date.now() < lockUntil}>
           Unlock
         </Btn>
         <div className="text-center font-mono text-[11px] text-white/25">v{APP_VERSION}</div>
@@ -186,11 +199,21 @@ function PinField({ label, pinKey, settings, update, toast }) {
  * Only accessible to admin (Fletch).
  */
 export function CrewModal({ state, update, toast, onClose }) {
+  // Factory defaults are visible in the public repo — warn until they're changed.
+  const usingDefaults =
+    state.settings.pinHashAdmin === hashPin('1966') ||
+    state.settings.pinHashCrew === hashPin('2007') ||
+    state.settings.pinHashViewer === hashPin('0000');
   return (
     <Modal title="Crew Management" onClose={onClose}>
       <div className="space-y-4">
         <div>
           <div className="mb-2 text-sm font-semibold text-white/80">Team PINs</div>
+          {usingDefaults && (
+            <div className="mb-3 rounded-lg border border-amber-400/30 bg-amber-400/10 px-3 py-2 text-xs text-amber-200">
+              You're still on the factory-default PINs, which are visible in the public code. Change them below so only the crew knows them.
+            </div>
+          )}
           <div className="mb-3 text-xs text-white/50">
             Each PIN unlocks only its roles. The app locks on launch and asks for a PIN, then shows just the names that PIN allows.
           </div>

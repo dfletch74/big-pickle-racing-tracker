@@ -1,50 +1,6 @@
 /**
  * Timeslip text parser: extract run fields from pasted/OCR text.
  * Used by the "Fill from clipboard" feature in AddRun.
- */
-const PATTERNS = {
-  rt: [
-    /(?:R\s*\/\s*T|RT|REACTION)\s*[:.]?\s*(-?\d*\.\d+)/gi,
-    /(-?\d*\.\d+)\s*[-–—]+\s*(?:R\s*\/\s*T|REACTION)/gi,
-  ],
-  sixty: [
-    /\b60\s*(?:FT|'|′)?\s*(\d+\.\d+)/gi,
-    /(\d+\.\d+)\s*[-–—]+\s*60\s*FT/gi,
-  ],
-  threeThirty: [
-    /\b330\s*(?:FT)?\s*(\d+\.\d+)/gi,
-    /(\d+\.\d+)\s*[-–—]+\s*330\s*FT/gi,
-  ],
-  eighthET: [
-    /(?:1\s*\/\s*8|660)\s*(?:FT|'|ET)?\s*(\d+\.\d+)/gi,
-    /(\d+\.\d+)\s*[-–—]+\s*1\s*\/\s*8\s*ET/gi,
-  ],
-  thousand: [
-    /\b1000\s*(?:FT|'|ET)?\s*(\d+\.\d+)/gi,
-    /(\d+\.\d+)\s*[-–—]+\s*1000\s*ET/gi,
-  ],
-  et: [
-    /(?:1\s*\/\s*4|1320|QUARTER)\s*(?:ET)?\s*(\d+\.\d+)/gi,
-    /\bE\.?\s*T\.?\s*(\d+\.\d+)/gi,
-    /(\d+\.\d+)\s*[-–—]+\s*1\s*\/\s*4\s*ET/gi,
-  ],
-};
-
-function allMatches(text, patterns) {
-  const out = [];
-  for (const re of patterns) {
-    re.lastIndex = 0;
-    let m;
-    while ((m = re.exec(text)) !== null) {
-      const v = parseFloat(m[1]);
-      if (!Number.isNaN(v) && v > 0 && v < 1000 && !out.includes(m[1])) out.push(m[1]);
-      if (m.index === re.lastIndex) re.lastIndex++;
-    }
-  }
-  return out;
-}
-
-/**
  * Parse OCR text into { field: [candidates] } plus a best guess per field.
  * MPH is positional: values in order are 1/8 MPH then 1/4 MPH.
  */

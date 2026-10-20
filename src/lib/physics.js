@@ -36,9 +36,7 @@
  *   gives ~9.260s — faster, as physics demands.
  */
 
-export const INHG_TO_HPA = 33.8639;
 
-const cToF = (c) => (c * 9) / 5 + 32;
 const fToC = (f) => ((f - 32) * 5) / 9;
 
 /** Magnus approximation: saturation vapor pressure in hPa from °C. */

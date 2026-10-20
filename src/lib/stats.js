@@ -150,7 +150,6 @@ export function bestSegments(runs) {
 }
 
 export const correctedETOf = (run, baseline) => correctET(run.et, run.daFt, baseline);
-export const correctedMPHOf = (run, baseline) => correctMPH(run.mph, run.daFt, baseline);
 
 /** Runs similar to target conditions: DA within ±750 ft and temp within ±12°F. */
 export function findSimilar(runs, { daFt, tempF, distance }) {
@@ -353,38 +352,6 @@ export function crewChiefCall(runs, target, baseline, latest) {
   
   return { conditions: { daFt, baselineDA, delta, tempF, airDesc }, opening, setup, rationale, advice, top, hasData: daRuns.length > 0 };
 }
-export function crewChief(runs, baseline, daTrend) {
-  const ranked = rankSetups(runs, baseline);
-  const top = ranked[0] || null;
-  const segs = bestSegments(runs);
-  // Weakest segment: where the fleet's average lags its best by the most.
-  let weakest = null;
-  let weakestGap = 0;
-  segs.forEach((s, i) => {
-    if (s.best == null) return;
-    const durs = runs.map((r) => segmentSplits(r)[i].dur).filter(isNum);
-    if (!durs.length) return;
-    const gap = avg(durs) - s.best;
-    if (gap > weakestGap) {
-      weakestGap = gap;
-      weakest = s.name;
-    }
-  });
-  const bullets = [];
-  if (daTrend) bullets.push(`Air is ${daTrend} — ${daTrend === 'improving' ? 'denser air should pick the car up' : daTrend === 'worsening' ? 'thinner air will cost power; consider leaning on the setup that ran best in thin air' : 'expect runs to repeat'}.`);
-  if (weakest) bullets.push(`Weakest segment vs your best: ${weakest} (avg trails best by ${weakestGap.toFixed(3)}s). Look at tire pressure, track prep, and shift points there.`);
-  if (top) {
-    const f = top.fields;
-    const parts = [];
-    if (isNum(f.jet)) parts.push(`Jet ${f.jet}`);
-    if (isNum(f.revLim)) parts.push(`Rev limiter ${f.revLim}`);
-    if (isNum(f.lPsi)) parts.push(`tire PSI ${f.lPsi}/${f.rPsi}`);
-    bullets.push(`Top-ranked setup by weather-corrected ET: ${parts.join(' · ')} — ${top.runs} run${top.runs === 1 ? '' : 's'}, best corrected ${top.best.toFixed(3)}s.${top.lowSample ? ' Small sample — treat as a lead, not a rule.' : ''}`);
-  } else {
-    bullets.push('Log a few runs with setup + weather data to unlock setup recommendations.');
-  }
-  return { top, weakest, bullets };
-}
 
 /** Least-squares regression of ET on DA. Returns slope (s per ft) + predictor. */
 export function regressETonDA(runs) {
@@ -465,11 +432,6 @@ export function cheatSheet(runs, bands, key) {
 }
 
 /** Win/loss for the 1/8-mile view. */
-export function winLoss(runs) {
-  const w = runs.filter((r) => r.wl === 'W').length;
-  const l = runs.filter((r) => r.wl === 'L').length;
-  return { w, l, rate: w + l ? (w / (w + l)) * 100 : null };
-}
 
 /** Similarity % of a run to target conditions (for SIMILAR PAST RUNS). */
 export function similarityPct(run, target) {

@@ -1,4 +1,4 @@
-import { densityAltitudeFromMslp } from './physics';
+import { densityAltitudeFromMslp, stationPressureHpa, waterGrains } from './physics';
 
 /**
  * Live weather via Open-Meteo (https://open-meteo.com) — free, no API key.
@@ -29,6 +29,11 @@ export async function fetchTrackWeather(track) {
       humidityPct: c.relative_humidity_2m,
       mslpHpa: c.pressure_msl,
       elevationFt,
+    }),
+    grains: waterGrains({
+      tempF: c.temperature_2m,
+      humidityPct: c.relative_humidity_2m ?? 0,
+      pressureHpa: stationPressureHpa(c.pressure_msl ?? 1013.25, elevationFt),
     }),
   };
 

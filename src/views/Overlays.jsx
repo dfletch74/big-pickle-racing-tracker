@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Modal, Card, SectionTitle, Btn, Field, inputCls, Badge, Icon } from '../components/ui';
+import { Modal, SectionTitle, Btn, Field, inputCls, Badge, Icon } from '../components/ui';
 import { uid, makeDemoState } from '../lib/store';
 import { runsForCar } from '../lib/stats';
 import { runsToCSV, downloadFile } from '../lib/io';
