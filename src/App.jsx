@@ -133,6 +133,24 @@ export default function App() {
 
   const car = state.cars.find((c) => c.id === state.activeCarId);
 
+  // PWA install: capture Chrome's install prompt so Android users get an
+  // in-app "Install" button that triggers the proper WebAPK flow (the menu
+  // path is where the Play Protect legacy-wrapper block comes from).
+  const [installEvt, setInstallEvt] = useState(null);
+  const [installDismissed, setInstallDismissed] = useState(false);
+  useEffect(() => {
+    const onPrompt = (e) => { e.preventDefault(); setInstallEvt(e); };
+    window.addEventListener('beforeinstallprompt', onPrompt);
+    return () => window.removeEventListener('beforeinstallprompt', onPrompt);
+  }, []);
+  const isAndroid = /android/i.test(navigator.userAgent || '');
+  const isStandalone = typeof window.matchMedia === 'function' && window.matchMedia('(display-mode: standalone)').matches;
+  const showInstallBanner = isAndroid && !isStandalone && installEvt && !installDismissed;
+  const doInstall = async () => {
+    try { installEvt.prompt(); await installEvt.userChoice; } catch { /* dismissed */ }
+    setInstallEvt(null);
+  };
+
   // Show lock screen if any PIN is set and not yet unlocked.
   if (isLocked) {
     return (
@@ -220,6 +238,17 @@ export default function App() {
           </div>
         </div>
       </header>
+
+      {/* Android install banner (Chrome install prompt captured) */}
+      {showInstallBanner && (
+        <div className="mx-auto flex max-w-3xl items-center gap-3 border-b border-pickle-400/30 bg-pickle-400/10 px-4 py-2.5">
+          <div className="min-w-0 flex-1 text-sm text-white/80">
+            Install <span className="font-semibold text-white">Big Pickle</span> as an app on this phone.
+          </div>
+          <Btn onClick={doInstall} className="!py-1.5 text-xs">Install</Btn>
+          <button onClick={() => setInstallDismissed(true)} aria-label="Dismiss" className="px-1 text-white/50 transition hover:text-white">✕</button>
+        </div>
+      )}
 
       {/* main */}
       <main className="app-chrome mx-auto max-w-3xl px-4 pb-32 pt-4">
