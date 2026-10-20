@@ -19,9 +19,9 @@ import { syncTeamData, teamSyncOnOpen } from './lib/teamSync';
 const NAV = [
   { id: 'dash', label: 'DASH', icon: 'gauge' },
   { id: 'runs', label: 'RUNS', icon: 'list' },
-  { id: 'add', label: 'ADD', icon: 'plus', fab: true },
   { id: 'track', label: 'TRACK', icon: 'flag' },
   { id: 'insight', label: 'INSIGHT', icon: 'chart' },
+  { id: 'add', label: 'ADD', icon: 'plus', fab: true },
   { id: 'garage', label: 'GARAGE', icon: 'wrench' },
 ];
 

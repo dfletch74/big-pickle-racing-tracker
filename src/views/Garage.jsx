@@ -13,7 +13,6 @@ export default function Garage({ state, update, toast, role }) {
   const tabs = [
     ['maint', 'Maintenance'],
     ['check', 'Checklists'],
-    ['segments', 'Segments'],
     ['report', 'Report Card'],
     ['video', 'Video'],
   ];
@@ -36,7 +35,6 @@ export default function Garage({ state, update, toast, role }) {
 
       {tab === 'maint' && <Maintenance state={state} update={update} toast={toast} canEdit={canEdit} />}
       {tab === 'check' && <Checklists state={state} update={update} toast={toast} canEdit={canEdit} />}
-      {tab === 'segments' && <SegmentAnalysis state={state} />}
       {tab === 'report' && <ReportCard state={state} />}
       {tab === 'video' && <VideoOverlay state={state} toast={toast} />}
     </div>
@@ -631,82 +629,4 @@ function ReportCard({ state }) {
   );
 }
 
-function SegmentAnalysis({ state }) {
-  const runs = (state.runs || [])
-    .filter((r) => r.source !== 'demo' && r.distance === '1/4')
-    .sort((a, b) => String(b.date).localeCompare(String(a.date)))
-    .slice(0, 10);
-
-  const segments = runs.map((r) => {
-    const s60 = r.sixty, s330 = r.threeThirty, e8 = r.eighthET, t1000 = r.thousand, et = r.et;
-    return {
-      run: r,
-      to330: s60 != null && s330 != null ? s330 - s60 : null,
-      toEighth: s330 != null && e8 != null ? e8 - s330 : null,
-      to1000: e8 != null && t1000 != null ? t1000 - e8 : null,
-      toQuarter: t1000 != null && et != null ? et - t1000 : null,
-    };
-  }).filter((s) => s.to330 != null || s.toEighth != null);
-
-  const avg = (arr) => arr.length ? arr.reduce((a, c) => a + c, 0) / arr.length : null;
-  const avg330 = avg(segments.map((s) => s.to330).filter((v) => v != null));
-  const avgEighth = avg(segments.map((s) => s.toEighth).filter((v) => v != null));
-
-  return (
-    <div className="space-y-3">
-      <Card>
-        <SectionTitle>Interval Averages (1/4 mi)</SectionTitle>
-        <div className="grid grid-cols-2 gap-2 text-center">
-          <div className="rounded-xl bg-white/5 p-3">
-            <div className="text-[10px] uppercase tracking-wider text-white/40">60–330 ft</div>
-            <div className="font-mono text-xl font-bold text-white/90">{avg330 != null ? avg330.toFixed(3) : '—'}</div>
-          </div>
-          <div className="rounded-xl bg-white/5 p-3">
-            <div className="text-[10px] uppercase tracking-wider text-white/40">330–1/8</div>
-            <div className="font-mono text-xl font-bold text-white/90">{avgEighth != null ? avgEighth.toFixed(3) : '—'}</div>
-          </div>
-        </div>
-        <div className="mt-2 text-xs text-white/40">
-          Isolates launch vs. back-half performance across your last {segments.length} full-split passes.
-        </div>
-      </Card>
-
-      {segments.length > 0 && (
-        <Card>
-          <SectionTitle>Recent intervals</SectionTitle>
-          <div className="mb-2 text-xs text-white/40">Green = quicker than your previous pass, red = slower.</div>
-          <div className="space-y-1.5">
-            {segments.map(({ run: r, to330, toEighth, to1000, toQuarter }, i) => {
-              const prev = segments[i + 1]; // runs are date-desc, so next in list = previous pass
-              const cls = (cur, old) => {
-                if (cur == null || old == null) return 'text-white/80';
-                if (cur < old - 0.0005) return 'text-pickle-400 font-bold';
-                if (cur > old + 0.0005) return 'text-red-400';
-                return 'text-white/80';
-              };
-              const cells = [
-                ['60-330', to330, prev?.to330],
-                ['330-⅛', toEighth, prev?.toEighth],
-                ['⅛-1000', to1000, prev?.to1000],
-                ['1000-¼', toQuarter, prev?.toQuarter],
-              ];
-              return (
-                <div key={r.id} className="rounded-lg bg-white/5 px-3 py-2">
-                  <div className="mb-1 text-xs text-white/40">{r.date} · {r.track} · ET {r.et != null ? Number(r.et).toFixed(3) : '—'}</div>
-                  <div className="grid grid-cols-4 gap-1 font-mono text-xs">
-                    {cells.map(([label, cur, old]) => (
-                      <div key={label} className={cls(cur, old)}>
-                        <span className="text-white/35">{label}:</span> {cur != null ? cur.toFixed(3) : '—'}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </Card>
-      )}
-    </div>
-  );
-}
 
