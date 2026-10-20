@@ -201,7 +201,7 @@ export default function AddRun({ state, update, toast, editId, onDone }) {
       daFt = Math.round(densityAltitudeFt({ tempF, humidityPct: humidity ?? 0, pressureHpa: p }));
     }
     const windMph = numOrNull(f.windMph), windDir = numOrNull(f.windDir);
-    const headwindMph = headwindMph(windMph, windDir, track?.heading);
+    const hwMph = headwindMph(windMph, windDir, track?.heading);
     const run = {
       id: editing ? editing.id : uid(),
       carId: state.activeCarId,
@@ -212,7 +212,7 @@ export default function AddRun({ state, update, toast, editId, onDone }) {
       eighthET: numOrNull(f.eighthET), eighthMPH: numOrNull(f.eighthMPH),
       thousand: numOrNull(f.thousand), et: etNum, mph: numOrNull(f.mph),
       tempF, humidity: isNum(humidity) ? Math.round(humidity) : null, altitudeFt, daFt,
-      windMph, windDir, headwindMph,
+      windMph, windDir, headwindMph: hwMph,
       jet: numOrNull(f.jet), lPsi: numOrNull(f.lPsi), rPsi: numOrNull(f.rPsi),
       lBar: numOrNull(f.lBar), rBar: numOrNull(f.rBar),
       comp: numOrNull(f.comp), rebound: numOrNull(f.rebound), revLim: numOrNull(f.revLim),
