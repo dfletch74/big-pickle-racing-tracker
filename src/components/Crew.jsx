@@ -349,14 +349,8 @@ function UserCard({ user, users, currentUserId, saveUsers, toast }) {
 
   return (
     <div className="rounded-xl border border-white/[0.07] bg-white/[0.02] p-3">
-      <div className="flex gap-2">
-        <input
-          value={user.name}
-          onChange={(e) => set({ name: e.target.value }, null)}
-          placeholder="First name"
-          autoComplete="off"
-          className={`${inputCls} min-w-0 flex-1 font-semibold`}
-        />
+      <div className="flex items-center gap-2">
+        <div className="min-w-0 flex-1 truncate text-base font-semibold text-white/90">{user.name}</div>
         <select
           value={USER_TITLES.includes(user.title) ? user.title : 'Viewer'}
           onChange={(e) => set({ title: e.target.value })}
