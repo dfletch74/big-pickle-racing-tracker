@@ -245,23 +245,38 @@ function PinField({ label, pinKey, settings, update, toast }) {
  * User edits publish to the shared team file so every device agrees.
  */
 export function CrewModal({ state, update, toast, onClose, users, currentUserId }) {
-  // One-time heal: if stored seed users have blank names/titles, fill them
-  // from the defaults and persist — so a bad local write can't stick.
+  // One-time heal: guarantee the 6 seed users exist with valid names/titles.
+  // Seed slots are rebuilt deterministically; this device's pinGroup and
+  // permission choices are preserved, custom users with real names are kept,
+  // and nameless cruft is dropped.
   useEffect(() => {
     const stored = state.settings.users;
     if (!Array.isArray(stored) || !stored.length) return;
     const seeds = defaultUsers();
-    const byId = Object.fromEntries(seeds.map((u) => [u.id, u]));
+    const seedIds = new Set(seeds.map((s) => s.id));
+    const byId = Object.fromEntries(stored.map((u) => [u && u.id, u]));
     let changed = false;
-    const next = stored.map((u) => {
-      const seed = byId[u.id];
-      if (!seed) return u;
-      const name = u.name && u.name.trim() ? u.name : seed.name;
-      const title = USER_TITLES.includes(u.title) ? u.title : seed.title;
-      if (name !== u.name || title !== u.title) { changed = true; return { ...u, name, title }; }
-      return u;
+    const seedUsers = seeds.map((seed) => {
+      const cur = byId[seed.id];
+      const okName = cur && cur.name && cur.name.trim();
+      const okTitle = cur && USER_TITLES.includes(cur.title);
+      if (okName && okTitle) return cur;
+      changed = true;
+      return {
+        ...seed,
+        pinGroup: (cur && cur.pinGroup) || seed.pinGroup,
+        canLog: cur ? !!cur.canLog : seed.canLog,
+        canDelete: cur ? !!cur.canDelete : seed.canDelete,
+        canSettings: cur ? !!cur.canSettings : seed.canSettings,
+        canSync: cur ? !!cur.canSync : seed.canSync,
+        canGarage: cur ? !!cur.canGarage : seed.canGarage,
+      };
     });
-    if (changed) update((s) => { s.settings.users = next; s.settings.usersUpdatedAt = Date.now(); });
+    const custom = stored.filter((u) => u && !seedIds.has(u.id) && u.name && u.name.trim());
+    if (custom.length !== stored.filter((u) => u && !seedIds.has(u.id)).length) changed = true;
+    if (!changed) return;
+    const next = [...seedUsers, ...custom];
+    update((s) => { s.settings.users = next; s.settings.usersUpdatedAt = Date.now(); });
   }, []);
   // Factory defaults are visible in the public repo — warn until they're changed.
   const usingDefaults =
@@ -369,24 +384,24 @@ function UserCard({ user, users, currentUserId, saveUsers, toast }) {
     <div className="rounded-xl border border-white/[0.07] bg-white/[0.02] p-3">
       <div>
         <div className="mb-1 text-[11px] uppercase tracking-wider text-white/40">Name</div>
-        <div className="flex items-center gap-2">
-          <input
-            key={user.id + '-' + (user.name || 'blank')}
-            defaultValue={user.name || ''}
-            onBlur={(e) => {
-              const v = e.target.value.trim();
-              if (v && v !== user.name) set({ name: v });
-            }}
-            placeholder="First name"
-            autoComplete="off"
-            aria-label="Name"
-            className={`${inputCls} min-w-0 flex-1 font-semibold`}
-          />
+        <input
+          key={user.id + '-' + (user.name || 'blank')}
+          defaultValue={user.name || ''}
+          onBlur={(e) => {
+            const v = e.target.value.trim();
+            if (v && v !== user.name) set({ name: v });
+          }}
+          placeholder="First name"
+          autoComplete="off"
+          aria-label="Name"
+          className={`${inputCls} w-full font-semibold`}
+        />
+        <div className="mt-2 flex items-center gap-2">
           <select
             value={USER_TITLES.includes(user.title) ? user.title : 'Viewer'}
             onChange={(e) => set({ title: e.target.value })}
             aria-label="Title"
-            className={`${inputCls} w-28 font-semibold`}
+            className={`${inputCls} min-w-0 flex-1 font-semibold`}
           >
             {USER_TITLES.map((t) => (
               <option key={t} value={t}>{t}</option>
