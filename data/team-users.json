@@ -1,0 +1,71 @@
+{
+  "updatedAt": "2026-10-21T06:08:01.772Z",
+  "users": [
+    {
+      "id": "admin",
+      "name": "Dwayne",
+      "title": "Admin",
+      "pinGroup": "admin",
+      "canLog": true,
+      "canDelete": true,
+      "canSettings": true,
+      "canSync": true,
+      "canGarage": true
+    },
+    {
+      "id": "driver",
+      "name": "Dean",
+      "title": "Driver",
+      "pinGroup": "driver",
+      "canLog": true,
+      "canDelete": false,
+      "canSettings": false,
+      "canSync": true,
+      "canGarage": true
+    },
+    {
+      "id": "crew",
+      "name": "Ethan",
+      "title": "Crew",
+      "pinGroup": "crew",
+      "canLog": true,
+      "canDelete": false,
+      "canSettings": false,
+      "canSync": true,
+      "canGarage": false
+    },
+    {
+      "id": "temp",
+      "name": "Temp Worker",
+      "title": "Viewer",
+      "pinGroup": "viewer",
+      "canLog": false,
+      "canDelete": false,
+      "canSettings": false,
+      "canSync": true,
+      "canGarage": false
+    },
+    {
+      "id": "viewer",
+      "name": "Hughie",
+      "title": "Viewer",
+      "pinGroup": "viewer",
+      "canLog": false,
+      "canDelete": false,
+      "canSettings": false,
+      "canSync": true,
+      "canGarage": false
+    },
+    {
+      "id": "grog",
+      "name": "Grog",
+      "title": "Viewer",
+      "pinGroup": "viewer",
+      "canLog": false,
+      "canDelete": false,
+      "canSettings": false,
+      "canSync": true,
+      "canGarage": false
+    }
+  ]
+}
