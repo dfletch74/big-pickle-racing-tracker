@@ -70,6 +70,77 @@ async function ghApi(path, pat, opts = {}) {
 const b64encode = (s) => btoa(unescape(encodeURIComponent(s)));
 const b64decode = (s) => decodeURIComponent(escape(atob(s.replace(/\n/g, ''))));
 
+/* ---------------- Team PINs (shared lock) ---------------- */
+// The app locks on EVERY launch on EVERY device. The PIN hashes live in this
+// shared file (public read — hashes can't be reversed into PINs). Only a
+// device with the GitHub token can publish, so a stranger can never set
+// their own PINs and walk in.
+const PINS_PATH = 'data/team-pins.json';
+const TEAM_PINS_CACHE_KEY = 'bpr-team-pins-cache';
+
+export async function fetchTeamPins() {
+  const url = TEAM_CSV_DEFAULT_URL.replace('Big_Pickle_runs_2026.csv', 'team-pins.json');
+  const busted = url + '?t=' + Date.now();
+  const res = await fetch(busted, { cache: 'no-store' });
+  if (!res.ok) return null; // 404 = not set up yet
+  const data = await res.json().catch(() => null);
+  if (!data || typeof data !== 'object') return null;
+  return data;
+}
+
+export function getCachedTeamPins() {
+  try { return JSON.parse(localStorage.getItem(TEAM_PINS_CACHE_KEY) || 'null'); } catch { return null; }
+}
+
+export function setCachedTeamPins(data) {
+  try {
+    if (data) localStorage.setItem(TEAM_PINS_CACHE_KEY, JSON.stringify(data));
+    else localStorage.removeItem(TEAM_PINS_CACHE_KEY);
+  } catch { /* ignore */ }
+}
+
+// Publish PIN hashes to the shared file, merging over what's already there.
+// Requires the GitHub token — without it, nothing is pushed.
+export async function publishTeamPins(partialHashes) {
+  const pat = getPat();
+  if (!pat) return { pushed: false, error: 'No GitHub token saved' };
+  const loc = parseRawUrl(TEAM_CSV_DEFAULT_URL);
+  if (!loc) throw new Error('Team CSV URL is not a GitHub raw URL');
+
+  for (let attempt = 0; attempt < 3; attempt++) {
+    let file = null;
+    let remote = {};
+    try {
+      file = await ghApi(`/repos/${loc.owner}/${loc.repo}/contents/${PINS_PATH}?ref=${loc.branch}`, pat);
+      remote = JSON.parse(b64decode(file.content || '')) || {};
+    } catch (e) {
+      if (e.status !== 404) throw e;
+    }
+    const merged = { ...(remote.pins || {}), ...partialHashes };
+    const payload = JSON.stringify({ updatedAt: new Date().toISOString(), pins: merged }, null, 2);
+    try {
+      const remoteText = file ? b64decode(file.content || '') : '';
+      if (payload.replace(/\s+$/, '') === remoteText.replace(/\s+$/, '')) {
+        return { pushed: false };
+      }
+      await ghApi(`/repos/${loc.owner}/${loc.repo}/contents/${PINS_PATH}`, pat, {
+        method: 'PUT',
+        body: JSON.stringify({
+          message: `Team PINs sync via app (${new Date().toISOString().slice(0, 16).replace('T', ' ')})`,
+          content: b64encode(payload),
+          ...(file ? { sha: file.sha } : {}),
+          branch: loc.branch,
+        }),
+      });
+      return { pushed: true };
+    } catch (e) {
+      if (e.status === 409 && attempt < 2) continue; // someone else pushed — retry
+      throw e;
+    }
+  }
+  throw new Error('Publish conflicted — try again');
+}
+
 function backfillAir(r, tracks) {
   if (r.altitudeFt == null && r.track) {
     const t = tracks.find((x) => (x.name || '').toLowerCase() === r.track.toLowerCase());

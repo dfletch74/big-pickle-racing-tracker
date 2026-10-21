@@ -2,11 +2,11 @@ import { useState, useCallback, useEffect } from 'react';
 import { useStore, uid } from './lib/store';
 import { Toasts, Icon } from './components/ui';
 import { LOGO_DATA_URI } from './components/logo';
-import { LockScreen, CrewModal, hasAnyPin } from './components/Crew';
+import { LockScreen, CrewModal, hasAnyPin, getPinHashes } from './components/Crew';
 import { ROLES, clearRole, hashPin } from './lib/roles';
 import { checkForAppUpdate, reloadForUpdate } from './lib/updater';
 import { parseSetupLink, clearSetupLink } from './lib/setupLink';
-import { setPat } from './lib/teamSync';
+import { setPat, fetchTeamPins, publishTeamPins, getCachedTeamPins, setCachedTeamPins, getPat } from './lib/teamSync';
 import Dash from './views/Dash';
 import Runs from './views/Runs';
 import AddRun from './views/AddRun';
@@ -33,16 +33,15 @@ export default function App() {
   const [overlay, setOverlay] = useState(null); // garage | tree | settings | crew
   const [toasts, setToasts] = useState([]);
   const [printRun, setPrintRun] = useState(null);
-  // Crew lock: if a team PIN is set, require unlock on launch.
+  // Crew lock: ALWAYS require unlock on launch, on every device.
+  // PIN hashes come from the shared team file (data/team-pins.json),
+  // falling back to this device's PINs until the team file exists.
   const [roleId, setRoleId] = useState(() => {
-    // If no PIN is set, default to admin (full access, current behavior).
     return null;
   });
-  const [locked, setLocked] = useState(() => {
-    // Check after store loads; default to unlocked until we know.
-    return false;
-  });
+  const [locked, setLocked] = useState(() => true);
   const [lockChecked, setLockChecked] = useState(false);
+  const [teamPins, setTeamPins] = useState(() => getCachedTeamPins());
 
   const toast = useCallback((text, kind = 'ok') => {
     const id = uid();
@@ -87,7 +86,11 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Crew lock: if any team PIN is set, lock on launch.
+  // Crew lock: lock on EVERY launch, on every device. The shared team PIN
+  // Crew lock: lock on EVERY launch, on every device. The shared team PIN
+  // file is the authority; this device's PINs are the fallback until the
+  // team file exists. If this device has local PINs and a token but the
+  // team file is missing, publish them once (bootstrap).
   // One-time migration from the old single PIN to per-role PINs.
   useEffect(() => {
     if (lockChecked) return;
@@ -102,12 +105,36 @@ export default function App() {
         s.settings.teamPinHash = null;
       });
     }
-    if (hasAnyPin(state.settings) || state.settings.teamPinHash) {
-      setLocked(true);
-    } else {
-      setRoleId('admin');
-    }
-  }, [state.settings.teamPinHash, lockChecked]);
+    setLocked(true);
+    fetchTeamPins()
+      .then((data) => {
+        if (data && data.pins && hasAnyPin(data.pins)) {
+          setCachedTeamPins(data);
+          setTeamPins(data);
+        } else {
+          const local = getPinHashes(state.settings);
+          if (hasAnyPin(local) && getPat()) {
+            publishTeamPins(local)
+              .then((r) => {
+                if (r.pushed) {
+                  toast('Team PINs published — every device now locks on launch.');
+                  fetchTeamPins()
+                    .then((d2) => {
+                      if (d2 && d2.pins) {
+                        setCachedTeamPins(d2);
+                        setTeamPins(d2);
+                      }
+                    })
+                    .catch(() => {});
+                }
+              })
+              .catch(() => {});
+          }
+        }
+      })
+      .catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lockChecked]);
 
   const role = ROLES[roleId] || ROLES.admin;
   const isLocked = locked;
@@ -151,11 +178,18 @@ export default function App() {
     setInstallEvt(null);
   };
 
-  // Show lock screen if any PIN is set and not yet unlocked.
+  // Effective PIN hashes: shared team file wins, this device's PINs are the
+  // fallback. When neither exists, nobody can unlock (except this device
+  // still bootstrapping its own PINs via Crew Management).
+  const teamHashObj = teamPins && teamPins.pins;
+  const effectiveHashes =
+    teamHashObj && hasAnyPin(teamHashObj) ? teamHashObj : getPinHashes(state.settings);
+
+  // Show lock screen on every launch until unlocked with a crew PIN.
   if (isLocked) {
     return (
       <div className="min-h-screen bg-coal-950 text-white">
-        <LockScreen settings={state.settings} onUnlock={handleUnlock} />
+        <LockScreen pinHashes={effectiveHashes} onUnlock={handleUnlock} />
         <Toasts toasts={toasts} />
       </div>
     );

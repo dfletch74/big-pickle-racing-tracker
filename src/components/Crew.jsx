@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Modal, Btn, inputCls } from './ui';
 import { ROLES, hashPin, verifyPin, saveRole } from '../lib/roles';
+import { getPat, publishTeamPins } from '../lib/teamSync';
 import { APP_VERSION } from '../version';
 
 // Which roles each PIN unlocks.
@@ -44,9 +45,11 @@ export function rolesForPin(pin, settings) {
 
 /**
  * Lock screen: PIN entry, then role picker (only roles unlocked by that PIN).
- * Shown on app start when any team PIN is set.
+ * Shown on EVERY app start, on every device. `pinHashes` is the effective
+ * set of team PIN hashes (shared team file, falling back to this device's).
+ * No PIN = no entry.
  */
-export function LockScreen({ settings, onUnlock }) {
+export function LockScreen({ pinHashes, onUnlock }) {
   const [pin, setPin] = useState('');
   const [error, setError] = useState('');
   const [stage, setStage] = useState('pin'); // pin | role
@@ -54,9 +57,23 @@ export function LockScreen({ settings, onUnlock }) {
   const [failCount, setFailCount] = useState(0);
   const [lockUntil, setLockUntil] = useState(0);
 
+  const configured = hasAnyPin(pinHashes || {});
+
+  if (!configured) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-coal-950 p-6">
+        <div className="w-full max-w-xs space-y-4 text-center">
+          <div className="font-display text-2xl font-bold uppercase tracking-wider text-white/90">Big Pickle Racing</div>
+          <div className="text-sm text-white/50">Team PINs aren&apos;t set up yet. An admin needs to set them on their device first.</div>
+          <div className="font-mono text-[11px] text-white/25">v{APP_VERSION}</div>
+        </div>
+      </div>
+    );
+  }
+
   const submitPin = () => {
     if (Date.now() < lockUntil) return;
-    const roles = rolesForPin(pin, settings);
+    const roles = rolesForPin(pin, pinHashes || {});
     if (roles.length > 0) {
       setError('');
       setFailCount(0);
@@ -146,16 +163,30 @@ function PinField({ label, pinKey, settings, update, toast }) {
       toast('PINs do not match.');
       return;
     }
-    update((s) => { s.settings[pinKey] = hashPin(val); });
+    const hash = hashPin(val);
+    const newHashes = { ...getPinHashes(settings), [pinKey]: hash };
+    update((s) => { s.settings[pinKey] = hash; });
     setVal('');
     setConfirm('');
     toast(`${label} set.`);
+    // Push to the shared team file so every crew device uses the new PIN.
+    if (getPat()) {
+      publishTeamPins(newHashes)
+        .then((r) => { if (r.pushed) toast('Published — all crew devices now use this PIN.'); })
+        .catch(() => toast('Saved on this device; team publish failed.', 'error'));
+    }
   };
 
   const clear = () => {
     if (!confirm(`Remove the ${label}?`)) return;
+    const newHashes = { ...getPinHashes(settings), [pinKey]: null };
     update((s) => { s.settings[pinKey] = null; });
     toast(`${label} removed.`);
+    if (getPat()) {
+      publishTeamPins(newHashes)
+        .then((r) => { if (r.pushed) toast('Published — that PIN no longer unlocks any device.'); })
+        .catch(() => toast('Removed on this device; team publish failed.', 'error'));
+    }
   };
 
   return (
@@ -215,7 +246,7 @@ export function CrewModal({ state, update, toast, onClose }) {
             </div>
           )}
           <div className="mb-3 text-xs text-white/50">
-            Each PIN unlocks only its roles. The app locks on launch and asks for a PIN, then shows just the names that PIN allows.
+            Each PIN unlocks only its roles. The app locks on every launch, on every device, and asks for a PIN — no PIN, no entry. PINs publish to the team automatically, so all crew devices share the same PINs.
           </div>
           <div className="space-y-2">
             {PIN_KEYS.map((k) => (
