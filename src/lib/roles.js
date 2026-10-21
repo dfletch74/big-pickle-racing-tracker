@@ -15,6 +15,48 @@ export const ROLES = {
   grog: { label: 'Grog', title: 'Viewer', canDelete: false, canLog: false, canSettings: false, canSync: true },
 };
 
+// Permission flags every user carries. canGarage controls the Garage tab
+// (previously hardcoded to Dwayne + Dean).
+export const PERM_FLAGS = ['canLog', 'canDelete', 'canSettings', 'canSync', 'canGarage'];
+export const PERM_LABELS = {
+  canLog: 'Log runs',
+  canDelete: 'Delete',
+  canSettings: 'Settings',
+  canSync: 'Team sync',
+  canGarage: 'Garage',
+};
+
+// Which PIN group unlocks the user: 'admin' | 'driver' | 'crew' | 'viewer'
+// (maps to pinHashAdmin / pinHashDriver / pinHashCrew / pinHashViewer).
+const SEED_PIN_GROUPS = { admin: 'admin', driver: 'driver', crew: 'crew', temp: 'viewer', viewer: 'viewer', grog: 'viewer' };
+const SEED_GARAGE = { admin: true, driver: true };
+
+/** Seed user list, from the original hardcoded roles (one-time migration). */
+export function defaultUsers() {
+  return Object.entries(ROLES).map(([id, r]) => ({
+    id,
+    name: r.label,
+    title: r.title,
+    pinGroup: SEED_PIN_GROUPS[id] || 'viewer',
+    canLog: !!r.canLog,
+    canDelete: !!r.canDelete,
+    canSettings: !!r.canSettings,
+    canSync: !!r.canSync,
+    canGarage: !!SEED_GARAGE[id],
+  }));
+}
+
+/** Find a user by id in a (possibly dynamic) users list. */
+export function getUser(users, id) {
+  if (!Array.isArray(users) || !id) return null;
+  return users.find((u) => u.id === id) || null;
+}
+
+/** Effective users: stored list, or the seed when nothing stored yet. */
+export function effectiveUsers(stored) {
+  return Array.isArray(stored) && stored.length ? stored : defaultUsers();
+}
+
 
 // Simple (non-crypto) hash for the PIN — keeps it out of plaintext in storage.
 // This is a deterrent, not real security.
@@ -37,7 +79,7 @@ const ROLE_KEY = 'bpr-crew-role';
 
 export function saveRole(roleId) {
   try {
-    if (roleId && ROLES[roleId]) localStorage.setItem(ROLE_KEY, roleId);
+    if (roleId) localStorage.setItem(ROLE_KEY, roleId);
     else localStorage.removeItem(ROLE_KEY);
   } catch {}
 }

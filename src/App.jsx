@@ -3,10 +3,10 @@ import { useStore, uid } from './lib/store';
 import { Toasts, Icon } from './components/ui';
 import { LOGO_DATA_URI } from './components/logo';
 import { LockScreen, CrewModal, hasAnyPin, getPinHashes } from './components/Crew';
-import { ROLES, clearRole, hashPin } from './lib/roles';
+import { clearRole, hashPin, getUser, effectiveUsers } from './lib/roles';
 import { checkForAppUpdate, reloadForUpdate } from './lib/updater';
 import { parseSetupLink, clearSetupLink } from './lib/setupLink';
-import { setPat, fetchTeamPins, publishTeamPins, getCachedTeamPins, setCachedTeamPins, getPat } from './lib/teamSync';
+import { setPat, getPat, fetchTeamPins, publishTeamPins, getCachedTeamPins, setCachedTeamPins, fetchTeamUsers, publishTeamUsers, getCachedTeamUsers, setCachedTeamUsers } from './lib/teamSync';
 import Dash from './views/Dash';
 import Runs from './views/Runs';
 import AddRun from './views/AddRun';
@@ -42,6 +42,7 @@ export default function App() {
   const [locked, setLocked] = useState(() => true);
   const [lockChecked, setLockChecked] = useState(false);
   const [teamPins, setTeamPins] = useState(() => getCachedTeamPins());
+  const [teamUsers, setTeamUsers] = useState(() => getCachedTeamUsers());
 
   const toast = useCallback((text, kind = 'ok') => {
     const id = uid();
@@ -106,6 +107,30 @@ export default function App() {
       });
     }
     setLocked(true);
+    // Shared team users: pull the crew list; bootstrap-publish from this
+    // device when missing or when this device's edits are newer.
+    fetchTeamUsers()
+      .then((data) => {
+        const teamList = data && Array.isArray(data.users) ? data.users : [];
+        const teamTs = data && data.updatedAt ? Date.parse(data.updatedAt) || 0 : 0;
+        const localTs = state.settings.usersUpdatedAt || 0;
+        if (teamList.length && teamTs >= localTs) {
+          setCachedTeamUsers(data);
+          setTeamUsers(data);
+          update((s) => { s.settings.users = teamList; s.settings.usersUpdatedAt = teamTs; });
+        } else if (getPat()) {
+          const seed = effectiveUsers(state.settings.users);
+          publishTeamUsers(seed)
+            .then((r) => {
+              if (r.pushed) {
+                toast('Team users published — crew list is now shared.');
+                update((s) => { s.settings.usersUpdatedAt = Date.now(); });
+              }
+            })
+            .catch(() => {});
+        }
+      })
+      .catch(() => {});
     fetchTeamPins()
       .then((data) => {
         if (data && data.pins && hasAnyPin(data.pins)) {
@@ -136,7 +161,9 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lockChecked]);
 
-  const role = ROLES[roleId] || ROLES.admin;
+  // Dynamic crew: users list (seeded from defaults until the team file lands).
+  const users = effectiveUsers(state.settings.users);
+  const role = getUser(users, roleId) || users[0];
   const isLocked = locked;
 
   const handleUnlock = (newRoleId) => {
@@ -189,7 +216,7 @@ export default function App() {
   if (isLocked) {
     return (
       <div className="min-h-screen bg-coal-950 text-white">
-        <LockScreen pinHashes={effectiveHashes} onUnlock={handleUnlock} />
+        <LockScreen pinHashes={effectiveHashes} users={users} onUnlock={handleUnlock} />
         <Toasts toasts={toasts} />
       </div>
     );
@@ -200,7 +227,7 @@ export default function App() {
   // never changes shape between users.
   const navDisabled = (n) => {
     if (n.id === 'add' && !role.canLog) return true;
-    if (n.id === 'garage' && roleId !== 'admin' && roleId !== 'driver') return true;
+    if (n.id === 'garage' && !role.canGarage) return true;
     return false;
   };
 
@@ -228,7 +255,7 @@ export default function App() {
             <button
               onClick={() => {
                 // Ensure the logged-in user has a racer profile so Tree stats stay separate.
-                const label = roleId ? ROLES[roleId]?.label : null;
+                const label = role?.name || null;
                 if (label && !state.racers.some((r) => r.name.toLowerCase() === label.toLowerCase())) {
                   update((s) => { s.racers.push({ id: uid(), name: label, attempts: [] }); });
                 }
@@ -352,9 +379,9 @@ export default function App() {
 
       {/* overlays */}
       {overlay === 'garage' && <GarageModal state={state} update={update} toast={toast} onClose={() => setOverlay(null)} role={role} />}
-      {overlay === 'tree' && <TreeSimModal state={state} update={update} toast={toast} onClose={() => setOverlay(null)} roleId={roleId} />}
+      {overlay === 'tree' && <TreeSimModal state={state} update={update} toast={toast} onClose={() => setOverlay(null)} roleId={roleId} users={users} />}
       {overlay === 'settings' && <SettingsModal state={state} update={update} reset={reset} toast={toast} onClose={() => setOverlay(null)} />}
-      {overlay === 'crew' && <CrewModal state={state} update={update} toast={toast} onClose={() => setOverlay(null)} />}
+      {overlay === 'crew' && <CrewModal state={state} update={update} toast={toast} onClose={() => setOverlay(null)} users={users} currentUserId={roleId} />}
 
       <Toasts toasts={toasts} />
 

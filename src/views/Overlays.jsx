@@ -6,7 +6,7 @@ import { runsToCSV, downloadFile } from '../lib/io';
 import { syncTeamData, teamCsvUrl, teamSyncOnOpen, getPat, setPat, TEAM_CSV_DEFAULT_URL } from '../lib/teamSync';
 import { APP_VERSION } from '../version';
 import { fmtET, fmtMPH, fmtRT, fmtTemp, fmtDA, fmtDate, isNum } from '../lib/format';
-import { ROLES } from '../lib/roles';
+import { getUser } from '../lib/roles';
 import { pullRacers, publishRacers } from '../lib/teamSync';
 import { makeSetupLink } from '../lib/setupLink';
 import QRCode from 'qrcode';
@@ -236,9 +236,9 @@ function RacerPicker({ racers, racerId, onPick, onAdd, onClose }) {
   );
 }
 
-export function TreeSimModal({ state, update, toast, onClose, roleId }) {
+export function TreeSimModal({ state, update, toast, onClose, roleId, users }) {
   const [racerId, setRacerId] = useState(() => {
-    const label = roleId ? ROLES[roleId]?.label : null;
+    const label = roleId ? getUser(users, roleId)?.name : null;
     if (label) {
       const match = state.racers.find((r) => r.name.toLowerCase() === label.toLowerCase());
       if (match) return match.id;
@@ -386,7 +386,7 @@ export function TreeSimModal({ state, update, toast, onClose, roleId }) {
   };
 
   const ranked = [...state.racers].map((r) => ({ r, s: stats(r) })).sort((a, b) => (a.s.best ?? 9) - (b.s.best ?? 9));
-  const isAdmin = roleId === 'admin';
+  const isAdmin = !!getUser(users, roleId)?.canDelete;
 
   const resetRankings = () => {
     if (!window.confirm('Reset the leaderboard? This deletes all racers and their stats, on all devices.')) return;

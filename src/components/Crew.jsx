@@ -1,25 +1,42 @@
 import { useState } from 'react';
 import { Modal, Btn, inputCls } from './ui';
-import { ROLES, hashPin, verifyPin, saveRole } from '../lib/roles';
-import { getPat, publishTeamPins } from '../lib/teamSync';
+import { hashPin, verifyPin, saveRole, PERM_FLAGS, PERM_LABELS } from '../lib/roles';
+import { getPat, publishTeamPins, publishTeamUsers } from '../lib/teamSync';
+import { uid } from '../lib/store';
 import { APP_VERSION } from '../version';
 
-// Which roles each PIN unlocks.
-const PIN_ROLES = {
-  pinHashAdmin: ['admin'],
-  pinHashDriver: ['driver'],
-  pinHashCrew: ['crew'],
-  pinHashViewer: ['viewer', 'temp', 'grog'],
+// Which PIN group each PIN hash unlocks. Users carry a pinGroup; the PIN
+// that verifies for that group unlocks them.
+const PIN_KEY_TO_GROUP = {
+  pinHashAdmin: 'admin',
+  pinHashDriver: 'driver',
+  pinHashCrew: 'crew',
+  pinHashViewer: 'viewer',
+};
+export const PIN_GROUP_LABELS = {
+  admin: 'Admin PIN',
+  driver: 'Driver PIN',
+  crew: 'Crew PIN',
+  viewer: 'Viewer PIN',
 };
 
+// Access templates for the "add user" form.
+const ACCESS_TEMPLATES = {
+  admin: { title: 'Admin', canLog: true, canDelete: true, canSettings: true, canSync: true, canGarage: true },
+  driver: { title: 'Driver', canLog: true, canDelete: false, canSettings: false, canSync: true, canGarage: true },
+  crew: { title: 'Crew', canLog: true, canDelete: false, canSettings: false, canSync: true, canGarage: false },
+  viewer: { title: 'Viewer', canLog: false, canDelete: false, canSettings: false, canSync: true, canGarage: false },
+};
+
+// The four PIN slots (labels keep the crew names as a reminder of who holds each).
 const PIN_LABELS = {
-  pinHashAdmin: 'Admin PIN (Fletch)',
+  pinHashAdmin: 'Admin PIN (Dwayne)',
   pinHashDriver: 'Driver PIN (Dean)',
   pinHashCrew: 'Crew PIN (Ethan)',
   pinHashViewer: 'Viewer PIN (Hughie, Temp, Grog)',
 };
 
-const PIN_KEYS = Object.keys(PIN_ROLES);
+const PIN_KEYS = Object.keys(PIN_KEY_TO_GROUP);
 
 export function getPinHashes(settings) {
   const out = {};
@@ -31,16 +48,14 @@ export function hasAnyPin(settings) {
   return PIN_KEYS.some((k) => !!settings[k]);
 }
 
-// Given a PIN, return the role IDs it unlocks.
-export function rolesForPin(pin, settings) {
-  const h = getPinHashes(settings);
-  const roles = [];
-  for (const [key, roleIds] of Object.entries(PIN_ROLES)) {
-    if (h[key] && verifyPin(pin, h[key])) {
-      roles.push(...roleIds);
-    }
+// Given a PIN, return the users it unlocks (via their pinGroup).
+export function usersForPin(pin, pinHashes, users) {
+  const h = getPinHashes(pinHashes);
+  const groups = [];
+  for (const [key, group] of Object.entries(PIN_KEY_TO_GROUP)) {
+    if (h[key] && verifyPin(pin, h[key])) groups.push(group);
   }
-  return [...new Set(roles)];
+  return (users || []).filter((u) => groups.includes(u.pinGroup));
 }
 
 /**
@@ -49,11 +64,11 @@ export function rolesForPin(pin, settings) {
  * set of team PIN hashes (shared team file, falling back to this device's).
  * No PIN = no entry.
  */
-export function LockScreen({ pinHashes, onUnlock }) {
+export function LockScreen({ pinHashes, users, onUnlock }) {
   const [pin, setPin] = useState('');
   const [error, setError] = useState('');
   const [stage, setStage] = useState('pin'); // pin | role
-  const [allowedRoles, setAllowedRoles] = useState([]);
+  const [allowedUsers, setAllowedUsers] = useState([]);
   const [failCount, setFailCount] = useState(0);
   const [lockUntil, setLockUntil] = useState(0);
 
@@ -73,11 +88,11 @@ export function LockScreen({ pinHashes, onUnlock }) {
 
   const submitPin = () => {
     if (Date.now() < lockUntil) return;
-    const roles = rolesForPin(pin, pinHashes || {});
-    if (roles.length > 0) {
+    const matched = usersForPin(pin, pinHashes || {}, users || []);
+    if (matched.length > 0) {
       setError('');
       setFailCount(0);
-      setAllowedRoles(roles);
+      setAllowedUsers(matched);
       setStage('role');
     } else {
       const fails = failCount + 1;
@@ -94,9 +109,9 @@ export function LockScreen({ pinHashes, onUnlock }) {
     }
   };
 
-  const pickRole = (roleId) => {
-    saveRole(roleId);
-    onUnlock(roleId);
+  const pickUser = (user) => {
+    saveRole(user.id);
+    onUnlock(user.id);
   };
 
   if (stage === 'role') {
@@ -107,14 +122,14 @@ export function LockScreen({ pinHashes, onUnlock }) {
             <div className="font-display text-2xl font-bold uppercase tracking-wider text-white/90">Who are you?</div>
             <div className="mt-1 text-xs text-white/40">Pick your name to continue</div>
           </div>
-          {allowedRoles.map((id) => (
+          {allowedUsers.map((u) => (
             <button
-              key={id}
-              onClick={() => pickRole(id)}
+              key={u.id}
+              onClick={() => pickUser(u)}
               className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-left transition hover:bg-white/10 active:scale-[0.98]"
             >
-              <div className="font-display text-lg font-bold text-white/90">{ROLES[id].label}</div>
-              <div className="text-xs uppercase tracking-wider text-white/40">{ROLES[id].title}</div>
+              <div className="font-display text-lg font-bold text-white/90">{u.name}</div>
+              <div className="text-xs uppercase tracking-wider text-white/40">{u.title}</div>
             </button>
           ))}
         </div>
@@ -226,15 +241,25 @@ function PinField({ label, pinKey, settings, update, toast }) {
 }
 
 /**
- * Crew management modal: set/change per-role PINs, view roles.
- * Only accessible to admin (Fletch).
+ * Crew management modal: team PINs + team users (admin only).
+ * User edits publish to the shared team file so every device agrees.
  */
-export function CrewModal({ state, update, toast, onClose }) {
+export function CrewModal({ state, update, toast, onClose, users, currentUserId }) {
   // Factory defaults are visible in the public repo — warn until they're changed.
   const usingDefaults =
     state.settings.pinHashAdmin === hashPin('1966') ||
     state.settings.pinHashCrew === hashPin('2007') ||
     state.settings.pinHashViewer === hashPin('0000');
+
+  const saveUsers = (next, msg) => {
+    update((s) => { s.settings.users = next; s.settings.usersUpdatedAt = Date.now(); });
+    if (msg) toast(msg);
+    if (getPat()) {
+      publishTeamUsers(next)
+        .then((r) => { if (r.pushed) toast('Published — all crew devices updated.'); })
+        .catch(() => toast('Saved on this device; team publish failed.', 'error'));
+    }
+  };
   return (
     <Modal title="Crew Management" onClose={onClose}>
       <div className="space-y-4">
@@ -256,27 +281,170 @@ export function CrewModal({ state, update, toast, onClose }) {
         </div>
 
         <div>
-          <div className="mb-2 text-sm font-semibold text-white/80">Roles</div>
-          <div className="space-y-1.5">
-            {Object.entries(ROLES).map(([id, r]) => {
-              const perms = [];
-              if (r.canLog) perms.push('log runs');
-              if (r.canDelete) perms.push('delete');
-              if (r.canSettings) perms.push('settings');
-              if (!perms.length) perms.push('view only');
-              return (
-                <div key={id} className="flex items-center justify-between rounded-lg bg-white/5 px-3 py-2">
-                  <div>
-                    <div className="text-sm font-semibold text-white/90">{r.label}</div>
-                    <div className="text-[11px] uppercase tracking-wider text-white/40">{r.title}</div>
-                  </div>
-                  <div className="text-xs text-white/50">{perms.join(' · ')}</div>
-                </div>
-              );
-            })}
+          <div className="mb-2 flex items-center justify-between">
+            <div className="text-sm font-semibold text-white/80">Team users</div>
+            <div className="text-[11px] text-white/40">{users.length} {users.length === 1 ? 'user' : 'users'}</div>
           </div>
+          <div className="mb-3 text-xs text-white/50">
+            Change what each person can do, or add someone new. Changes publish to the whole crew automatically.
+          </div>
+          <div className="space-y-2">
+            {users.map((u) => (
+              <UserCard key={u.id} user={u} users={users} currentUserId={currentUserId} saveUsers={saveUsers} toast={toast} />
+            ))}
+          </div>
+          <AddUserForm users={users} saveUsers={saveUsers} toast={toast} />
         </div>
       </div>
     </Modal>
+  );
+}
+
+/** Toggle chip for one permission flag. */
+function PermChip({ active, label, onToggle }) {
+  return (
+    <button
+      onClick={onToggle}
+      className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold transition active:scale-95 ${
+        active
+          ? 'border-pickle-500/60 bg-pickle-500/20 text-pickle-200'
+          : 'border-white/10 bg-white/[0.03] text-white/35'
+      }`}
+    >
+      {label}
+    </button>
+  );
+}
+
+/** Edit one user: name, title, PIN group, permission flags, remove. */
+function UserCard({ user, users, currentUserId, saveUsers, toast }) {
+  const set = (patch, msg) => {
+    const next = users.map((u) => (u.id === user.id ? { ...u, ...patch } : u));
+    // Guard: at least one user must keep Settings access (or nobody can
+    // ever open Crew Management again).
+    if (!next.some((u) => u.canSettings)) {
+      toast('Blocked: at least one user must keep Settings access.', 'error');
+      return;
+    }
+    saveUsers(next, msg || `${patch.name || user.name} updated.`);
+  };
+
+  const remove = () => {
+    if (users.length <= 1) {
+      toast("Can't remove the last user.", 'error');
+      return;
+    }
+    if (user.id === currentUserId) {
+      toast("You can't remove the user you're logged in as.", 'error');
+      return;
+    }
+    if (!confirm(`Remove ${user.name} from the crew?`)) return;
+    const next = users.filter((u) => u.id !== user.id);
+    if (!next.some((u) => u.canSettings)) {
+      toast('Blocked: at least one user must keep Settings access.', 'error');
+      return;
+    }
+    saveUsers(next, `${user.name} removed.`);
+  };
+
+  return (
+    <div className="rounded-xl border border-white/[0.07] bg-white/[0.02] p-3">
+      <div className="flex gap-2">
+        <input
+          value={user.name}
+          onChange={(e) => set({ name: e.target.value }, null)}
+          placeholder="First name"
+          autoComplete="off"
+          className={`${inputCls} min-w-0 flex-1 font-semibold`}
+        />
+        <input
+          value={user.title}
+          onChange={(e) => set({ title: e.target.value }, null)}
+          placeholder="Title"
+          autoComplete="off"
+          className={`${inputCls} w-24 font-semibold`}
+        />
+        <Btn kind="ghost" onClick={remove} className="!px-2.5 !py-2 text-xs" title={`Remove ${user.name}`}>
+          ✕
+        </Btn>
+      </div>
+      <div className="mt-2 flex items-center gap-2">
+        <div className="text-[11px] uppercase tracking-wider text-white/40">Unlocked by</div>
+        <select
+          value={user.pinGroup}
+          onChange={(e) => set({ pinGroup: e.target.value })}
+          className={`${inputCls} min-w-0 flex-1 !py-1.5 text-xs`}
+        >
+          {Object.entries(PIN_GROUP_LABELS).map(([g, label]) => (
+            <option key={g} value={g}>{label}</option>
+          ))}
+        </select>
+      </div>
+      <div className="mt-2 flex flex-wrap gap-1.5">
+        {PERM_FLAGS.map((f) => (
+          <PermChip key={f} active={!!user[f]} label={PERM_LABELS[f]} onToggle={() => set({ [f]: !user[f] })} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/** Add a new user: name + PIN group + access template. */
+function AddUserForm({ users, saveUsers, toast }) {
+  const [name, setName] = useState('');
+  const [pinGroup, setPinGroup] = useState('viewer');
+  const [template, setTemplate] = useState('viewer');
+
+  const add = () => {
+    const clean = name.trim();
+    if (!clean) {
+      toast('Enter a name first.', 'error');
+      return;
+    }
+    if (users.some((u) => u.name.toLowerCase() === clean.toLowerCase())) {
+      toast('That name is already on the crew.', 'error');
+      return;
+    }
+    const t = ACCESS_TEMPLATES[template] || ACCESS_TEMPLATES.viewer;
+    const next = [...users, { id: 'u-' + uid(), name: clean, title: t.title, pinGroup, ...Object.fromEntries(PERM_FLAGS.map((f) => [f, !!t[f]])) }];
+    setName('');
+    saveUsers(next, `${clean} added — unlocked by the ${PIN_GROUP_LABELS[pinGroup]}.`);
+  };
+
+  return (
+    <div className="mt-2 rounded-xl border border-dashed border-white/15 p-3">
+      <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-white/50">Add user</div>
+      <div className="flex gap-2">
+        <input
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter') add(); }}
+          placeholder="First name"
+          autoComplete="off"
+          className={`${inputCls} min-w-0 flex-1`}
+        />
+        <Btn kind="primary" onClick={add} className="!py-2 text-xs">Add</Btn>
+      </div>
+      <div className="mt-2 text-[11px] text-white/40">First names only.</div>
+      <div className="mt-2 grid grid-cols-2 gap-2">
+        <label className="block">
+          <div className="mb-1 text-[11px] uppercase tracking-wider text-white/40">Unlocked by</div>
+          <select value={pinGroup} onChange={(e) => setPinGroup(e.target.value)} className={`${inputCls} w-full !py-1.5 text-xs`}>
+            {Object.entries(PIN_GROUP_LABELS).map(([g, label]) => (
+              <option key={g} value={g}>{label}</option>
+            ))}
+          </select>
+        </label>
+        <label className="block">
+          <div className="mb-1 text-[11px] uppercase tracking-wider text-white/40">Access</div>
+          <select value={template} onChange={(e) => setTemplate(e.target.value)} className={`${inputCls} w-full !py-1.5 text-xs`}>
+            <option value="admin">Admin — everything</option>
+            <option value="driver">Driver — log + garage</option>
+            <option value="crew">Crew — log runs</option>
+            <option value="viewer">Viewer — view only</option>
+          </select>
+        </label>
+      </div>
+    </div>
   );
 }

@@ -141,6 +141,71 @@ export async function publishTeamPins(partialHashes) {
   throw new Error('Publish conflicted — try again');
 }
 
+/* ---------------- Team users (shared crew list) ---------------- */
+// The crew list (names, access flags, PIN groups) is shared so every device
+// agrees on who exists and what they can do. Same shape/pattern as team PINs.
+const USERS_PATH = 'data/team-users.json';
+const TEAM_USERS_CACHE_KEY = 'bpr-team-users-cache';
+
+export async function fetchTeamUsers() {
+  const url = TEAM_CSV_DEFAULT_URL.replace('Big_Pickle_runs_2026.csv', 'team-users.json');
+  const busted = url + '?t=' + Date.now();
+  const res = await fetch(busted, { cache: 'no-store' });
+  if (!res.ok) return null; // 404 = not set up yet
+  const data = await res.json().catch(() => null);
+  if (!data || typeof data !== 'object') return null;
+  return data;
+}
+
+export function getCachedTeamUsers() {
+  try { return JSON.parse(localStorage.getItem(TEAM_USERS_CACHE_KEY) || 'null'); } catch { return null; }
+}
+
+export function setCachedTeamUsers(data) {
+  try {
+    if (data) localStorage.setItem(TEAM_USERS_CACHE_KEY, JSON.stringify(data));
+    else localStorage.removeItem(TEAM_USERS_CACHE_KEY);
+  } catch { /* ignore */ }
+}
+
+// Publish the users list to the shared file (merge-safe replace; needs token).
+export async function publishTeamUsers(users) {
+  const pat = getPat();
+  if (!pat) return { pushed: false, error: 'No GitHub token saved' };
+  const loc = parseRawUrl(TEAM_CSV_DEFAULT_URL);
+  if (!loc) throw new Error('Team CSV URL is not a GitHub raw URL');
+
+  for (let attempt = 0; attempt < 3; attempt++) {
+    let file = null;
+    try {
+      file = await ghApi(`/repos/${loc.owner}/${loc.repo}/contents/${USERS_PATH}?ref=${loc.branch}`, pat);
+    } catch (e) {
+      if (e.status !== 404) throw e;
+    }
+    const payload = JSON.stringify({ updatedAt: new Date().toISOString(), users }, null, 2);
+    try {
+      const remoteText = file ? b64decode(file.content || '') : '';
+      if (payload.replace(/\s+$/, '') === remoteText.replace(/\s+$/, '')) {
+        return { pushed: false };
+      }
+      await ghApi(`/repos/${loc.owner}/${loc.repo}/contents/${USERS_PATH}`, pat, {
+        method: 'PUT',
+        body: JSON.stringify({
+          message: `Team users sync via app (${new Date().toISOString().slice(0, 16).replace('T', ' ')})`,
+          content: b64encode(payload),
+          ...(file ? { sha: file.sha } : {}),
+          branch: loc.branch,
+        }),
+      });
+      return { pushed: true };
+    } catch (e) {
+      if (e.status === 409 && attempt < 2) continue; // someone else pushed — retry
+      throw e;
+    }
+  }
+  throw new Error('Publish conflicted — try again');
+}
+
 function backfillAir(r, tracks) {
   if (r.altitudeFt == null && r.track) {
     const t = tracks.find((x) => (x.name || '').toLowerCase() === r.track.toLowerCase());
