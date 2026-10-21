@@ -669,7 +669,7 @@ function SetupRecommendations({ runs: propRuns, baseline }) {
 }
 
 function SegmentAnalysis({ state }) {
-  const runs = (state.runs || [])
+  const runs = runsForCar(state, state.activeCarId)
     .filter((r) => r.source !== 'demo' && !r.backup && r.distance === '1/4')
     .sort((a, b) => String(b.date).localeCompare(String(a.date)))
     .slice(0, 10);

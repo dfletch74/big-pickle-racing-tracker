@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { Card, SectionTitle, Btn, inputCls, Badge, Segmented } from '../components/ui';
-import { predictET } from '../lib/stats';
+import { predictET, runsForCar } from '../lib/stats';
 
 /**
  * GARAGE (temporary, admin-only) — new features from the app review.
@@ -280,7 +280,7 @@ function VideoOverlay({ state, toast }) {
   // Revoke the blob URL when the component unmounts (avoids leaking memory).
   useEffect(() => () => { if (urlRef.current) URL.revokeObjectURL(urlRef.current); }, []);
 
-  const runs = (state.runs || [])
+  const runs = runsForCar(state, state.activeCarId)
     .filter((r) => r.source !== 'demo' && r.et != null)
     .sort((a, b) => String(b.date).localeCompare(String(a.date)));
   const run = runs.find((r) => r.id === runId);
@@ -547,7 +547,7 @@ function ReportCard({ state }) {
   const [dist, setDist] = useState('1/4');
   // 1/8-mile runs store their ET in eighthET (et is blank) — use the right field.
   const etOf = (r) => (dist === '1/8' ? r.eighthET : r.et);
-  const runs = (state.runs || [])
+  const runs = runsForCar(state, state.activeCarId)
     .filter((r) => r.source !== 'demo' && !r.backup && etOf(r) != null && r.daFt != null && r.distance === dist)
     .sort((a, b) => String(a.date).localeCompare(String(b.date)));
 
