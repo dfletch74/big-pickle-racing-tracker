@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-10-21T06:49:34.283Z",
+  "updatedAt": "2026-10-21T06:49:54.064Z",
   "users": [
     {
       "id": "admin",
@@ -35,17 +35,6 @@
       "canGarage": false
     },
     {
-      "id": "temp",
-      "name": "Temp Worker",
-      "title": "Viewer",
-      "pinGroup": "viewer",
-      "canLog": false,
-      "canDelete": false,
-      "canSettings": false,
-      "canSync": true,
-      "canGarage": false
-    },
-    {
       "id": "viewer",
       "name": "Hughie",
       "title": "Viewer",
@@ -68,5 +57,7 @@
       "canGarage": false
     }
   ],
-  "deletedUserIds": {}
+  "deletedUserIds": {
+    "temp": 1792565393702
+  }
 }
