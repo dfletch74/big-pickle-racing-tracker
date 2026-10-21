@@ -38,7 +38,10 @@ export default function Runs({ state, update, toast, dist, setDist, onPrint, onA
       list = list.filter((r) => `${r.track} ${r.notes} ${r.runType}`.toLowerCase().includes(s));
     }
     if (filter === 'today') {
-      const today = new Date().toISOString().slice(0, 10);
+      // Local date, not UTC — toISOString() would flip to tomorrow at 6pm MDT
+      // and hide this evening's runs under the Today filter.
+      const now = new Date();
+      const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
       list = list.filter((r) => r.date === today);
     }
     if (filter === 'issues') {
