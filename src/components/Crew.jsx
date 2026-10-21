@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Modal, Btn, inputCls } from './ui';
-import { hashPin, verifyPin, saveRole, PERM_FLAGS, PERM_LABELS, USER_TITLES } from '../lib/roles';
+import { hashPin, verifyPin, saveRole, PERM_FLAGS, PERM_LABELS, USER_TITLES, defaultUsers } from '../lib/roles';
 import { getPat, publishTeamPins, publishTeamUsers } from '../lib/teamSync';
 import { uid } from '../lib/store';
 import { APP_VERSION } from '../version';
@@ -245,6 +245,24 @@ function PinField({ label, pinKey, settings, update, toast }) {
  * User edits publish to the shared team file so every device agrees.
  */
 export function CrewModal({ state, update, toast, onClose, users, currentUserId }) {
+  // One-time heal: if stored seed users have blank names/titles, fill them
+  // from the defaults and persist — so a bad local write can't stick.
+  useEffect(() => {
+    const stored = state.settings.users;
+    if (!Array.isArray(stored) || !stored.length) return;
+    const seeds = defaultUsers();
+    const byId = Object.fromEntries(seeds.map((u) => [u.id, u]));
+    let changed = false;
+    const next = stored.map((u) => {
+      const seed = byId[u.id];
+      if (!seed) return u;
+      const name = u.name && u.name.trim() ? u.name : seed.name;
+      const title = USER_TITLES.includes(u.title) ? u.title : seed.title;
+      if (name !== u.name || title !== u.title) { changed = true; return { ...u, name, title }; }
+      return u;
+    });
+    if (changed) update((s) => { s.settings.users = next; s.settings.usersUpdatedAt = Date.now(); });
+  }, []);
   // Factory defaults are visible in the public repo — warn until they're changed.
   const usingDefaults =
     state.settings.pinHashAdmin === hashPin('1966') ||
@@ -349,21 +367,35 @@ function UserCard({ user, users, currentUserId, saveUsers, toast }) {
 
   return (
     <div className="rounded-xl border border-white/[0.07] bg-white/[0.02] p-3">
-      <div className="flex items-center gap-2">
-        <div className="min-w-0 flex-1 truncate text-base font-semibold text-white/90">{user.name}</div>
-        <select
-          value={USER_TITLES.includes(user.title) ? user.title : 'Viewer'}
-          onChange={(e) => set({ title: e.target.value })}
-          aria-label="Title"
-          className={`${inputCls} w-28 font-semibold`}
-        >
-          {USER_TITLES.map((t) => (
-            <option key={t} value={t}>{t}</option>
-          ))}
-        </select>
-        <Btn kind="ghost" onClick={remove} className="!px-2.5 !py-2 text-xs" title={`Remove ${user.name}`}>
-          ✕
-        </Btn>
+      <div>
+        <div className="mb-1 text-[11px] uppercase tracking-wider text-white/40">Name</div>
+        <div className="flex items-center gap-2">
+          <input
+            key={user.id + '-' + (user.name || 'blank')}
+            defaultValue={user.name || ''}
+            onBlur={(e) => {
+              const v = e.target.value.trim();
+              if (v && v !== user.name) set({ name: v });
+            }}
+            placeholder="First name"
+            autoComplete="off"
+            aria-label="Name"
+            className={`${inputCls} min-w-0 flex-1 font-semibold`}
+          />
+          <select
+            value={USER_TITLES.includes(user.title) ? user.title : 'Viewer'}
+            onChange={(e) => set({ title: e.target.value })}
+            aria-label="Title"
+            className={`${inputCls} w-28 font-semibold`}
+          >
+            {USER_TITLES.map((t) => (
+              <option key={t} value={t}>{t}</option>
+            ))}
+          </select>
+          <Btn kind="ghost" onClick={remove} className="!px-2.5 !py-2 text-xs" title={`Remove ${user.name}`}>
+            ✕
+          </Btn>
+        </div>
       </div>
       <div className="mt-2 flex items-center gap-2">
         <div className="text-[11px] uppercase tracking-wider text-white/40">Unlocked by</div>
