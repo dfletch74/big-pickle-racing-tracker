@@ -245,38 +245,24 @@ function PinField({ label, pinKey, settings, update, toast }) {
  * User edits publish to the shared team file so every device agrees.
  */
 export function CrewModal({ state, update, toast, onClose, users, currentUserId }) {
-  // One-time heal: guarantee the 6 seed users exist with valid names/titles.
-  // Seed slots are rebuilt deterministically; this device's pinGroup and
-  // permission choices are preserved, custom users with real names are kept,
-  // and nameless cruft is dropped.
+  // One-time heal: fill blank names/titles on existing users from the
+  // defaults. Never recreates missing users — a deleted member stays deleted.
   useEffect(() => {
     const stored = state.settings.users;
     if (!Array.isArray(stored) || !stored.length) return;
     const seeds = defaultUsers();
-    const seedIds = new Set(seeds.map((s) => s.id));
-    const byId = Object.fromEntries(stored.map((u) => [u && u.id, u]));
+    const byId = Object.fromEntries(seeds.map((u) => [u.id, u]));
     let changed = false;
-    const seedUsers = seeds.map((seed) => {
-      const cur = byId[seed.id];
-      const okName = cur && cur.name && cur.name.trim();
-      const okTitle = cur && USER_TITLES.includes(cur.title);
-      if (okName && okTitle) return cur;
-      changed = true;
-      return {
-        ...seed,
-        pinGroup: (cur && cur.pinGroup) || seed.pinGroup,
-        canLog: cur ? !!cur.canLog : seed.canLog,
-        canDelete: cur ? !!cur.canDelete : seed.canDelete,
-        canSettings: cur ? !!cur.canSettings : seed.canSettings,
-        canSync: cur ? !!cur.canSync : seed.canSync,
-        canGarage: cur ? !!cur.canGarage : seed.canGarage,
-      };
+    const next = stored.map((u) => {
+      if (!u) return u;
+      const seed = byId[u.id];
+      if (!seed) return u;
+      const name = u.name && u.name.trim() ? u.name : seed.name;
+      const title = USER_TITLES.includes(u.title) ? u.title : seed.title;
+      if (name !== u.name || title !== u.title) { changed = true; return { ...u, name, title }; }
+      return u;
     });
-    const custom = stored.filter((u) => u && !seedIds.has(u.id) && u.name && u.name.trim());
-    if (custom.length !== stored.filter((u) => u && !seedIds.has(u.id)).length) changed = true;
-    if (!changed) return;
-    const next = [...seedUsers, ...custom];
-    update((s) => { s.settings.users = next; s.settings.usersUpdatedAt = Date.now(); });
+    if (changed) update((s) => { s.settings.users = next; s.settings.usersUpdatedAt = Date.now(); });
   }, []);
   // Factory defaults are visible in the public repo — warn until they're changed.
   const usingDefaults =
@@ -284,12 +270,27 @@ export function CrewModal({ state, update, toast, onClose, users, currentUserId 
     state.settings.pinHashCrew === hashPin('2007') ||
     state.settings.pinHashViewer === hashPin('0000');
 
-  const saveUsers = (next, msg) => {
-    update((s) => { s.settings.users = next; s.settings.usersUpdatedAt = Date.now(); });
+  const saveUsers = (next, msg, tombstones) => {
+    update((s) => {
+      s.settings.users = next;
+      s.settings.usersUpdatedAt = Date.now();
+      if (tombstones) s.settings.deletedUserIds = { ...(s.settings.deletedUserIds || {}), ...tombstones };
+    });
     if (msg) toast(msg);
     if (getPat()) {
-      publishTeamUsers(next)
-        .then((r) => { if (r.pushed) toast('Published — all crew devices updated.'); })
+      const deleted = { ...(state.settings.deletedUserIds || {}), ...(tombstones || {}) };
+      publishTeamUsers(next, deleted)
+        .then((r) => {
+          if (r.pushed) toast('Published — all crew devices updated.');
+          // Adopt the merged result so a concurrent edit elsewhere isn't lost.
+          if (r.merged) {
+            update((s) => {
+              s.settings.users = r.merged.users;
+              s.settings.deletedUserIds = r.merged.deletedUserIds;
+              s.settings.usersUpdatedAt = Date.now();
+            });
+          }
+        })
         .catch(() => toast('Saved on this device; team publish failed.', 'error'));
     }
   };
@@ -352,7 +353,8 @@ function PermChip({ active, label, onToggle }) {
 /** Edit one user: name, title, PIN group, permission flags, remove. */
 function UserCard({ user, users, currentUserId, saveUsers, toast }) {
   const set = (patch, msg) => {
-    const next = users.map((u) => (u.id === user.id ? { ...u, ...patch } : u));
+    const now = Date.now();
+    const next = users.map((u) => (u.id === user.id ? { ...u, ...patch, updatedAt: now } : u));
     // Guard: at least one user must keep Settings access (or nobody can
     // ever open Crew Management again).
     if (!next.some((u) => u.canSettings)) {
@@ -377,7 +379,7 @@ function UserCard({ user, users, currentUserId, saveUsers, toast }) {
       toast('Blocked: at least one user must keep Settings access.', 'error');
       return;
     }
-    saveUsers(next, `${user.name} removed.`);
+    saveUsers(next, `${user.name} removed.`, { [user.id]: Date.now() });
   };
 
   return (
@@ -450,7 +452,7 @@ function AddUserForm({ users, saveUsers, toast }) {
       return;
     }
     const t = ACCESS_TEMPLATES[template] || ACCESS_TEMPLATES.viewer;
-    const next = [...users, { id: 'u-' + uid(), name: clean, title: t.title, pinGroup, ...Object.fromEntries(PERM_FLAGS.map((f) => [f, !!t[f]])) }];
+    const next = [...users, { id: 'u-' + uid(), name: clean, title: t.title, pinGroup, updatedAt: Date.now(), ...Object.fromEntries(PERM_FLAGS.map((f) => [f, !!t[f]])) }];
     setName('');
     saveUsers(next, `${clean} added — unlocked by the ${PIN_GROUP_LABELS[pinGroup]}.`);
   };

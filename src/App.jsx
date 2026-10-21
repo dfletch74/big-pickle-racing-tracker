@@ -6,7 +6,7 @@ import { LockScreen, CrewModal, hasAnyPin, getPinHashes } from './components/Cre
 import { clearRole, hashPin, getUser, effectiveUsers } from './lib/roles';
 import { checkForAppUpdate, reloadForUpdate } from './lib/updater';
 import { parseSetupLink, clearSetupLink } from './lib/setupLink';
-import { setPat, getPat, fetchTeamPins, publishTeamPins, getCachedTeamPins, setCachedTeamPins, fetchTeamUsers, publishTeamUsers, getCachedTeamUsers, setCachedTeamUsers } from './lib/teamSync';
+import { setPat, getPat, fetchTeamPins, publishTeamPins, getCachedTeamPins, setCachedTeamPins, fetchTeamUsers, publishTeamUsers, getCachedTeamUsers, setCachedTeamUsers, mergeUserData } from './lib/teamSync';
 import Dash from './views/Dash';
 import Runs from './views/Runs';
 import AddRun from './views/AddRun';
@@ -107,27 +107,42 @@ export default function App() {
       });
     }
     setLocked(true);
-    // Shared team users: pull the crew list; bootstrap-publish from this
-    // device when missing or when this device's edits are newer.
+    // Shared team users: merge the crew list with the team file (tombstones
+    // for deletes, per-user last-writer-wins) so edits on two devices can't
+    // wipe each other out. Bootstrap-publish when the file is missing.
     fetchTeamUsers()
       .then((data) => {
-        const teamList = data && Array.isArray(data.users) ? data.users : [];
-        const teamTs = data && data.updatedAt ? Date.parse(data.updatedAt) || 0 : 0;
-        const localTs = state.settings.usersUpdatedAt || 0;
-        if (teamList.length && teamTs >= localTs) {
+        const remoteUsers = data && Array.isArray(data.users) ? data.users : [];
+        const remoteDeleted = (data && data.deletedUserIds) || {};
+        const localUsers = effectiveUsers(state.settings.users);
+        const localDeleted = state.settings.deletedUserIds || {};
+        const merged = mergeUserData(localUsers, localDeleted, remoteUsers, remoteDeleted);
+        const localKey = JSON.stringify({ u: localUsers, d: localDeleted });
+        const mergedKey = JSON.stringify(merged);
+        if (mergedKey !== localKey) {
+          setCachedTeamUsers({ updatedAt: new Date().toISOString(), users: merged.users, deletedUserIds: merged.deletedUserIds });
+          setTeamUsers({ updatedAt: new Date().toISOString(), users: merged.users, deletedUserIds: merged.deletedUserIds });
+          update((s) => {
+            s.settings.users = merged.users;
+            s.settings.deletedUserIds = merged.deletedUserIds;
+            s.settings.usersUpdatedAt = Date.now();
+          });
+        } else if (remoteUsers.length) {
           setCachedTeamUsers(data);
           setTeamUsers(data);
-          update((s) => { s.settings.users = teamList; s.settings.usersUpdatedAt = teamTs; });
-        } else if (getPat()) {
-          const seed = effectiveUsers(state.settings.users);
-          publishTeamUsers(seed)
-            .then((r) => {
-              if (r.pushed) {
-                toast('Team users published — crew list is now shared.');
-                update((s) => { s.settings.usersUpdatedAt = Date.now(); });
-              }
-            })
-            .catch(() => {});
+        }
+        if (getPat()) {
+          const remoteKey = JSON.stringify({ users: remoteUsers, deletedUserIds: remoteDeleted });
+          if (mergedKey !== remoteKey) {
+            publishTeamUsers(merged.users, merged.deletedUserIds)
+              .then((r) => {
+                if (r.pushed) {
+                  toast('Team users published — crew list is now shared.');
+                  update((s) => { s.settings.usersUpdatedAt = Date.now(); });
+                }
+              })
+              .catch(() => {});
+          }
         }
       })
       .catch(() => {});

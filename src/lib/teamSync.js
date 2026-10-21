@@ -168,8 +168,42 @@ export function setCachedTeamUsers(data) {
   } catch { /* ignore */ }
 }
 
-// Publish the users list to the shared file (merge-safe replace; needs token).
-export async function publishTeamUsers(users) {
+// Merge two user lists (local + remote) with tombstones for deletes.
+// Per-user last-writer-wins on updatedAt; a tombstone newer than the user's
+// updatedAt drops the user. Returns { users, deletedUserIds }.
+const SEED_USER_ORDER = ['admin', 'driver', 'crew', 'temp', 'viewer', 'grog'];
+export function mergeUserData(localUsers, localDeleted, remoteUsers, remoteDeleted) {
+  const deleted = {};
+  for (const [id, ts] of Object.entries(remoteDeleted || {})) deleted[id] = ts || 0;
+  for (const [id, ts] of Object.entries(localDeleted || {})) {
+    if (!deleted[id] || (ts || 0) > deleted[id]) deleted[id] = ts || 0;
+  }
+  const byId = new Map();
+  const consider = (u) => {
+    if (!u || !u.id) return;
+    const cur = byId.get(u.id);
+    if (!cur || (u.updatedAt || 0) > (cur.updatedAt || 0)) byId.set(u.id, u);
+  };
+  (localUsers || []).forEach(consider);
+  (remoteUsers || []).forEach(consider);
+  const users = [];
+  for (const [id, u] of byId) {
+    if ((deleted[id] || 0) > (u.updatedAt || 0)) continue; // deleted after last edit
+    users.push(u);
+  }
+  users.sort((a, b) => {
+    const ai = SEED_USER_ORDER.indexOf(a.id), bi = SEED_USER_ORDER.indexOf(b.id);
+    const ao = ai < 0 ? 99 : ai, bo = bi < 0 ? 99 : bi;
+    if (ao !== bo) return ao - bo;
+    return (a.name || '').localeCompare(b.name || '');
+  });
+  return { users, deletedUserIds: deleted };
+}
+
+// Publish the users list to the shared file (merge-safe; needs token).
+// Fetches remote, merges with local, and PUTs the merged result so concurrent
+// edits on two devices don't wipe each other out.
+export async function publishTeamUsers(users, deletedUserIds) {
   const pat = getPat();
   if (!pat) return { pushed: false, error: 'No GitHub token saved' };
   const loc = parseRawUrl(TEAM_CSV_DEFAULT_URL);
@@ -182,11 +216,18 @@ export async function publishTeamUsers(users) {
     } catch (e) {
       if (e.status !== 404) throw e;
     }
-    const payload = JSON.stringify({ updatedAt: new Date().toISOString(), users }, null, 2);
+    let remoteUsers = [], remoteDeleted = {};
+    try {
+      const remote = file ? JSON.parse(b64decode(file.content || '')) : null;
+      if (remote && Array.isArray(remote.users)) remoteUsers = remote.users;
+      if (remote && remote.deletedUserIds) remoteDeleted = remote.deletedUserIds;
+    } catch { /* treat as empty */ }
+    const merged = mergeUserData(users, deletedUserIds, remoteUsers, remoteDeleted);
+    const payload = JSON.stringify({ updatedAt: new Date().toISOString(), users: merged.users, deletedUserIds: merged.deletedUserIds }, null, 2);
     try {
       const remoteText = file ? b64decode(file.content || '') : '';
       if (payload.replace(/\s+$/, '') === remoteText.replace(/\s+$/, '')) {
-        return { pushed: false };
+        return { pushed: false, merged };
       }
       await ghApi(`/repos/${loc.owner}/${loc.repo}/contents/${USERS_PATH}`, pat, {
         method: 'PUT',
@@ -197,7 +238,7 @@ export async function publishTeamUsers(users) {
           branch: loc.branch,
         }),
       });
-      return { pushed: true };
+      return { pushed: true, merged };
     } catch (e) {
       if (e.status === 409 && attempt < 2) continue; // someone else pushed — retry
       throw e;

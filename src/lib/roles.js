@@ -43,6 +43,7 @@ export function defaultUsers() {
     canSettings: !!r.canSettings,
     canSync: !!r.canSync,
     canGarage: !!SEED_GARAGE[id],
+    updatedAt: 0,
   }));
 }
 
