@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { Card, SectionTitle, Btn, inputCls, Badge, Segmented } from '../components/ui';
 import { predictET, runsForCar } from '../lib/stats';
+import { migrateMaintenanceCarIds, carRunCount, runsSinceService } from '../lib/maintenance';
 
 /**
  * GARAGE (temporary, admin-only) — new features from the app review.
@@ -9,6 +10,7 @@ import { predictET, runsForCar } from '../lib/stats';
 export default function Garage({ state, update, toast, role }) {
   const [tab, setTab] = useState('maint');
   const canEdit = role?.canLog ?? true;
+  const isAdmin = role?.canDelete ?? false;
 
   const tabs = [
     ['maint', 'Maintenance'],
@@ -33,7 +35,7 @@ export default function Garage({ state, update, toast, role }) {
         ))}
       </div>
 
-      {tab === 'maint' && <Maintenance state={state} update={update} toast={toast} canEdit={canEdit} />}
+      {tab === 'maint' && <Maintenance state={state} update={update} toast={toast} canEdit={canEdit} isAdmin={isAdmin} />}
       {tab === 'check' && <Checklists state={state} update={update} toast={toast} canEdit={canEdit} />}
       {tab === 'report' && <ReportCard state={state} />}
       {tab === 'video' && <VideoOverlay state={state} toast={toast} />}
@@ -41,12 +43,30 @@ export default function Garage({ state, update, toast, role }) {
   );
 }
 
-function Maintenance({ state, update, toast, canEdit }) {
+/**
+ * One-time migration: parts that predate per-car tracking move to the car
+ * with the most runs, keeping each part's "runs since last service" intact
+ * across the unit change (global run count -> that car's run count).
+ * Idempotent — safe to run on every mount.
+ * (Lives in lib/maintenance.js so it can be unit-tested.)
+ */
+function Maintenance({ state, update, toast, canEdit, isAdmin }) {
   const [name, setName] = useState('');
   const [runsPer, setRunsPer] = useState('');
   const [notes, setNotes] = useState('');
-  const parts = state.maintenance || [];
-  const totalRuns = (state.runs || []).filter((r) => r.source !== 'demo').length;
+  const [editingId, setEditingId] = useState(null);
+  const [editInterval, setEditInterval] = useState('');
+  const [editSince, setEditSince] = useState('');
+  const carId = state.activeCarId;
+  const carName = (state.cars || []).find((c) => c.id === carId)?.name || 'this car';
+  // Maintenance is tracked per car. One-time migration: existing parts (which
+  // predate carId) move to the car with the most runs, keeping each part's
+  // "runs since last service" value intact across the unit change.
+  useEffect(() => {
+    update((s) => { migrateMaintenanceCarIds(s); });
+  }, []);
+  const parts = (state.maintenance || []).filter((p) => p.carId === carId);
+  const totalRuns = carRunCount(state, carId);
 
   const addPart = () => {
     if (!name.trim()) { toast('Enter a part name.', 'error'); return; }
@@ -56,6 +76,7 @@ function Maintenance({ state, update, toast, canEdit }) {
       s.maintenance = s.maintenance || [];
       s.maintenance.push({
         id: Math.random().toString(36).slice(2),
+        carId: s.activeCarId,
         name: name.trim(),
         runsPerService: runs,
         lastServiceAt: totalRuns,
@@ -77,6 +98,29 @@ function Maintenance({ state, update, toast, canEdit }) {
   const removePart = (id) => {
     if (!window.confirm('Remove this part?')) return;
     update((s) => { s.maintenance = (s.maintenance || []).filter((x) => x.id !== id); });
+  };
+
+  // Admin: correct the counter when track reality goes off schedule, or change
+  // the service interval when the mechanic wants a different duration.
+  const startAdjust = (p) => {
+    setEditingId(p.id);
+    setEditInterval(String(p.runsPerService));
+    setEditSince(String(runsSinceService(state, p)));
+  };
+  const saveAdjust = () => {
+    const interval = parseInt(editInterval, 10);
+    const since = parseInt(editSince, 10);
+    if (!interval || interval < 1) { toast('Enter a valid service interval.', 'error'); return; }
+    if (isNaN(since) || since < 0) { toast('Enter a valid runs-since-service.', 'error'); return; }
+    update((s) => {
+      const p = (s.maintenance || []).find((x) => x.id === editingId);
+      if (p) {
+        p.runsPerService = interval;
+        p.lastServiceAt = Math.max(0, carRunCount(s, p.carId) - since);
+      }
+    });
+    setEditingId(null);
+    toast('Maintenance updated.');
   };
 
   // Standard bracket-racing service intervals, compiled from:
@@ -107,11 +151,14 @@ function Maintenance({ state, update, toast, canEdit }) {
   const loadStandard = () => {
     update((s) => {
       s.maintenance = s.maintenance || [];
-      const existing = new Set(s.maintenance.map((p) => p.name.toLowerCase()));
+      const existing = new Set(
+        s.maintenance.filter((p) => p.carId === s.activeCarId).map((p) => p.name.toLowerCase())
+      );
       for (const item of STANDARD_SCHEDULE) {
         if (existing.has(item.name.toLowerCase())) continue;
         s.maintenance.push({
           id: Math.random().toString(36).slice(2),
+          carId: s.activeCarId,
           name: item.name,
           runsPerService: item.runsPerService,
           lastServiceAt: totalRuns,
@@ -124,8 +171,11 @@ function Maintenance({ state, update, toast, canEdit }) {
 
   return (
     <div className="space-y-3">
+      <div className="text-xs text-white/45">
+        Tracked per car — showing maintenance for <span className="font-semibold text-white/80">{carName}</span>. Switch cars via the logo to see theirs.
+      </div>
       {parts.map((p) => {
-        const since = totalRuns - (p.lastServiceAt || 0);
+        const since = runsSinceService(state, p);
         const remaining = p.runsPerService - since;
         const overdue = remaining <= 0;
         const soon = !overdue && remaining <= Math.ceil(p.runsPerService * 0.2);
@@ -144,14 +194,32 @@ function Maintenance({ state, update, toast, canEdit }) {
             <div className="mt-1 text-xs text-white/50">
               Service every {p.runsPerService} runs · {since} since last · {p.notes}
             </div>
-            <div className="mt-2 flex gap-2">
-              {canEdit && (
-                <>
-                  <Btn kind="ghost" onClick={() => markServiced(p.id)} className="!py-1.5 text-xs">Mark serviced</Btn>
-                  <Btn kind="quiet" onClick={() => removePart(p.id)} className="!py-1.5 text-xs text-red-400/70">Remove</Btn>
-                </>
-              )}
-            </div>
+            {editingId === p.id ? (
+              <div className="mt-2 space-y-2">
+                <div className="grid grid-cols-2 gap-2">
+                  <label className="block text-xs text-white/50">Service every (runs)
+                    <input value={editInterval} onChange={(e) => setEditInterval(e.target.value.replace(/\D/g, ''))} inputMode="numeric" className={inputCls} />
+                  </label>
+                  <label className="block text-xs text-white/50">Runs since service
+                    <input value={editSince} onChange={(e) => setEditSince(e.target.value.replace(/\D/g, ''))} inputMode="numeric" className={inputCls} />
+                  </label>
+                </div>
+                <div className="flex gap-2">
+                  <Btn kind="primary" onClick={saveAdjust} className="!py-1.5 text-xs">Save</Btn>
+                  <Btn kind="ghost" onClick={() => setEditingId(null)} className="!py-1.5 text-xs">Cancel</Btn>
+                </div>
+              </div>
+            ) : (
+              <div className="mt-2 flex gap-2">
+                {canEdit && (
+                  <>
+                    <Btn kind="ghost" onClick={() => markServiced(p.id)} className="!py-1.5 text-xs">Mark serviced</Btn>
+                    {isAdmin && <Btn kind="ghost" onClick={() => startAdjust(p)} className="!py-1.5 text-xs">Adjust</Btn>}
+                    <Btn kind="quiet" onClick={() => removePart(p.id)} className="!py-1.5 text-xs text-red-400/70">Remove</Btn>
+                  </>
+                )}
+              </div>
+            )}
           </Card>
         );
       })}
