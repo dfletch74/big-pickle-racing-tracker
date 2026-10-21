@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-10-21T06:40:57.611Z",
+  "updatedAt": "2026-10-21T06:41:07.884Z",
   "users": [
     {
       "id": "admin",
@@ -40,7 +40,7 @@
       "title": "Viewer",
       "pinGroup": "viewer",
       "canLog": false,
-      "canDelete": false,
+      "canDelete": true,
       "canSettings": false,
       "canSync": true,
       "canGarage": false
