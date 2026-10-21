@@ -69,12 +69,14 @@ export function waterGrains({ tempF, humidityPct = 0, pressureHpa = 1013.25 }) {
  * Head-wind component in mph (+ = headwind, − = tailwind).
  * windDirFrom: compass direction the wind comes FROM (meteorological).
  * trackHeading: compass direction the cars travel (0–359).
+ * The raw cosine is the along-travel component (+ = tailwind), so it is
+ * negated to match the documented + = headwind convention.
  */
 export function headwindMph(windMph, windDirFrom, trackHeading) {
   if (windMph == null || windDirFrom == null || trackHeading == null) return null;
   const windTo = ((windDirFrom + 180) % 360) * Math.PI / 180;
   const head = ((trackHeading % 360) + 360) % 360 * Math.PI / 180;
-  return Math.round(windMph * Math.cos(windTo - head) * 10) / 10;
+  return Math.round(-windMph * Math.cos(windTo - head) * 10) / 10;
 }
 
 /**
