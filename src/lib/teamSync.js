@@ -122,14 +122,24 @@ function mergePull(s, teamRuns) {
       s.cars.push(car);
     }
     carNames.push(car.name);
-    const keys = new Set(runs.map(runKey));
+    // Team-sourced copies refresh from the sheet so every phone converges to
+    // the latest published row. But local runs (logged or edited on this phone,
+    // source unset) must NOT be replaced — the sheet copy is older than this
+    // phone's edits, and deleting them here is what was wiping out edits
+    // (e.g. the backup flag) on every app reopen. The push side already says
+    // "local wins on conflict"; the pull has to let it.
     s.runs = s.runs.filter((r) => {
       if (r.carId !== car.id) return true;
       if (r.source === 'team') return false;
-      return !keys.has(runKey({ ...r, carName: car.name }));
+      return true;
     });
+    const localKeys = new Set(
+      s.runs.filter((r) => r.carId === car.id).map((r) => runKey({ ...r, carName: car.name })),
+    );
     for (const r of runs) {
-      if (tombstoned.has(runKey({ ...r, carName: name }))) continue;
+      const k = runKey({ ...r, carName: name });
+      if (localKeys.has(k)) continue; // a local version exists — don't add the stale sheet copy
+      if (tombstoned.has(k)) continue;
       s.runs.push({ ...r, id: uid(), carId: car.id, carName: car.name, source: 'team', createdAt: Date.now() });
       added++;
     }
