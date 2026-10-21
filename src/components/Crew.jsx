@@ -28,13 +28,16 @@ const ACCESS_TEMPLATES = {
   viewer: { title: 'Viewer', canLog: false, canDelete: false, canSettings: false, canSync: true, canGarage: false },
 };
 
-// The four PIN slots (labels keep the crew names as a reminder of who holds each).
-const PIN_LABELS = {
-  pinHashAdmin: 'Admin PIN (Dwayne)',
-  pinHashDriver: 'Driver PIN (Dean)',
-  pinHashCrew: 'Crew PIN (Ethan)',
-  pinHashViewer: 'Viewer PIN (Hughie, Temp, Grog)',
-};
+// PIN slot label with the current holders' names, e.g. "Viewer PIN (Hughie, Grog)".
+// Derived from the live user list so adding/removing members updates it.
+function pinLabel(pinKey, users) {
+  const group = PIN_KEY_TO_GROUP[pinKey];
+  const base = PIN_GROUP_LABELS[group] || 'PIN';
+  const holders = (users || [])
+    .filter((u) => u && u.pinGroup === group && u.name && u.name.trim())
+    .map((u) => u.name.trim());
+  return holders.length ? `${base} (${holders.join(', ')})` : base;
+}
 
 const PIN_KEYS = Object.keys(PIN_KEY_TO_GROUP);
 
@@ -309,7 +312,7 @@ export function CrewModal({ state, update, toast, onClose, users, currentUserId 
           </div>
           <div className="space-y-2">
             {PIN_KEYS.map((k) => (
-              <PinField key={k} label={PIN_LABELS[k]} pinKey={k} settings={state.settings} update={update} toast={toast} />
+              <PinField key={k} label={pinLabel(k, users)} pinKey={k} settings={state.settings} update={update} toast={toast} />
             ))}
           </div>
         </div>
