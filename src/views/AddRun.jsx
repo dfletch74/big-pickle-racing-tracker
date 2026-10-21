@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Card, SectionTitle, Btn, Field, inputCls, Segmented } from '../components/ui';
 import { uid } from '../lib/store';
 import { runsForCar, latestRun } from '../lib/stats';
@@ -76,6 +76,22 @@ export default function AddRun({ state, update, toast, editId, onDone }) {
   const [wxBusy, setWxBusy] = useState(false);
 
   const set = (k, v) => setF((p) => ({ ...p, [k]: v }));
+
+  // The form initializes from `initial` only on mount. If the edit target
+  // changes while this view is already mounted (edit run A, switch tabs, edit
+  // run B — or tap + while editing), the form would keep showing the previous
+  // run's data and saving would silently duplicate it. Reset on target change.
+  // Keyed on editId only: a tracks reload mid-edit must NOT wipe in-progress input.
+  const editKey = editId || 'new';
+  useEffect(() => {
+    setF(initial);
+    setBackup(!!editing?.backup);
+    setQuickNums('');
+    setClipMsg('');
+    setNewTrack('');
+    setPresetName('');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editKey]);
 
   // Fill the form from scanned timeslip values.
   const fillFromScan = (vals) => {
