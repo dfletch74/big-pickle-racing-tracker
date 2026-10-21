@@ -52,9 +52,25 @@ export function getUser(users, id) {
   return users.find((u) => u.id === id) || null;
 }
 
-/** Effective users: stored list, or the seed when nothing stored yet. */
+/** The four crew titles — picked from a dropdown, not free text. */
+export const USER_TITLES = ['Admin', 'Driver', 'Crew', 'Viewer'];
+
+/** Effective users: stored list, or the seed when nothing stored yet.
+ * Blank names (or titles outside the four roles) fall back to the seed
+ * defaults, so a bad local write can never render an empty card. */
 export function effectiveUsers(stored) {
-  return Array.isArray(stored) && stored.length ? stored : defaultUsers();
+  const seeds = defaultUsers();
+  if (!Array.isArray(stored) || !stored.length) return seeds;
+  const byId = Object.fromEntries(seeds.map((u) => [u.id, u]));
+  return stored.map((u) => {
+    const seed = byId[u.id];
+    if (!seed) return u;
+    return {
+      ...u,
+      name: u.name && u.name.trim() ? u.name : seed.name,
+      title: USER_TITLES.includes(u.title) ? u.title : seed.title,
+    };
+  });
 }
 
 

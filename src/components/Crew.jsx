@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Modal, Btn, inputCls } from './ui';
-import { hashPin, verifyPin, saveRole, PERM_FLAGS, PERM_LABELS } from '../lib/roles';
+import { hashPin, verifyPin, saveRole, PERM_FLAGS, PERM_LABELS, USER_TITLES } from '../lib/roles';
 import { getPat, publishTeamPins, publishTeamUsers } from '../lib/teamSync';
 import { uid } from '../lib/store';
 import { APP_VERSION } from '../version';
@@ -357,13 +357,16 @@ function UserCard({ user, users, currentUserId, saveUsers, toast }) {
           autoComplete="off"
           className={`${inputCls} min-w-0 flex-1 font-semibold`}
         />
-        <input
-          value={user.title}
-          onChange={(e) => set({ title: e.target.value }, null)}
-          placeholder="Title"
-          autoComplete="off"
-          className={`${inputCls} w-24 font-semibold`}
-        />
+        <select
+          value={USER_TITLES.includes(user.title) ? user.title : 'Viewer'}
+          onChange={(e) => set({ title: e.target.value })}
+          aria-label="Title"
+          className={`${inputCls} w-28 font-semibold`}
+        >
+          {USER_TITLES.map((t) => (
+            <option key={t} value={t}>{t}</option>
+          ))}
+        </select>
         <Btn kind="ghost" onClick={remove} className="!px-2.5 !py-2 text-xs" title={`Remove ${user.name}`}>
           ✕
         </Btn>
