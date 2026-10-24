@@ -767,8 +767,28 @@ export function SettingsModal({ state, update, reset, toast, onClose }) {
       <div className="mb-2 text-xs text-white/50">
         Two-way sync with the GitHub sheet: every sync pulls the latest sheet down, and — with a token saved —
         publishes runs you logged in the app back up. Demo runs are never published.
-        {lastSync && <span className="text-white/70"> Last synced {lastSync.toLocaleString()} ({state.settings?.lastTeamSyncCount ?? 0} runs).</span>}
-        {state.settings?.lastTeamPublish && <span className="text-white/70"> Last published {new Date(state.settings.lastTeamPublish).toLocaleString()}.</span>}
+      </div>
+      <div className="mb-2 rounded-xl border border-white/[0.07] bg-white/[0.02] p-3 text-xs">
+        <div className="mb-1 flex items-center justify-between">
+          <span className="font-semibold text-white/70">Sync status</span>
+          {state.settings?.lastTeamSyncError || state.settings?.lastTeamPublishError ? (
+            <span className="rounded-full bg-red-500/15 px-2 py-0.5 font-semibold text-red-300">attention needed</span>
+          ) : lastSync ? (
+            <span className="rounded-full bg-pickle-500/15 px-2 py-0.5 font-semibold text-pickle-300">healthy</span>
+          ) : (
+            <span className="rounded-full bg-white/10 px-2 py-0.5 font-semibold text-white/50">never synced</span>
+          )}
+        </div>
+        <div className="space-y-0.5 text-white/55">
+          <div>Last sync: {lastSync ? `${lastSync.toLocaleString()} (${state.settings?.lastTeamSyncCount ?? 0} runs)` : '—'}</div>
+          {state.settings?.lastTeamSyncError && (
+            <div className="text-red-300">Last sync failed: {state.settings.lastTeamSyncError.message} ({new Date(state.settings.lastTeamSyncError.at).toLocaleString()})</div>
+          )}
+          <div>Last publish: {state.settings?.lastTeamPublish ? new Date(state.settings.lastTeamPublish).toLocaleString() : '—'}</div>
+          {state.settings?.lastTeamPublishError && (
+            <div className="text-red-300">Last publish failed: {state.settings.lastTeamPublishError.message} ({new Date(state.settings.lastTeamPublishError.at).toLocaleString()})</div>
+          )}
+        </div>
       </div>
       <div className="mb-2 flex gap-2">
         <Btn kind="ghost" onClick={syncNow} disabled={syncing}>{syncing ? 'Syncing…' : 'Sync now'}</Btn>

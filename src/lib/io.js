@@ -52,7 +52,7 @@ const COLUMNS = {
 
 const norm = (h) => String(h ?? '').toLowerCase().replace(/[^a-z0-9]/g, '');
 
-function parseDate(v) {
+export function parseDate(v) {
   if (v == null || v === '') return null;
   // Excel/SheetJS dates are UTC-midnight calendar dates — UTC components are correct here.
   if (v instanceof Date && !Number.isNaN(v.getTime())) return v.toISOString().slice(0, 10);
@@ -67,10 +67,31 @@ function parseDate(v) {
   if (m) {
     let [y, mo, d] = [m[1], m[2], m[3]];
     if (y.length <= 2) [y, mo, d] = [m[3], m[1], m[2]]; // MM/DD/YYYY
-    const iso = `${String(y).padStart(4, '20')}-${String(mo).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-    const dt = new Date(`${iso}T12:00:00`);
-    return Number.isNaN(dt.getTime()) ? null : iso;
+    const yy = Number(y.length <= 2 ? '20' + y.padStart(2, '0') : y);
+    const mm = Number(mo), dd = Number(d);
+    if (!isRealCalendarDate(yy, mm, dd)) return null;
+    return `${String(yy).padStart(4, '0')}-${String(mm).padStart(2, '0')}-${String(dd).padStart(2, '0')}`;
   }
+  return null;
+}
+
+/** True only for a real calendar date (rejects 2026-02-30, month 13, etc.). */
+export function isRealCalendarDate(y, m, d) {
+  if (!Number.isInteger(y) || !Number.isInteger(m) || !Number.isInteger(d)) return false;
+  if (y < 1900 || y > 2100 || m < 1 || m > 12 || d < 1) return false;
+  return d <= new Date(y, m, 0).getDate();
+}
+
+/** Sanity ranges for imported runs. Returns an error string or null. */
+export function validateRunValues({ date, et, mph, distance }) {
+  if (!date) return 'needs a valid Date';
+  const today = new Date().toISOString().slice(0, 10);
+  if (date > today) return `date ${date} is in the future`;
+  if (!isNum(et) || et <= 0) return 'needs a valid E.T.';
+  // Generous bounds: top fuel ~4s quarter, bracket cars up to ~20s; eighth ~3-15s.
+  const [etMin, etMax] = distance === '1/8' ? [2, 20] : [3, 30];
+  if (et < etMin || et > etMax) return `E.T. ${et} is outside the plausible range (${etMin}–${etMax}s for ${distance})`;
+  if (mph != null && (mph <= 0 || mph > 350)) return `MPH ${mph} is outside the plausible range`;
   return null;
 }
 
@@ -130,8 +151,9 @@ export async function parseImportFile(file, carId, fallbackTrack) {
     let et = num(get('et'));
     if (!isNum(et) && distance === '1/8' && isNum(eighthETCol)) et = eighthETCol;
     if (!isNum(mphCol) && distance === '1/8' && isNum(eighthMPHCol)) mphCol = eighthMPHCol;
-    if (!date || !isNum(et)) {
-      errors.push(`Row ${i + 2}: skipped (needs a valid Date and E.T.).`);
+    const validationError = validateRunValues({ date, et, mph: mphCol, distance });
+    if (validationError) {
+      errors.push(`Row ${i + 2}: skipped (${validationError}).`);
       return;
     }
     // Time column may come through as a Date (SheetJS) or a "HH:MM" string.

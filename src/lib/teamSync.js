@@ -274,7 +274,7 @@ async function fetchTeamRuns(url) {
 
 // Pure merge of pulled runs into a state draft. Mutates the draft.
 // Tombstoned runs (deleted by the user on any device) are never re-added.
-function mergePull(s, teamRuns) {
+export function mergePull(s, teamRuns) {
   const tombstoned = new Set(s.deletedKeys || []);
   const fallbackCar =
     s.cars.find((c) => /big pickle/i.test(c.name || '')) ||
@@ -422,7 +422,16 @@ async function publishDraft(draft, pat) {
  * fresh draft so the publish merge sees the pulled state. Silent when offline.
  */
 export async function syncTeamData(state, update) {
-  const teamRuns = await fetchTeamRuns(teamCsvUrl(state));
+  let teamRuns;
+  try {
+    teamRuns = await fetchTeamRuns(teamCsvUrl(state));
+  } catch (e) {
+    update((s) => {
+      s.settings = s.settings || {};
+      s.settings.lastTeamSyncError = { message: e.message || 'fetch failed', at: new Date().toISOString() };
+    });
+    throw e;
+  }
   const draft = JSON.parse(JSON.stringify(state));
   draft.deletedKeys = draft.deletedKeys || [];
 
@@ -444,7 +453,7 @@ export async function syncTeamData(state, update) {
     s.runs = draft.runs;
     s.cars = draft.cars;
     s.deletedKeys = draft.deletedKeys;
-    s.settings = { ...s.settings, lastTeamSync: draft.settings.lastTeamSync, lastTeamSyncCount: draft.settings.lastTeamSyncCount };
+    s.settings = { ...s.settings, lastTeamSync: draft.settings.lastTeamSync, lastTeamSyncCount: draft.settings.lastTeamSyncCount, lastTeamSyncError: null };
   });
 
   let published = null;
@@ -452,10 +461,14 @@ export async function syncTeamData(state, update) {
     try {
       published = await publishDraft(draft, pat);
       if (published.pushed) {
-        update((s) => { s.settings = s.settings || {}; s.settings.lastTeamPublish = new Date().toISOString(); });
+        update((s) => { s.settings = s.settings || {}; s.settings.lastTeamPublish = new Date().toISOString(); s.settings.lastTeamPublishError = null; });
       }
     } catch (e) {
       published = { error: e.message };
+      update((s) => {
+        s.settings = s.settings || {};
+        s.settings.lastTeamPublishError = { message: e.message || 'publish failed', at: new Date().toISOString() };
+      });
     }
   }
   return { ...pulled, published };
