@@ -18,7 +18,7 @@ export default function Runs({ state, update, toast, dist, setDist, onPrint, onA
   const [mode, setMode] = useState('list'); // list | compare | import
   const [q, setQ] = useState('');
   const [sort, setSort] = useState('date');
-  const [filter, setFilter] = useState('all'); // all | today | issues
+  const [filter, setFilter] = useState('all'); // all | today | issues | local
   // Local date, not UTC — toISOString() would flip to tomorrow at 6pm MDT
   // and hide this evening's runs under the Today filter. Snapshotted at
   // mount; calling `new Date()` inside the memo below is impure.
@@ -51,6 +51,11 @@ export default function Runs({ state, update, toast, dist, setDist, onPrint, onA
     if (filter === 'issues') {
       // Bug fix #5: the Issues filter MUST actually filter the list.
       list = list.filter((r) => detectIssues(r, ctx).length > 0);
+    }
+    if (filter === 'local') {
+      // Runs logged or edited on this phone (source unset) — the ones
+      // carrying the LOCAL badge. Team-pulled and demo runs excluded.
+      list = list.filter((r) => !r.source);
     }
     const key = sort;
     return [...list].sort((a, b) => {
@@ -167,7 +172,7 @@ export default function Runs({ state, update, toast, dist, setDist, onPrint, onA
           { value: 'all', label: 'All' }, { value: '1/4', label: '1/4 mi' }, { value: '1/8', label: '1/8 mi' },
         ]} />
         <Segmented value={filter} onChange={setFilter} options={[
-          { value: 'all', label: 'All' }, { value: 'today', label: 'Today' }, { value: 'issues', label: filter === 'issues' ? 'Hide issues' : 'Issues' },
+          { value: 'all', label: 'All' }, { value: 'today', label: 'Today' }, { value: 'issues', label: filter === 'issues' ? 'Hide issues' : 'Issues' }, { value: 'local', label: 'Local' },
         ]} />
       </div>
 
