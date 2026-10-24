@@ -24,6 +24,7 @@ export default function RunCard({ run, ctx, baseline, onEdit, onDelete, onFlag, 
           {run.flagged && <Badge tone="red">FLAGGED</Badge>}
           {run.wl === 'W' && <Badge tone="green">W</Badge>}
           {run.wl === 'L' && <Badge tone="red">L</Badge>}
+          {!run.source && <Badge tone="green">LOCAL</Badge>}
           {issues.map((i) => (
             <Badge key={i.key} tone={i.key === 'red' ? 'red' : 'amber'}>{i.label}</Badge>
           ))}
