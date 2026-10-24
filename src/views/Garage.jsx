@@ -64,7 +64,7 @@ function Maintenance({ state, update, toast, canEdit, isAdmin }) {
   // "runs since last service" value intact across the unit change.
   useEffect(() => {
     update((s) => { migrateMaintenanceCarIds(s); });
-  }, []);
+  }, [update]);
   const parts = (state.maintenance || []).filter((p) => p.carId === carId);
   const totalRuns = carRunCount(state, carId);
 
@@ -423,7 +423,7 @@ function VideoOverlay({ state, toast }) {
         src.connect(dest);
         src.connect(audioCtx.destination);
         dest.stream.getAudioTracks().forEach((t) => stream.addTrack(t));
-      } catch (e) { /* audio optional — video still exports */ }
+      } catch { /* audio optional — video still exports */ }
 
       let mime = '';
       if (MediaRecorder.isTypeSupported('video/mp4')) mime = 'video/mp4';
@@ -496,6 +496,7 @@ function VideoOverlay({ state, toast }) {
       });
 
       // Hold the final frame ~1.5s so the ET stays readable.
+      // eslint-disable-next-line react/purity -- inside the video-export event handler, not during render
       const holdUntil = performance.now() + 1500;
       await new Promise((res) => {
         const hold = () => {
@@ -508,7 +509,7 @@ function VideoOverlay({ state, toast }) {
 
       rec.stop();
       await done;
-      try { audioCtx?.close(); } catch (e) {}
+      try { audioCtx?.close(); } catch {}
       const blob = new Blob(chunks, { type: mime || 'video/webm' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');

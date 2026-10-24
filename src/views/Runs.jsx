@@ -19,6 +19,13 @@ export default function Runs({ state, update, toast, dist, setDist, onPrint, onA
   const [q, setQ] = useState('');
   const [sort, setSort] = useState('date');
   const [filter, setFilter] = useState('all'); // all | today | issues
+  // Local date, not UTC — toISOString() would flip to tomorrow at 6pm MDT
+  // and hide this evening's runs under the Today filter. Snapshotted at
+  // mount; calling `new Date()` inside the memo below is impure.
+  const [todayStr] = useState(() => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  });
   const baseline = state.settings.daBaseline;
 
   const carRuns = useMemo(() => runsForCar(state, state.activeCarId), [state]);
@@ -39,11 +46,7 @@ export default function Runs({ state, update, toast, dist, setDist, onPrint, onA
       list = list.filter((r) => `${r.track} ${r.notes} ${r.runType}`.toLowerCase().includes(s));
     }
     if (filter === 'today') {
-      // Local date, not UTC — toISOString() would flip to tomorrow at 6pm MDT
-      // and hide this evening's runs under the Today filter.
-      const now = new Date();
-      const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-      list = list.filter((r) => r.date === today);
+      list = list.filter((r) => r.date === todayStr);
     }
     if (filter === 'issues') {
       // Bug fix #5: the Issues filter MUST actually filter the list.
@@ -57,7 +60,7 @@ export default function Runs({ state, update, toast, dist, setDist, onPrint, onA
       if (!isNum(bv)) return -1;
       return av - bv;
     });
-  }, [carRuns, dist, q, sort, filter, ctx]);
+  }, [carRuns, dist, q, sort, filter, ctx, todayStr]);
 
   const doExport = () => {
     // Bug fix #1: export produces a REAL download + visible confirmation.

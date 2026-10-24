@@ -1,5 +1,5 @@
 import { runDateTime, isNum } from './format';
-import { correctET, correctMPH } from './physics';
+import { correctET } from './physics';
 
 export const runsForCar = (state, carId) => state.runs.filter((r) => r.carId === carId);
 

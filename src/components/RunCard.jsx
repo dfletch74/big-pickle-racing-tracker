@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Card, Badge, Btn, Icon } from './ui';
 import { fmtET, fmtMPH, fmtRT, fmtTemp, fmtRH, fmtDA, fmtDate, isNum } from '../lib/format';
-import { detectIssues, segmentSplits, bestSegments, correctedETOf } from '../lib/stats';
+import { detectIssues, segmentSplits, correctedETOf } from '../lib/stats';
 
 const SETUP_LABELS = [
   ['jet', 'Jet'], ['lPsi', 'L PSI'], ['rPsi', 'R PSI'], ['lBar', 'L Bar'], ['rBar', 'R Bar'],
@@ -134,5 +134,3 @@ function SplitTable({ segs, bests }) {
     </div>
   );
 }
-
-export { bestSegments };

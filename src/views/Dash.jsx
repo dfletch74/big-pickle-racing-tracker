@@ -13,8 +13,10 @@ export default function Dash({ state, onAddRun, onImport, onSeeRuns }) {
   // Backup (lifted/braked/aborted) runs stay in the log but never feed stats.
   const fullRuns = useMemo(() => raceRuns(allRuns), [allRuns]);
 
-  const curYear = String(new Date().getFullYear());
-  const prevYear = String(new Date().getFullYear() - 1);
+  // Year strings for the Time selector. Snapshotted at mount — recomputing
+  // `new Date()` on every render is impure and gains nothing here.
+  const [curYear] = useState(() => String(new Date().getFullYear()));
+  const [prevYear] = useState(() => String(new Date().getFullYear() - 1));
 
   // Time scope: 'all' (every logged run), current year, or previous year.
   // Everything on the dashboard follows the selector.
@@ -59,6 +61,7 @@ export default function Dash({ state, onAddRun, onImport, onSeeRuns }) {
     return [...ys].sort().reverse();
   }, [distRuns]);
   const [conMode, setConMode] = useState(curYear); // year | last5 | last10 | last15
+  // eslint-disable-next-line react/preserve-manual-memoization -- plain useMemo; nothing for the compiler to preserve
   const conRuns = useMemo(() => {
     const sorted = [...distRuns].sort((a, b) => (b.date || '').localeCompare(a.date || '') || (b.createdAt || 0) - (a.createdAt || 0));
     if (conMode === 'last5') return sorted.slice(0, 5);

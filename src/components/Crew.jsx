@@ -1,24 +1,9 @@
 import { useState, useEffect } from 'react';
 import { Modal, Btn, inputCls } from './ui';
-import { hashPin, verifyPin, saveRole, PERM_FLAGS, PERM_LABELS, USER_TITLES, defaultUsers } from '../lib/roles';
+import { hashPin, saveRole, PERM_FLAGS, PERM_LABELS, USER_TITLES, defaultUsers, PIN_KEY_TO_GROUP, PIN_GROUP_LABELS, getPinHashes, hasAnyPin, usersForPin } from '../lib/roles';
 import { getPat, publishTeamPins, publishTeamUsers } from '../lib/teamSync';
 import { uid } from '../lib/store';
 import { APP_VERSION } from '../version';
-
-// Which PIN group each PIN hash unlocks. Users carry a pinGroup; the PIN
-// that verifies for that group unlocks them.
-const PIN_KEY_TO_GROUP = {
-  pinHashAdmin: 'admin',
-  pinHashDriver: 'driver',
-  pinHashCrew: 'crew',
-  pinHashViewer: 'viewer',
-};
-export const PIN_GROUP_LABELS = {
-  admin: 'Admin PIN',
-  driver: 'Driver PIN',
-  crew: 'Crew PIN',
-  viewer: 'Viewer PIN',
-};
 
 // Access templates for the "add user" form.
 const ACCESS_TEMPLATES = {
@@ -37,28 +22,6 @@ function pinLabel(pinKey, users) {
     .filter((u) => u && u.pinGroup === group && u.name && u.name.trim())
     .map((u) => u.name.trim());
   return holders.length ? `${base} (${holders.join(', ')})` : base;
-}
-
-const PIN_KEYS = Object.keys(PIN_KEY_TO_GROUP);
-
-export function getPinHashes(settings) {
-  const out = {};
-  for (const k of PIN_KEYS) out[k] = settings[k] || null;
-  return out;
-}
-
-export function hasAnyPin(settings) {
-  return PIN_KEYS.some((k) => !!settings[k]);
-}
-
-// Given a PIN, return the users it unlocks (via their pinGroup).
-export function usersForPin(pin, pinHashes, users) {
-  const h = getPinHashes(pinHashes);
-  const groups = [];
-  for (const [key, group] of Object.entries(PIN_KEY_TO_GROUP)) {
-    if (h[key] && verifyPin(pin, h[key])) groups.push(group);
-  }
-  return (users || []).filter((u) => groups.includes(u.pinGroup));
 }
 
 /**
@@ -158,6 +121,7 @@ export function LockScreen({ pinHashes, users, onUnlock }) {
           className={`${inputCls} text-center font-mono text-2xl tracking-[0.5em]`}
         />
         {error && <div className="text-center text-sm text-red-400">{error}</div>}
+        {/* eslint-disable-next-line react/purity -- Date.now() snapshot for the lockout button state; benign */}
         <Btn kind="primary" onClick={submitPin} className="w-full" disabled={!pin || Date.now() < lockUntil}>
           Unlock
         </Btn>
@@ -248,8 +212,10 @@ function PinField({ label, pinKey, settings, update, toast }) {
  * User edits publish to the shared team file so every device agrees.
  */
 export function CrewModal({ state, update, toast, onClose, users, currentUserId }) {
-  // One-time heal: fill blank names/titles on existing users from the
-  // defaults. Never recreates missing users — a deleted member stays deleted.
+  // Heal: fill blank names/titles on existing users from the defaults.
+  // Never recreates missing users — a deleted member stays deleted.
+  // Re-runs when the user list changes so blanks arriving via sync get healed
+  // too; the heal is idempotent (no-op once names/titles are filled).
   useEffect(() => {
     const stored = state.settings.users;
     if (!Array.isArray(stored) || !stored.length) return;
@@ -266,7 +232,7 @@ export function CrewModal({ state, update, toast, onClose, users, currentUserId 
       return u;
     });
     if (changed) update((s) => { s.settings.users = next; s.settings.usersUpdatedAt = Date.now(); });
-  }, []);
+  }, [state.settings.users, update]);
   // Factory defaults are visible in the public repo — warn until they're changed.
   const usingDefaults =
     state.settings.pinHashAdmin === hashPin('1966') ||

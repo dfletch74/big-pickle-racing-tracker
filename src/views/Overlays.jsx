@@ -112,7 +112,7 @@ export function GarageModal({ state, update, toast, onClose, role }) {
    emulation and fires the action directly. Desktop still uses onClick. */
 function useNativeTap(fn) {
   const fnRef = useRef(fn);
-  fnRef.current = fn;
+  useEffect(() => { fnRef.current = fn; });
   const elRef = useRef(null);
   return useCallback((el) => {
     const old = elRef.current;
@@ -669,17 +669,18 @@ export function SettingsModal({ state, update, reset, toast, onClose }) {
   const current = currentBundleHash();
 
   // Generate QR code for the setup link when the share modal opens.
-  useEffect(() => {
-    if (showQr) {
-      const pat = getPat();
-      if (pat) {
-        const link = makeSetupLink(pat);
-        QRCode.toDataURL(link, { width: 256, margin: 2 }).then(setQrUrl).catch(() => setQrUrl(''));
-      }
+  // QR setup link: generated when Share is tapped (async — the modal opens
+  // immediately and the code pops in), cleared on close.
+  const openQrShare = () => {
+    setShowQr(true);
+    const pat = getPat();
+    if (pat) {
+      QRCode.toDataURL(makeSetupLink(pat), { width: 256, margin: 2 }).then(setQrUrl).catch(() => setQrUrl(''));
     } else {
       setQrUrl('');
     }
-  }, [showQr]);
+  };
+  const closeQrShare = () => { setShowQr(false); setQrUrl(''); };
   const loadDemo = () => {
     if (!window.confirm('Load demo data? This REPLACES everything currently in the app.')) return;
     takeSnapshot(state, 'Before demo data');
@@ -777,7 +778,7 @@ export function SettingsModal({ state, update, reset, toast, onClose }) {
       } else {
         toast('You are on the latest version.');
       }
-    } catch (e) {
+    } catch {
       toast('Update check failed — are you online?', 'error');
     }
     setChecking(false);
@@ -835,7 +836,7 @@ export function SettingsModal({ state, update, reset, toast, onClose }) {
           <div className="flex items-center justify-between gap-2">
             <div className="text-[11px] text-white/45">Runs you log will be published to the sheet on sync.</div>
             <div className="flex shrink-0 gap-2">
-              <Btn kind="quiet" onClick={() => setShowQr(true)} className="!py-1.5 text-xs">Share</Btn>
+              <Btn kind="quiet" onClick={openQrShare} className="!py-1.5 text-xs">Share</Btn>
               <Btn kind="quiet" onClick={() => { setPat(''); setHasPat(false); toast('GitHub token removed — publishing off.'); }} className="!py-1.5 text-xs">Remove token</Btn>
             </div>
           </div>
@@ -906,7 +907,7 @@ export function SettingsModal({ state, update, reset, toast, onClose }) {
           {checking ? 'Checking…' : 'Check for updates'}
         </Btn>
       </div>
-      {showQr && <QrShareModal onClose={() => setShowQr(false)} qrUrl={qrUrl} toast={toast} />}
+      {showQr && <QrShareModal onClose={closeQrShare} qrUrl={qrUrl} toast={toast} />}
     </Modal>
   );
 }

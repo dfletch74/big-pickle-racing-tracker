@@ -25,7 +25,12 @@ export const teamSyncOnOpen = (state) => state.settings?.teamSyncOnOpen !== fals
 
 const PAT_KEY = 'bpr-github-pat';
 export const getPat = () => { try { return localStorage.getItem(PAT_KEY) || ''; } catch { return ''; } };
-export const setPat = (t) => { try { t ? localStorage.setItem(PAT_KEY, t) : localStorage.removeItem(PAT_KEY); } catch {} };
+export const setPat = (t) => {
+  try {
+    if (t) localStorage.setItem(PAT_KEY, t);
+    else localStorage.removeItem(PAT_KEY);
+  } catch { /* storage blocked — publishing just stays off */ }
+};
 
 // Runs are the same when car, date, track, ET and distance all match. Time is
 // deliberately excluded — older imports may record it differently, and the

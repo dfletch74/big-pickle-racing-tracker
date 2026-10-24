@@ -3,7 +3,8 @@ import { Card, SectionTitle, Btn, inputCls, Segmented, Badge, EmptyState } from 
 import { fmtET, fmtMPH, fmtTemp, fmtDA, fmtDate, isNum } from '../lib/format';
 import { runsForCar, raceRuns, filterDistance, latestRun, segmentSplits, bestSegments, predictET, cheatSheet } from '../lib/stats';
 import { DA_BANDS, TEMP_BANDS, airTrendLabel } from '../lib/physics';
-import { useWeatherEntry, WeatherEntryCard } from '../components/WeatherEntry';
+import { useWeatherEntry } from '../lib/useWeatherEntry';
+import { WeatherEntryCard } from '../components/WeatherEntry';
 import { uid } from '../lib/store';
 import { publishTracks } from '../lib/teamSync';
 

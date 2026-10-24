@@ -1,9 +1,9 @@
 import { useState, useCallback, useEffect } from 'react';
 import { useStore, uid } from './lib/store';
-import { Toasts, Icon } from './components/ui';
+import { Toasts, Icon, Btn } from './components/ui';
 import { LOGO_DATA_URI } from './components/logo';
-import { LockScreen, CrewModal, hasAnyPin, getPinHashes } from './components/Crew';
-import { clearRole, hashPin, getUser, effectiveUsers } from './lib/roles';
+import { LockScreen, CrewModal } from './components/Crew';
+import { clearRole, hashPin, getUser, effectiveUsers, hasAnyPin, getPinHashes } from './lib/roles';
 import { checkForAppUpdate, reloadForUpdate } from './lib/updater';
 import { parseSetupLink, clearSetupLink } from './lib/setupLink';
 import { setPat, getPat, fetchTeamPins, publishTeamPins, getCachedTeamPins, setCachedTeamPins, fetchTeamUsers, publishTeamUsers, getCachedTeamUsers, setCachedTeamUsers, mergeUserData } from './lib/teamSync';
@@ -42,7 +42,7 @@ export default function App() {
   const [locked, setLocked] = useState(() => true);
   const [lockChecked, setLockChecked] = useState(false);
   const [teamPins, setTeamPins] = useState(() => getCachedTeamPins());
-  const [teamUsers, setTeamUsers] = useState(() => getCachedTeamUsers());
+  const [, setTeamUsers] = useState(() => getCachedTeamUsers());
 
   const toast = useCallback((text, kind = 'ok') => {
     const id = uid();

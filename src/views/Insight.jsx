@@ -4,7 +4,8 @@ import { ScatterPlot } from '../components/charts';
 import { fmtET, fmtDate, isNum } from '../lib/format';
 import { correctET, waterGrains, stationPressureHpa } from '../lib/physics';
 import { runsForCar, raceRuns, filterDistance, latestRun, findSimilar, dialIn, rankSetups, crewChiefCall, similarityPct, predictET, avg, pearsonR } from '../lib/stats';
-import { useWeatherEntry, WeatherEntryCard } from '../components/WeatherEntry';
+import { useWeatherEntry } from '../lib/useWeatherEntry';
+import { WeatherEntryCard } from '../components/WeatherEntry';
 
 export default function Insight({ state, dist, setDist }) {
   const [trackId, setTrackId] = useState(state.tracks[0]?.id || '');
@@ -17,23 +18,26 @@ export default function Insight({ state, dist, setDist }) {
   const runs = useMemo(() => filterDistance(carRuns, dist), [carRuns, dist]);
   const last = useMemo(() => latestRun(runs), [runs]);
 
-  const target = {
+  // Memoized so downstream useMemos can depend on the whole object safely —
+  // depending on individual fields risked stale results when humidity moved
+  // without moving DA (findSimilar/similarityPct both read target.humidity).
+  const target = useMemo(() => ({
     tempF: weather.manualTemp,
     humidity: weather.manualHum,
     daFt: weather.effDA,
     distance: dist,
-  };
+  }), [weather.manualTemp, weather.manualHum, weather.effDA, dist]);
 
   const similar = useMemo(
     () => (target.daFt != null ? findSimilar(runs, target) : []),
-    [runs, target.daFt, target.tempF, dist],
+    [runs, target],
   );
-  const dial = useMemo(() => dialIn(runs, target), [runs, target.daFt, target.tempF, dist]);
+  const dial = useMemo(() => dialIn(runs, target), [runs, target]);
   // Fallback: no runs inside the similar-air band — derive from whatever exists,
   // with an honest basis note (same tiers as the Track tab predictor).
   const dialFallback = useMemo(
     () => (dial.n === 0 && target.daFt != null ? predictET(runs, target.daFt) : null),
-    [dial.n, runs, target.daFt],
+    [dial.n, runs, target],
   );
   const dialShow = dial.n > 0 ? { ...dial, kind: 'similar' } : dialFallback ? {
     n: 0,
@@ -47,14 +51,14 @@ export default function Insight({ state, dist, setDist }) {
   const ranked = useMemo(() => rankSetups(runs, baseline), [runs, baseline]);
   const call = useMemo(
     () => (target.daFt != null ? crewChiefCall(runs, target, baseline, last) : null),
-    [runs, target.daFt, target.tempF, baseline, last],
+    [runs, target, baseline, last],
   );
   const top = ranked[0];
   const nAir = useMemo(() => runs.filter((r) => isNum(r.et) && isNum(r.daFt)).length, [runs]);
 
   const similarSorted = useMemo(
     () => [...similar].map((r) => ({ r, pct: similarityPct(r, target) })).sort((a, b) => b.pct - a.pct).slice(0, 8),
-    [similar],
+    [similar, target],
   );
 
   if (!carRuns.length) {

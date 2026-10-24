@@ -97,7 +97,7 @@ export function validateRunValues({ date, et, mph, distance }) {
 
 const num = (v) => {
   if (v == null || v === '') return null;
-  const n = Number(String(v).replace(/[^0-9.\-]/g, ''));
+  const n = Number(String(v).replace(/[^0-9.-]/g, ''));
   return Number.isNaN(n) ? null : n;
 };
 

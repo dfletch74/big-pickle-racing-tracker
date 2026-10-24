@@ -185,7 +185,7 @@ export function parseSlipText(rawText) {
     }
   }
   const upper = ` ${cleaned.toUpperCase()} `;
-  const dateM = upper.match(/\b(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})\b/);
+  const dateM = upper.match(/\b(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})\b/);
   let date = null;
   if (dateM) {
     let [, a, b, c] = dateM;

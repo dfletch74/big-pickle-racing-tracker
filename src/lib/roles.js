@@ -92,6 +92,42 @@ export function verifyPin(pin, hash) {
   return hashPin(pin) === hash;
 }
 
+// Which PIN group each PIN hash unlocks. Users carry a pinGroup; the PIN
+// that verifies for that group unlocks them.
+export const PIN_KEY_TO_GROUP = {
+  pinHashAdmin: 'admin',
+  pinHashDriver: 'driver',
+  pinHashCrew: 'crew',
+  pinHashViewer: 'viewer',
+};
+export const PIN_GROUP_LABELS = {
+  admin: 'Admin PIN',
+  driver: 'Driver PIN',
+  crew: 'Crew PIN',
+  viewer: 'Viewer PIN',
+};
+const PIN_KEYS = Object.keys(PIN_KEY_TO_GROUP);
+
+export function getPinHashes(settings) {
+  const out = {};
+  for (const k of PIN_KEYS) out[k] = settings[k] || null;
+  return out;
+}
+
+export function hasAnyPin(settings) {
+  return PIN_KEYS.some((k) => !!settings[k]);
+}
+
+// Given a PIN, return the users it unlocks (via their pinGroup).
+export function usersForPin(pin, pinHashes, users) {
+  const h = getPinHashes(pinHashes);
+  const groups = [];
+  for (const [key, group] of Object.entries(PIN_KEY_TO_GROUP)) {
+    if (h[key] && verifyPin(pin, h[key])) groups.push(group);
+  }
+  return (users || []).filter((u) => groups.includes(u.pinGroup));
+}
+
 const ROLE_KEY = 'bpr-crew-role';
 
 export function saveRole(roleId) {
