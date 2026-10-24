@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-10-23T00:00:00.000Z",
+  "updatedAt": "2026-10-24T00:20:00.000Z",
   "racers": [
     {
       "name": "Dwayne",
@@ -140,10 +140,6 @@
     },
     {
       "name": "Ethan",
-      "attempts": []
-    },
-    {
-      "name": "Temp Worker",
       "attempts": []
     },
     {
