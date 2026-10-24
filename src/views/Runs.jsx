@@ -4,6 +4,7 @@ import RunCard from '../components/RunCard';
 import { fmtET, fmtMPH, fmtRT, fmtDate, isNum, runDateTime } from '../lib/format';
 import { runsForCar, filterDistance, latestRun, avg, detectIssues, bestSegments, correctedETOf } from '../lib/stats';
 import { parseImportFile, runsToCSV, downloadFile } from '../lib/io';
+import { takeSnapshot } from '../lib/snapshots';
 import { tombstoneKey } from '../lib/teamSync';
 import { jsPDF } from 'jspdf';
 
@@ -405,6 +406,7 @@ function ImportView({ state, update, toast, onBack, onDone }) {
   };
 
   const commit = () => {
+    takeSnapshot(state, `Before import (${result.runs.length} runs)`);
     update((s) => { s.runs.push(...result.runs); });
     toast(`Imported ${result.runs.length} runs.`);
     onDone();

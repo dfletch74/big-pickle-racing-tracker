@@ -23,7 +23,7 @@ writeFileSync(
   "export const uid = () => 'id-'+Math.random().toString(36).slice(2,8);\nexport function useStore(){}\n"
 );
 // Patch extensionless relative imports for Node ESM
-for (const f of ['teamSync.js', 'roles.js', 'io.js', 'physics.js', 'format.js', 'stats.js', 'weather.js', 'maintenance.js', 'setupLink.js']) {
+for (const f of ['teamSync.js', 'roles.js', 'io.js', 'physics.js', 'format.js', 'stats.js', 'weather.js', 'maintenance.js', 'setupLink.js', 'snapshots.js']) {
   const p = join(tmp, f);
   if (!existsSync(p)) continue;
   writeFileSync(p, readFileSync(p, 'utf8').replace(/from '(\.\/[A-Za-z_]+)'/g, "from '$1.js'"));
@@ -34,8 +34,16 @@ test = test.replace("'../src/lib/teamSync.js'", `'${join(tmp, 'teamSync.js')}'`)
 test = test.replace("'../src/lib/roles.js'", `'${join(tmp, 'roles.js')}'`);
 writeFileSync(join(tmp, 'tests', 'sync-races.test.js'), test);
 
+let snapTest = readFileSync(join(here, 'snapshots.test.js'), 'utf8');
+snapTest = snapTest.replace("'../src/lib/snapshots.js'", `'${join(tmp, 'snapshots.js')}'`);
+writeFileSync(join(tmp, 'tests', 'snapshots.test.js'), snapTest);
+
 try {
   execSync(`node --input-type=module -e "import('${join(tmp, 'tests', 'sync-races.test.js')}')"`, {
+    stdio: 'inherit',
+    cwd: root,
+  });
+  execSync(`node --input-type=module -e "import('${join(tmp, 'tests', 'snapshots.test.js')}')"`, {
     stdio: 'inherit',
     cwd: root,
   });

@@ -30,7 +30,7 @@ export const setPat = (t) => { try { t ? localStorage.setItem(PAT_KEY, t) : loca
 // Runs are the same when car, date, track, ET and distance all match. Time is
 // deliberately excluded — older imports may record it differently, and the
 // same car can't run the same ET twice at one track on one day.
-const runKey = (r) => [(r.carName || '').toLowerCase(), r.date, r.track, r.et, r.distance].join('|');
+export const runKey = (r) => [(r.carName || '').toLowerCase(), r.date, r.track, r.et, r.distance].join('|');
 
 /** Stable identity for a run across devices — used for dedupe and tombstones. */
 export function tombstoneKey(run, cars) {

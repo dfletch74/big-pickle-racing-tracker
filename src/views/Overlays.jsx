@@ -9,6 +9,7 @@ import { fmtET, fmtMPH, fmtRT, fmtTemp, fmtDA, fmtDate, isNum } from '../lib/for
 import { getUser } from '../lib/roles';
 import { pullRacers, publishRacers, pruneRacersToCrew } from '../lib/teamSync';
 import { makeSetupLink } from '../lib/setupLink';
+import { takeSnapshot, listSnapshots, getSnapshot, deleteSnapshot, dropTombstonesForRuns } from '../lib/snapshots';
 import QRCode from 'qrcode';
 
 /* ---------------- Garage ---------------- */
@@ -664,6 +665,7 @@ export function SettingsModal({ state, update, reset, toast, onClose }) {
   const [hasPat, setHasPat] = useState(!!getPat());
   const [showQr, setShowQr] = useState(false);
   const [qrUrl, setQrUrl] = useState('');
+  const [snaps, setSnaps] = useState(() => listSnapshots());
   const current = currentBundleHash();
 
   // Generate QR code for the setup link when the share modal opens.
@@ -680,21 +682,46 @@ export function SettingsModal({ state, update, reset, toast, onClose }) {
   }, [showQr]);
   const loadDemo = () => {
     if (!window.confirm('Load demo data? This REPLACES everything currently in the app.')) return;
+    takeSnapshot(state, 'Before demo data');
     const s = makeDemoState();
     s.settings = s.settings || {};
     s.settings.teamSyncOnOpen = false; // don't mix real team runs into the fake set
     reset(s);
+    setSnaps(listSnapshots());
     toast('Demo data loaded — team auto-sync paused (re-enable in Team data).');
     onClose();
   };
   const clearAll = () => {
     if (!window.confirm('Delete ALL runs, notes, events and racers from THIS DEVICE? The car and tracks stay. The GitHub team sheet is not touched.')) return;
+    takeSnapshot(state, 'Before clear all data');
     update((s) => { s.runs = []; s.trackNotes = []; s.events = []; s.presets = []; s.racers.forEach((r) => { r.attempts = []; }); });
+    setSnaps(listSnapshots());
     toast('All data cleared.');
   };
   const backup = () => {
     downloadFile(`big-pickle-backup-${new Date().toISOString().slice(0, 10)}.json`, JSON.stringify(state, null, 2), 'application/json');
     toast('Full backup downloaded (JSON).');
+  };
+  const takeManualSnap = () => {
+    const meta = takeSnapshot(state, 'Manual');
+    setSnaps(listSnapshots());
+    toast(`Snapshot saved (${meta.runs} runs).`);
+  };
+  const restoreSnap = (id) => {
+    const snap = getSnapshot(id);
+    if (!snap) { toast('Snapshot not found.'); return; }
+    const when = new Date(snap.at).toLocaleString();
+    if (!window.confirm(`Restore the snapshot from ${when} (${snap.reason}, ${snap.runs} runs)? Your current data will be snapshotted first so this can be undone.`)) return;
+    takeSnapshot(state, 'Before restore');
+    const s = dropTombstonesForRuns(structuredClone(snap.state));
+    reset(s);
+    setSnaps(listSnapshots());
+    toast('Snapshot restored.');
+  };
+  const delSnap = (id) => {
+    if (!window.confirm('Delete this snapshot?')) return;
+    deleteSnapshot(id);
+    setSnaps(listSnapshots());
   };
   const car = state.cars.find((c) => c.id === state.activeCarId);
   const exportCSV = () => {
@@ -826,6 +853,30 @@ export function SettingsModal({ state, update, reset, toast, onClose }) {
           </>
         )}
       </div>
+      <SectionTitle>Snapshots</SectionTitle>
+      <div className="mb-2 text-xs text-white/50">
+        Safety copies of everything on this device — taken automatically before imports, demo data,
+        "Clear all data", and restores. Kept on this device only, never uploaded. The newest 10 are kept.
+      </div>
+      <div className="mb-2"><Btn kind="ghost" onClick={takeManualSnap}>Take snapshot now</Btn></div>
+      {snaps.length === 0 ? (
+        <div className="mb-4 text-xs text-white/40">No snapshots yet.</div>
+      ) : (
+        <div className="mb-4 space-y-1.5">
+          {snaps.map((s) => (
+            <div key={s.id} className="flex items-center justify-between gap-2 rounded-xl border border-white/[0.07] bg-white/[0.02] px-3 py-2">
+              <div className="min-w-0 text-xs">
+                <div className="truncate font-semibold text-white/75">{new Date(s.at).toLocaleString()}</div>
+                <div className="truncate text-white/45">{s.reason} · {s.runs} runs</div>
+              </div>
+              <div className="flex shrink-0 gap-2">
+                <Btn kind="quiet" onClick={() => restoreSnap(s.id)} className="!py-1 text-xs">Restore</Btn>
+                <Btn kind="quiet" onClick={() => delSnap(s.id)} className="!py-1 text-xs !text-red-300">Delete</Btn>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
       <SectionTitle>Demo data</SectionTitle>
       <div className="mb-4 rounded-xl border border-amber-500/30 bg-amber-500/5 p-3 text-xs text-amber-200/90">
         Demo data is ~36 clearly-fake runs (2025–2026, 3 tracks) for trying the app's charts and predictors.
