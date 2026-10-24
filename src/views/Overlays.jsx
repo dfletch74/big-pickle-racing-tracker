@@ -808,7 +808,7 @@ export function SettingsModal({ state, update, reset, toast, onClose }) {
           )}
         </div>
         <div className="space-y-0.5 text-white/55">
-          <div>Last sync: {lastSync ? `${lastSync.toLocaleString()} (${state.settings?.lastTeamSyncCount ?? 0} runs)` : '—'}</div>
+          <div>Last sync: {lastSync ? `${lastSync.toLocaleString()} (${state.settings?.lastTeamSyncCount ?? 0} runs pulled)` : '—'}</div>
           {state.settings?.lastTeamSyncError && (
             <div className="text-red-300">Last sync failed: {state.settings.lastTeamSyncError.message} ({new Date(state.settings.lastTeamSyncError.at).toLocaleString()})</div>
           )}
