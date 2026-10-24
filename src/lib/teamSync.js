@@ -491,16 +491,31 @@ export function pruneRacersToCrew(update, users) {
     if (n && !crew.includes(n)) crew.push(n);
   }
   if (!crew.length) return;
+  const crewLower = crew.map((c) => c.toLowerCase());
   update((s) => {
     s.racers = s.racers || [];
     // Drop racers who aren't live crew; rename the rest to the crew's canonical name.
-    s.racers = s.racers
+    const renamed = s.racers
       .map((r) => {
-        const canon = canonRacerName(r.name || '');
-        const crewName = crew.find((c) => c === canon);
+        const canonLower = canonRacerName(r.name || '').toLowerCase();
+        const idx = crewLower.indexOf(canonLower);
+        const crewName = idx >= 0 ? crew[idx] : null;
         return crewName ? (r.name === crewName ? r : { ...r, name: crewName }) : null;
       })
       .filter(Boolean);
+    // Dedupe by canonical name, merging attempts (same key as pullRacers).
+    const byName = new Map();
+    for (const r of renamed) {
+      const key = canonRacerName(r.name || '').toLowerCase();
+      const existing = byName.get(key);
+      if (!existing) { byName.set(key, r); continue; }
+      const have = new Set((existing.attempts || []).map(attemptKey));
+      for (const a of r.attempts || []) {
+        const ak = attemptKey(a);
+        if (!have.has(ak)) { have.add(ak); existing.attempts.push({ ...a, id: a.id || uid() }); }
+      }
+    }
+    s.racers = [...byName.values()];
     for (const name of crew) {
       if (!s.racers.some((r) => canonRacerName(r.name || '') === name)) {
         s.racers.push({ id: uid(), name, attempts: [] });
