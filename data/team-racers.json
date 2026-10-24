@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-10-19T18:31:51.639Z",
+  "updatedAt": "2026-10-23T00:00:00.000Z",
   "racers": [
     {
       "name": "Dwayne",
@@ -135,7 +135,15 @@
       ]
     },
     {
+      "name": "Dean",
+      "attempts": []
+    },
+    {
       "name": "Ethan",
+      "attempts": []
+    },
+    {
+      "name": "Temp Worker",
       "attempts": []
     },
     {
@@ -150,6 +158,10 @@
           "id": "mvflcj13-v4dno0s"
         }
       ]
+    },
+    {
+      "name": "Grog",
+      "attempts": []
     }
   ]
 }

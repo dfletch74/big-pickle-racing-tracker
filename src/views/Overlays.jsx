@@ -7,7 +7,7 @@ import { syncTeamData, teamCsvUrl, teamSyncOnOpen, getPat, setPat, TEAM_CSV_DEFA
 import { APP_VERSION } from '../version';
 import { fmtET, fmtMPH, fmtRT, fmtTemp, fmtDA, fmtDate, isNum } from '../lib/format';
 import { getUser } from '../lib/roles';
-import { pullRacers, publishRacers } from '../lib/teamSync';
+import { pullRacers, publishRacers, pruneRacersToCrew } from '../lib/teamSync';
 import { makeSetupLink } from '../lib/setupLink';
 import QRCode from 'qrcode';
 
@@ -167,17 +167,10 @@ function TreeSeg({ options, value, onChange, labelClass = '', compact = false })
   );
 }
 
-function RacerPicker({ racers, racerId, onPick, onAdd, onClose }) {
-  const [name, setName] = useState('');
+function RacerPicker({ racers, racerId, onPick, onClose }) {
   const avgOf = (r) => {
     const clean = r.attempts.filter((a) => !a.red);
     return clean.length ? clean.reduce((a, b) => a + b.rt, 0) / clean.length : null;
-  };
-  const add = () => {
-    const n = name.trim();
-    if (!n) return;
-    onAdd(n);
-    setName('');
   };
   return (
     <div className="fixed inset-0 z-[70] flex items-end justify-center bg-black/75 p-4 sm:items-center" onClick={onClose}>
@@ -192,7 +185,7 @@ function RacerPicker({ racers, racerId, onPick, onAdd, onClose }) {
           </h2>
         </div>
         <p className="mb-4 text-[15px] leading-snug text-white/45">
-          Pick a racer or add a new one — reaction times are tracked per racer.
+          Pick a racer — reaction times are tracked per crew member.
         </p>
         <div className="max-h-[38vh] space-y-2 overflow-y-auto">
           {racers.map((r) => {
@@ -213,23 +206,7 @@ function RacerPicker({ racers, racerId, onPick, onAdd, onClose }) {
               </button>
             );
           })}
-          {!racers.length && <div className="py-4 text-center text-sm text-white/40">No racers yet — add one below.</div>}
-        </div>
-        <div className="mt-3 flex gap-2">
-          <input
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && add()}
-            placeholder="New racer name…"
-            className={`${inputCls} flex-1 !rounded-2xl !bg-white/[0.05] !py-3.5`}
-            autoComplete="off"
-          />
-          <button
-            onClick={add}
-            className="flex items-center gap-1.5 rounded-2xl bg-pickle-500 px-5 font-display text-xl font-bold uppercase tracking-wide text-black transition hover:bg-pickle-400 active:scale-95"
-          >
-            <Icon name="plus" className="h-5 w-5" strokeWidth={2.5} /> Add
-          </button>
+          {!racers.length && <div className="py-4 text-center text-sm text-white/40">No racers yet.</div>}
         </div>
       </div>
     </div>
@@ -248,7 +225,9 @@ export function TreeSimModal({ state, update, toast, onClose, roleId, users }) {
 
   // Pull shared racer stats on open; publish on close (if a token is saved).
   useEffect(() => {
-    pullRacers(state, update).catch(() => {});
+    pullRacers(state, update)
+      .then(() => pruneRacersToCrew(update, users))
+      .catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -366,13 +345,6 @@ export function TreeSimModal({ state, update, toast, onClose, roleId, users }) {
   const stageTapRef = useNativeTap(stage);
   const resetTapRef = useNativeTap(reset);
 
-  const addRacer = (n) => {
-    const id = uid();
-    update((s) => { s.racers.push({ id, name: n, attempts: [] }); });
-    setRacerId(id);
-    setShowPicker(false);
-    toast(`Racer added — ${n} is on the tree.`);
-  };
 
   const stats = (r) => {
     const clean = r.attempts.filter((a) => !a.red);
@@ -671,7 +643,6 @@ export function TreeSimModal({ state, update, toast, onClose, roleId, users }) {
           racers={state.racers}
           racerId={racerId}
           onPick={(id) => { setRacerId(id); setShowPicker(false); }}
-          onAdd={addRacer}
           onClose={() => setShowPicker(false)}
         />
       )}

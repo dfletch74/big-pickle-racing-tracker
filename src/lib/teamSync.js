@@ -479,6 +479,36 @@ export function canonRacerName(name) {
   return RACER_NAME_ALIASES[String(name).trim().toLowerCase()] || name;
 }
 
+/**
+ * Prune local tree racers to live crew members only.
+ * Drops racers who aren't on the crew; ensures every crew member has a racer.
+ * Crew identity is the user list (first names).
+ */
+export function pruneRacersToCrew(update, users) {
+  const crew = [];
+  for (const u of users || []) {
+    const n = canonRacerName(u && u.name ? String(u.name).trim() : '');
+    if (n && !crew.includes(n)) crew.push(n);
+  }
+  if (!crew.length) return;
+  update((s) => {
+    s.racers = s.racers || [];
+    // Drop racers who aren't live crew; rename the rest to the crew's canonical name.
+    s.racers = s.racers
+      .map((r) => {
+        const canon = canonRacerName(r.name || '');
+        const crewName = crew.find((c) => c === canon);
+        return crewName ? (r.name === crewName ? r : { ...r, name: crewName }) : null;
+      })
+      .filter(Boolean);
+    for (const name of crew) {
+      if (!s.racers.some((r) => canonRacerName(r.name || '') === name)) {
+        s.racers.push({ id: uid(), name, attempts: [] });
+      }
+    }
+  });
+}
+
 // Attempt identity: new attempts have ids; old ones fall back to a content key.
 const attemptKey = (a) => a.id || [a.rt, a.date, a.tree, a.mode].join('|');
 
