@@ -768,6 +768,10 @@ export function SettingsModal({ state, update, reset, toast, onClose }) {
   // copy is the master, so the sheet's version is skipped on pull and they never
   // count as "pulled". Pulled + local = everything on the device.
   const localCount = (state.runs || []).filter((r) => !r.source).length;
+  // Live total, not the per-sync "pulled" delta: the pulled count only covers
+  // runs downloaded in that one sync, so it can never match the log when a
+  // run was already on the phone. The total always does.
+  const totalRuns = (state.runs || []).length;
 
   // iOS home-screen apps cache aggressively — this lets the user pull a new
   // version on demand without deleting the icon (data is preserved).
@@ -812,7 +816,7 @@ export function SettingsModal({ state, update, reset, toast, onClose }) {
           )}
         </div>
         <div className="space-y-0.5 text-white/55">
-          <div>Last sync: {lastSync ? `${lastSync.toLocaleString()} (${state.settings?.lastTeamSyncCount ?? 0} pulled · ${localCount} local)` : '—'}</div>
+          <div>Last sync: {lastSync ? `${lastSync.toLocaleString()} (${totalRuns} runs on this phone · ${localCount} local)` : '—'}</div>
           {state.settings?.lastTeamSyncError && (
             <div className="text-red-300">Last sync failed: {state.settings.lastTeamSyncError.message} ({new Date(state.settings.lastTeamSyncError.at).toLocaleString()})</div>
           )}
