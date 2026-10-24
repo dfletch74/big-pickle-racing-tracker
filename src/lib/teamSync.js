@@ -423,6 +423,27 @@ async function publishDraft(draft, pat) {
 }
 
 /**
+ * After a successful publish, the sheet provably contains every local run
+ * from the draft (publishDraft's merged map includes them whether or not a
+ * PUT was needed — no-change means they were already there). So those runs
+ * stop being "local": the phone and the sheet agree.
+ *
+ * `pushedLocal` maps run id → JSON snapshot taken from the draft before
+ * publishing. Only runs byte-identical to their snapshot are cleared — a
+ * run edited mid-sync must stay local, or the next pull would clobber it
+ * with the just-pushed older copy. Runs added mid-sync (not in the map)
+ * also stay local. Mutates and returns `runs`.
+ */
+export function clearPushedLocalFlag(runs, pushedLocal) {
+  for (const r of runs || []) {
+    if (!r.source && pushedLocal.has(r.id) && JSON.stringify(r) === pushedLocal.get(r.id)) {
+      r.source = 'team';
+    }
+  }
+  return runs;
+}
+
+/**
  * Full sync: pull, then publish when a token is saved. Works from a single
  * fresh draft so the publish merge sees the pulled state. Silent when offline.
  */
@@ -464,10 +485,22 @@ export async function syncTeamData(state, update) {
   let published = null;
   if (pat) {
     try {
+      // Snapshot local runs pre-publish so post-push reconciliation can
+      // tell unchanged runs (now in the sheet) from mid-sync edits.
+      const pushedLocal = new Map(
+        draft.runs.filter((r) => !r.source).map((r) => [r.id, JSON.stringify(r)]),
+      );
       published = await publishDraft(draft, pat);
-      if (published.pushed) {
-        update((s) => { s.settings = s.settings || {}; s.settings.lastTeamPublish = new Date().toISOString(); s.settings.lastTeamPublishError = null; });
-      }
+      update((s) => {
+        s.settings = s.settings || {};
+        if (published.pushed) {
+          s.settings.lastTeamPublish = new Date().toISOString();
+        }
+        s.settings.lastTeamPublishError = null;
+        // Local is only local until it's written to the sheet — and the
+        // publish just did that. Clear the flag on unchanged runs.
+        clearPushedLocalFlag(s.runs, pushedLocal);
+      });
     } catch (e) {
       published = { error: e.message };
       update((s) => {

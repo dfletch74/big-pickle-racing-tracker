@@ -38,12 +38,20 @@ let snapTest = readFileSync(join(here, 'snapshots.test.js'), 'utf8');
 snapTest = snapTest.replace("'../src/lib/snapshots.js'", `'${join(tmp, 'snapshots.js')}'`);
 writeFileSync(join(tmp, 'tests', 'snapshots.test.js'), snapTest);
 
+let pushedTest = readFileSync(join(here, 'pushed-local.test.js'), 'utf8');
+pushedTest = pushedTest.replace("'../src/lib/teamSync.js'", `'${join(tmp, 'teamSync.js')}'`);
+writeFileSync(join(tmp, 'tests', 'pushed-local.test.js'), pushedTest);
+
 try {
   execSync(`node --input-type=module -e "import('${join(tmp, 'tests', 'sync-races.test.js')}')"`, {
     stdio: 'inherit',
     cwd: root,
   });
   execSync(`node --input-type=module -e "import('${join(tmp, 'tests', 'snapshots.test.js')}')"`, {
+    stdio: 'inherit',
+    cwd: root,
+  });
+  execSync(`node --input-type=module -e "import('${join(tmp, 'tests', 'pushed-local.test.js')}')"`, {
     stdio: 'inherit',
     cwd: root,
   });
