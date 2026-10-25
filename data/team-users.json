@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-10-25T00:06:17.195Z",
+  "updatedAt": "2026-10-25T00:13:03.987Z",
   "users": [
     {
       "id": "admin",
@@ -10,8 +10,7 @@
       "canDelete": true,
       "canSettings": true,
       "canSync": true,
-      "canGarage": true,
-      "updatedAt": 0
+      "canGarage": true
     },
     {
       "id": "driver",
@@ -22,8 +21,7 @@
       "canDelete": false,
       "canSettings": false,
       "canSync": true,
-      "canGarage": true,
-      "updatedAt": 0
+      "canGarage": true
     },
     {
       "id": "crew",
@@ -34,8 +32,7 @@
       "canDelete": false,
       "canSettings": false,
       "canSync": true,
-      "canGarage": false,
-      "updatedAt": 0
+      "canGarage": false
     },
     {
       "id": "viewer",
@@ -46,8 +43,7 @@
       "canDelete": false,
       "canSettings": false,
       "canSync": true,
-      "canGarage": false,
-      "updatedAt": 0
+      "canGarage": false
     },
     {
       "id": "grog",
@@ -58,8 +54,7 @@
       "canDelete": false,
       "canSettings": false,
       "canSync": true,
-      "canGarage": false,
-      "updatedAt": 0
+      "canGarage": false
     }
   ],
   "deletedUserIds": {
