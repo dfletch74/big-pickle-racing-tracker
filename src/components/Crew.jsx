@@ -30,8 +30,9 @@ function pinLabel(pinKey, users) {
  * set of team PIN hashes (shared team file, falling back to this device's).
  * No PIN = no entry.
  */
-export function LockScreen({ pinHashes, users, onUnlock }) {
+export function LockScreen({ pinHashes, users, onUnlock, onSetupPin }) {
   const [pin, setPin] = useState('');
+  const [confirmPin, setConfirmPin] = useState('');
   const [error, setError] = useState('');
   const [stage, setStage] = useState('pin'); // pin | role
   const [allowedUsers, setAllowedUsers] = useState([]);
@@ -41,12 +42,48 @@ export function LockScreen({ pinHashes, users, onUnlock }) {
   const configured = hasAnyPin(pinHashes || {});
 
   if (!configured) {
+    // First-time setup: no PINs in the code and none saved anywhere, so the
+    // first person here creates the admin PIN. After unlocking with it,
+    // the admin sets the driver/crew/viewer PINs in Crew Management.
+    const submitSetup = () => {
+      if (pin.length < 4) { setError('PIN must be at least 4 digits.'); return; }
+      if (pin !== confirmPin) { setError('PINs do not match.'); return; }
+      setError('');
+      onSetupPin(pin);
+    };
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-coal-950 p-6">
-        <div className="w-full max-w-xs space-y-4 text-center">
-          <div className="font-display text-2xl font-bold uppercase tracking-wider text-white/90">Big Pickle Racing</div>
-          <div className="text-sm text-white/50">Team PINs aren&apos;t set up yet. An admin needs to set them on their device first.</div>
-          <div className="font-mono text-[11px] text-white/25">v{APP_VERSION}</div>
+        <div className="w-full max-w-xs space-y-4">
+          <div className="text-center">
+            <div className="font-display text-2xl font-bold uppercase tracking-wider text-white/90">Big Pickle Racing</div>
+            <div className="mt-1 text-xs text-white/40">First-time setup — create the admin PIN</div>
+          </div>
+          <div className="text-center text-sm text-white/50">
+            No team PINs are set on this device yet. Create the admin PIN to get started; you&apos;ll set the driver, crew, and viewer PINs in Crew Management after you unlock.
+          </div>
+          <input
+            type="password"
+            inputMode="numeric"
+            value={pin}
+            onChange={(e) => setPin(e.target.value.replace(/\D/g, '').slice(0, 8))}
+            placeholder="New admin PIN"
+            autoFocus
+            className={`${inputCls} text-center font-mono text-2xl tracking-[0.5em]`}
+          />
+          <input
+            type="password"
+            inputMode="numeric"
+            value={confirmPin}
+            onChange={(e) => setConfirmPin(e.target.value.replace(/\D/g, '').slice(0, 8))}
+            onKeyDown={(e) => { if (e.key === 'Enter') submitSetup(); }}
+            placeholder="Confirm PIN"
+            className={`${inputCls} text-center font-mono text-2xl tracking-[0.5em]`}
+          />
+          {error && <div className="text-center text-sm text-red-400">{error}</div>}
+          <Btn kind="primary" onClick={submitSetup} className="w-full" disabled={!pin || !confirmPin}>
+            Create admin PIN
+          </Btn>
+          <div className="text-center font-mono text-[11px] text-white/25">v{APP_VERSION}</div>
         </div>
       </div>
     );
@@ -233,12 +270,6 @@ export function CrewModal({ state, update, toast, onClose, users, currentUserId 
     });
     if (changed) update((s) => { s.settings.users = next; s.settings.usersUpdatedAt = Date.now(); });
   }, [state.settings.users, update]);
-  // Factory defaults are visible in the public repo — warn until they're changed.
-  const usingDefaults =
-    state.settings.pinHashAdmin === hashPin('1966') ||
-    state.settings.pinHashCrew === hashPin('2007') ||
-    state.settings.pinHashViewer === hashPin('0000');
-
   const saveUsers = (next, msg, tombstones) => {
     update((s) => {
       s.settings.users = next;
@@ -268,11 +299,6 @@ export function CrewModal({ state, update, toast, onClose, users, currentUserId 
       <div className="space-y-4">
         <div>
           <div className="mb-2 text-sm font-semibold text-white/80">Team PINs</div>
-          {usingDefaults && (
-            <div className="mb-3 rounded-lg border border-amber-400/30 bg-amber-400/10 px-3 py-2 text-xs text-amber-200">
-              You're still on the factory-default PINs, which are visible in the public code. Change them below so only the crew knows them.
-            </div>
-          )}
           <div className="mb-3 text-xs text-white/50">
             Each PIN unlocks only its roles. The app locks on every launch, on every device, and asks for a PIN — no PIN, no entry. PINs publish to the team automatically, so all crew devices share the same PINs.
           </div>

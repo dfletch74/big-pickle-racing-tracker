@@ -113,24 +113,14 @@ export default function App() {
   }, []);
 
   // Crew lock: lock on EVERY launch, on every device. The shared team PIN
-  // Crew lock: lock on EVERY launch, on every device. The shared team PIN
   // file is the authority; this device's PINs are the fallback until the
   // team file exists. If this device has local PINs and a token but the
-  // team file is missing, publish them once (bootstrap).
-  // One-time migration from the old single PIN to per-role PINs.
+  // team file is missing, publish them once (bootstrap). There are NO
+  // default PINs in the code: when no PINs exist anywhere, the lock
+  // screen itself offers first-time setup (create the admin PIN).
   useEffect(() => {
     if (lockChecked) return;
     setLockChecked(true);
-    // Migrate old single PIN to the per-role PINs the user requested.
-    if (state.settings.teamPinHash && !hasAnyPin(state.settings)) {
-      update((s) => {
-        s.settings.pinHashAdmin = hashPin('1966');
-        s.settings.pinHashDriver = hashPin('1966');
-        s.settings.pinHashCrew = hashPin('2007');
-        s.settings.pinHashViewer = hashPin('0000');
-        s.settings.teamPinHash = null;
-      });
-    }
     setLocked(true);
     // Shared team users: merge the crew list with the team file (tombstones
     // for deletes, per-user last-writer-wins) so edits on two devices can't
@@ -206,8 +196,20 @@ export default function App() {
   const role = getUser(users, roleId) || users[0];
   const isLocked = locked;
 
-  const handleUnlock = (newRoleId) => {
-    setRoleId(newRoleId);
+  // First-time setup: no PINs exist anywhere (fresh device, or PINs were
+  // cleared). The lock screen collects the new admin PIN; save it locally
+  // and publish it so the team file carries it to every device. The admin
+  // sets the remaining PINs in Crew Management after unlocking.
+  const handleSetupAdminPin = (pin) => {
+    const hash = hashPin(pin);
+    update((s) => { s.settings.pinHashAdmin = hash; });
+    if (getPat()) {
+      publishTeamPins({ ...getPinHashes(state.settings), pinHashAdmin: hash }).catch(() => {});
+    }
+    toast('Admin PIN created — enter it to unlock, then set the other PINs in Crew Management.');
+  };
+
+  const handleUnlock = (newRoleId) => {    setRoleId(newRoleId);
     setLocked(false);
     // Auto-check for app updates after unlock — keeps crew devices current
     // without them needing Settings access.
@@ -246,8 +248,8 @@ export default function App() {
   };
 
   // Effective PIN hashes: shared team file wins, this device's PINs are the
-  // fallback. When neither exists, nobody can unlock (except this device
-  // still bootstrapping its own PINs via Crew Management).
+  // fallback. When neither exists, the lock screen runs first-time setup
+  // (create the admin PIN) instead of a PIN prompt nobody can pass.
   const teamHashObj = teamPins && teamPins.pins;
   const effectiveHashes =
     teamHashObj && hasAnyPin(teamHashObj) ? teamHashObj : getPinHashes(state.settings);
@@ -256,7 +258,7 @@ export default function App() {
   if (isLocked) {
     return (
       <div className="min-h-screen bg-coal-950 text-white">
-        <LockScreen pinHashes={effectiveHashes} users={users} onUnlock={handleUnlock} />
+        <LockScreen pinHashes={effectiveHashes} users={users} onUnlock={handleUnlock} onSetupPin={handleSetupAdminPin} />
         <Toasts toasts={toasts} />
       </div>
     );
