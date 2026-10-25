@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-10-24T00:20:00.000Z",
+  "updatedAt": "2026-10-25T07:30:07.580Z",
   "racers": [
     {
       "name": "Dwayne",
@@ -131,6 +131,138 @@
           "tree": "500",
           "mode": "sportsman",
           "id": "mvflcj13-xm1g6xm"
+        },
+        {
+          "id": "mvflgxgf-3bw0rk7",
+          "rt": 0.096,
+          "red": false,
+          "date": "2026-10-19",
+          "tree": "500",
+          "mode": "sportsman"
+        },
+        {
+          "id": "mvflia7k-6c4aaer",
+          "rt": 0.062,
+          "red": false,
+          "date": "2026-10-19",
+          "tree": "500",
+          "mode": "sportsman"
+        },
+        {
+          "id": "mvfliewi-hojm2p6",
+          "rt": 0.026,
+          "red": false,
+          "date": "2026-10-19",
+          "tree": "500",
+          "mode": "sportsman"
+        },
+        {
+          "id": "mvlnovdm-zbso66i",
+          "rt": 0.09,
+          "red": false,
+          "date": "2026-10-24",
+          "tree": "500",
+          "mode": "sportsman",
+          "delayBox": 0
+        },
+        {
+          "id": "mvlnpbpe-4tqz60f",
+          "rt": 0.097,
+          "red": false,
+          "date": "2026-10-24",
+          "tree": "500",
+          "mode": "sportsman",
+          "delayBox": 0.02
+        },
+        {
+          "id": "mvlnq1yv-wfqc7ug",
+          "rt": 0.141,
+          "red": false,
+          "date": "2026-10-24",
+          "tree": "500",
+          "mode": "sportsman",
+          "delayBox": 0.345
+        },
+        {
+          "id": "mvlnqf9m-r71a3oi",
+          "rt": 0.306,
+          "red": false,
+          "date": "2026-10-24",
+          "tree": "500",
+          "mode": "sportsman",
+          "delayBox": 0.41
+        },
+        {
+          "id": "mvlnqibd-b047rcs",
+          "rt": 0.206,
+          "red": false,
+          "date": "2026-10-24",
+          "tree": "500",
+          "mode": "sportsman",
+          "delayBox": 0.41
+        },
+        {
+          "id": "mvlnqkfq-mo6lxl1",
+          "rt": -0.045,
+          "red": true,
+          "date": "2026-10-24",
+          "tree": "500",
+          "mode": "sportsman",
+          "delayBox": 0.41
+        },
+        {
+          "id": "mvlnqn4j-ux1yuvi",
+          "rt": 0.023,
+          "red": false,
+          "date": "2026-10-24",
+          "tree": "500",
+          "mode": "sportsman",
+          "delayBox": 0.41
+        },
+        {
+          "id": "mvlnqpq2-ie27e1f",
+          "rt": 0.038,
+          "red": false,
+          "date": "2026-10-24",
+          "tree": "500",
+          "mode": "sportsman",
+          "delayBox": 0.41
+        },
+        {
+          "id": "mvlnqs46-im6v4dw",
+          "rt": 0.006,
+          "red": false,
+          "date": "2026-10-24",
+          "tree": "500",
+          "mode": "sportsman",
+          "delayBox": 0.41
+        },
+        {
+          "id": "mvlnqvm5-oa5u3b3",
+          "rt": -0.094,
+          "red": true,
+          "date": "2026-10-24",
+          "tree": "500",
+          "mode": "sportsman",
+          "delayBox": 0.41
+        },
+        {
+          "id": "mvlnqxta-kt2x990",
+          "rt": -0.028,
+          "red": true,
+          "date": "2026-10-24",
+          "tree": "500",
+          "mode": "sportsman",
+          "delayBox": 0.41
+        },
+        {
+          "id": "mvlnqzyn-fgxfklr",
+          "rt": 0.006,
+          "red": false,
+          "date": "2026-10-24",
+          "tree": "500",
+          "mode": "sportsman",
+          "delayBox": 0.41
         }
       ]
     },
