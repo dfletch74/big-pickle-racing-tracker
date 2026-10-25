@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { useStore, uid } from './lib/store';
 import { Toasts, Icon, Btn } from './components/ui';
 import { LOGO_DATA_URI } from './components/logo';
@@ -14,7 +14,7 @@ import TrackDay from './views/TrackDay';
 import Insight from './views/Insight';
 import Garage from './views/Garage';
 import { GarageModal, TreeSimModal, SettingsModal, PrintSheet } from './views/Overlays';
-import { syncTeamData, teamSyncOnOpen, pullTracks } from './lib/teamSync';
+import { syncTeamData, teamSyncOnOpen, pullTracks, foregroundSyncDue } from './lib/teamSync';
 
 const NAV = [
   { id: 'dash', label: 'DASH', icon: 'gauge' },
@@ -68,13 +68,38 @@ export default function App() {
   }, [printRun]);
 
   // Team data: pull the shared sheet from GitHub on every open (silent —
-  // offline or unchanged is fine, local runs are never touched).
+  // offline or unchanged is fine, local runs are never touched). iOS
+  // resumes home-screen apps without reloading them, so the open sync
+  // alone leaves a returning user stale — also re-sync when the app comes
+  // back to the foreground, throttled to once a minute, so a run a
+  // teammate just published shows up without a kill/relaunch.
+  const stateRef = useRef(state);
+  useEffect(() => { stateRef.current = state; });
+  const syncGuardRef = useRef({ inFlight: false, lastAt: 0 });
+  const runTeamSync = useCallback(() => {
+    const g = syncGuardRef.current;
+    if (g.inFlight || !teamSyncOnOpen(stateRef.current)) return;
+    g.inFlight = true;
+    g.lastAt = Date.now();
+    syncTeamData(stateRef.current, update)
+      .catch(() => {})
+      .finally(() => { g.inFlight = false; });
+    pullTracks(stateRef.current, update).catch(() => {});
+  }, [update]);
+  useEffect(() => { runTeamSync(); }, [runTeamSync]);
   useEffect(() => {
-    if (!teamSyncOnOpen(state)) return;
-    syncTeamData(state, update).catch(() => {});
-    pullTracks(state, update).catch(() => {});
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    const onForeground = () => {
+      if (document.visibilityState !== 'visible') return;
+      if (!foregroundSyncDue(syncGuardRef.current.lastAt, Date.now())) return;
+      runTeamSync();
+    };
+    document.addEventListener('visibilitychange', onForeground);
+    window.addEventListener('focus', onForeground);
+    return () => {
+      document.removeEventListener('visibilitychange', onForeground);
+      window.removeEventListener('focus', onForeground);
+    };
+  }, [runTeamSync]);
 
   // Magic setup link: if the URL has #setup=..., save the token automatically.
   useEffect(() => {

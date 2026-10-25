@@ -23,6 +23,18 @@ export const TEAM_CSV_DEFAULT_URL =
 export const teamCsvUrl = (state) => state.settings?.teamCsvUrl || TEAM_CSV_DEFAULT_URL;
 export const teamSyncOnOpen = (state) => state.settings?.teamSyncOnOpen !== false;
 
+export const FOREGROUND_SYNC_MIN_GAP_MS = 60_000;
+/**
+ * Whether returning to the foreground should re-run the team sync. iOS
+ * resumes home-screen apps without reloading them, so the on-open sync
+ * never fires again after first launch — a teammate's just-published run
+ * would only appear after a full kill/relaunch. Throttled so quick
+ * app-switching doesn't hammer GitHub.
+ */
+export function foregroundSyncDue(lastAtMs, nowMs, minGapMs = FOREGROUND_SYNC_MIN_GAP_MS) {
+  return nowMs - (lastAtMs || 0) >= minGapMs;
+}
+
 const PAT_KEY = 'bpr-github-pat';
 export const getPat = () => { try { return localStorage.getItem(PAT_KEY) || ''; } catch { return ''; } };
 export const setPat = (t) => {

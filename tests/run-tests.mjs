@@ -42,6 +42,10 @@ let pushedTest = readFileSync(join(here, 'pushed-local.test.js'), 'utf8');
 pushedTest = pushedTest.replace("'../src/lib/teamSync.js'", `'${join(tmp, 'teamSync.js')}'`);
 writeFileSync(join(tmp, 'tests', 'pushed-local.test.js'), pushedTest);
 
+let fgTest = readFileSync(join(here, 'foreground-sync.test.js'), 'utf8');
+fgTest = fgTest.replace("'../src/lib/teamSync.js'", `'${join(tmp, 'teamSync.js')}'`);
+writeFileSync(join(tmp, 'tests', 'foreground-sync.test.js'), fgTest);
+
 try {
   execSync(`node --input-type=module -e "import('${join(tmp, 'tests', 'sync-races.test.js')}')"`, {
     stdio: 'inherit',
@@ -52,6 +56,10 @@ try {
     cwd: root,
   });
   execSync(`node --input-type=module -e "import('${join(tmp, 'tests', 'pushed-local.test.js')}')"`, {
+    stdio: 'inherit',
+    cwd: root,
+  });
+  execSync(`node --input-type=module -e "import('${join(tmp, 'tests', 'foreground-sync.test.js')}')"`, {
     stdio: 'inherit',
     cwd: root,
   });
