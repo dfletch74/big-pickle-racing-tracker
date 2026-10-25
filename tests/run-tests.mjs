@@ -71,6 +71,11 @@ try {
     stdio: 'inherit',
     cwd: root,
   });
+  // Render smoke tests run from the original location (need node_modules).
+  execSync(`node --input-type=module -e "import('${join(here, 'crew-render.test.js')}')"`, {
+    stdio: 'inherit',
+    cwd: root,
+  });
 } finally {
   rmSync(tmp, { recursive: true, force: true });
 }

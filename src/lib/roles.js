@@ -106,7 +106,7 @@ export const PIN_GROUP_LABELS = {
   crew: 'Crew PIN',
   viewer: 'Viewer PIN',
 };
-const PIN_KEYS = Object.keys(PIN_KEY_TO_GROUP);
+export const PIN_KEYS = Object.keys(PIN_KEY_TO_GROUP);
 
 export function getPinHashes(settings) {
   const out = {};

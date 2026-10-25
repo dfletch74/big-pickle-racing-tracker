@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Modal, Btn, inputCls } from './ui';
-import { hashPin, saveRole, PERM_FLAGS, PERM_LABELS, USER_TITLES, defaultUsers, PIN_KEY_TO_GROUP, PIN_GROUP_LABELS, getPinHashes, hasAnyPin, usersForPin } from '../lib/roles';
+import { hashPin, saveRole, PERM_FLAGS, PERM_LABELS, USER_TITLES, defaultUsers, PIN_KEYS, PIN_KEY_TO_GROUP, PIN_GROUP_LABELS, getPinHashes, hasAnyPin, usersForPin } from '../lib/roles';
 import { getPat, publishTeamPins, publishTeamUsers } from '../lib/teamSync';
 import { uid } from '../lib/store';
 import { APP_VERSION } from '../version';

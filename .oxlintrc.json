@@ -1,8 +1,44 @@
 {
   "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "oxc"],
+  "plugins": [
+    "react",
+    "oxc"
+  ],
   "rules": {
     "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
+    "react/only-export-components": [
+      "warn",
+      {
+        "allowConstantExport": true
+      }
+    ],
+    "no-undef": "error"
+  },
+  "globals": {
+    "window": "readonly",
+    "console": "readonly",
+    "localStorage": "readonly",
+    "fetch": "readonly",
+    "document": "readonly",
+    "URL": "readonly",
+    "setTimeout": "readonly",
+    "navigator": "readonly",
+    "self": "readonly",
+    "process": "readonly",
+    "performance": "readonly",
+    "caches": "readonly",
+    "MediaRecorder": "readonly",
+    "structuredClone": "readonly",
+    "Buffer": "readonly",
+    "requestAnimationFrame": "readonly",
+    "clearTimeout": "readonly",
+    "btoa": "readonly",
+    "atob": "readonly",
+    "TextEncoder": "readonly",
+    "Blob": "readonly",
+    "location": "readonly",
+    "history": "readonly",
+    "confirm": "readonly",
+    "HTMLCanvasElement": "readonly"
   }
 }
