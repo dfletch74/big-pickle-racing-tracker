@@ -264,19 +264,20 @@ export async function publishTeamUsers(users, deletedUserIds) {
   throw new Error('Publish conflicted — try again');
 }
 
-const WIND_FIELDS = ['windMph', 'windDir', 'headwindMph'];
+const CAPTURED_FIELDS = ['windMph', 'windDir', 'headwindMph', 'tempF', 'humidity', 'daFt'];
 
 /**
- * Fill wind fields on `target` from `source` where the target has none.
- * Wind is only ever captured (live weather at log time, or the ERA5 archive
- * backfill) — never typed in or edited — so a missing value means "this copy
- * predates the data", never "the user cleared it". Without this, a phone
- * whose local runs predate the 2026-10-19 backfill published the full sheet
- * on 2026-10-21 and blanked the wind columns on all 38 rows. Mutates target.
+ * Fill captured-weather fields on `target` from `source` where the target
+ * has none. These values come from live weather at log time or from archive
+ * backfills (ERA5 wind 2026-10-19; temp/humidity/DA 2026-10-26) — a missing
+ * value means "this copy predates the data", not a deliberate edit, and real
+ * values are never overwritten. Without this, a phone whose local runs
+ * predated the wind backfill published the full sheet on 2026-10-21 and
+ * blanked the wind columns on all 38 rows. Mutates target.
  */
-export function fillMissingWind(target, source) {
+export function fillMissingCaptured(target, source) {
   if (!target || !source) return target;
-  for (const f of WIND_FIELDS) {
+  for (const f of CAPTURED_FIELDS) {
     if (target[f] == null && source[f] != null) target[f] = source[f];
   }
   return target;
@@ -352,10 +353,10 @@ export function mergePull(s, teamRuns) {
       const k = runKey({ ...r, carName: name });
       const localRun = localByKey.get(k);
       if (localRun) {
-        // A local version exists — it wins, but heal capture-only fields it
-        // never had (wind), or this device keeps missing them and its next
+        // A local version exists — it wins, but heal captured-weather fields
+        // it never had, or this device keeps missing them and its next
         // publish would blank them on the sheet.
-        fillMissingWind(localRun, r);
+        fillMissingCaptured(localRun, r);
         continue;
       }
       if (tombstoned.has(k)) continue;
@@ -419,11 +420,11 @@ async function publishDraft(draft, pat) {
       backfillAir(withCar, draft.tracks);
       const k = runKey(withCar);
       if (tombstoned.has(k)) { merged.delete(k); continue; }
-      // Local wins — but if the local copy never had the wind data (it
-      // predates the capture/backfill), keep the sheet's values instead of
-      // publishing blanks over them.
+      // Local wins — but if the local copy never had the captured-weather
+      // data (it predates the capture/backfill), keep the sheet's values
+      // instead of publishing blanks over them.
       const prev = merged.get(k);
-      if (prev) fillMissingWind(withCar, prev);
+      if (prev) fillMissingCaptured(withCar, prev);
       merged.set(k, withCar);
       localCount++;
     }
