@@ -36,3 +36,15 @@ export const runDateTime = (run) => {
   const d = new Date(`${run.date || '1970-01-01'}T${t}:00`);
   return Number.isNaN(d.getTime()) ? new Date(0) : d;
 };
+
+/**
+ * Axis tick label for charts. Thousands read as plain numbers ("2,900"),
+ * never "2.9e+3" — DA in feet lives in the thousands and exponential axis
+ * labels are unreadable (Dwayne, 2026-10-26).
+ */
+export function fmtAxisTick(v) {
+  const a = Math.abs(v);
+  if (a >= 1000) return Math.round(v).toLocaleString('en-US');
+  if (a !== 0 && a < 0.01) return v.toExponential(1);
+  return String(Math.round(v * 1000) / 1000);
+}

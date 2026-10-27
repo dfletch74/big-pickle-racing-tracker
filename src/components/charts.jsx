@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { isNum, fmtDate } from '../lib/format';
+import { isNum, fmtDate, fmtAxisTick } from '../lib/format';
 
 const TRACK_COLORS = ['#a3e635', '#38bdf8', '#f472b6', '#fbbf24', '#c084fc', '#fb7185'];
 
@@ -22,11 +22,7 @@ export function ScatterPlot({ points, xLabel, yLabel, trend, height = 260 }) {
   const X = (v) => pad.l + ((v - loX) / (hiX - loX || 1)) * (W - pad.l - pad.r);
   const Y = (v) => pad.t + (1 - (v - loY) / (hiY - loY || 1)) * (H - pad.t - pad.b);
 
-  const fmtTick = (v) => {
-    const a = Math.abs(v);
-    if (a !== 0 && (a >= 1000 || a < 0.01)) return v.toExponential(1);
-    return String(Math.round(v * 1000) / 1000);
-  };
+  const fmtTick = fmtAxisTick; // lib/format — thousands stay plain ("2,900")
   const xTicks = [0, 0.5, 1].map((f) => loX + f * (hiX - loX));
   const yTicks = [0, 0.5, 1].map((f) => loY + f * (hiY - loY));
 
