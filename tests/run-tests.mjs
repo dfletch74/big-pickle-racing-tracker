@@ -58,6 +58,10 @@ let fmtTest = readFileSync(join(here, 'charts-format.test.js'), 'utf8');
 fmtTest = fmtTest.replace("'../src/lib/format.js'", `'${join(tmp, 'format.js')}'`);
 writeFileSync(join(tmp, 'tests', 'charts-format.test.js'), fmtTest);
 
+let windTest = readFileSync(join(here, 'wind-merge.test.js'), 'utf8');
+windTest = windTest.replace("'../src/lib/teamSync.js'", `'${join(tmp, 'teamSync.js')}'`);
+writeFileSync(join(tmp, 'tests', 'wind-merge.test.js'), windTest);
+
 try {
   execSync(`node --input-type=module -e "import('${join(tmp, 'tests', 'sync-races.test.js')}')"`, {
     stdio: 'inherit',
@@ -84,6 +88,10 @@ try {
     cwd: root,
   });
   execSync(`node --input-type=module -e "import('${join(tmp, 'tests', 'charts-format.test.js')}')"`, {
+    stdio: 'inherit',
+    cwd: root,
+  });
+  execSync(`node --input-type=module -e "import('${join(tmp, 'tests', 'wind-merge.test.js')}')"`, {
     stdio: 'inherit',
     cwd: root,
   });
