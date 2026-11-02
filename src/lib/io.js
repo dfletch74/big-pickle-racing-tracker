@@ -253,6 +253,11 @@ export function runsToCSV(runs, carNameOf = () => '') {
     if (k === 'carName') return r.carName || carNameOf(r.carId);
     if (k === 'backup') return r.backup ? 'Y' : '';
     if (k === 'flagged') return r.flagged ? 'Y' : '';
+    // Write distance in words: a bare '1/4' cell is auto-converted by Excel
+    // into the date Jan 4 ("04-Jan") when the export is opened. parseDistance
+    // reads '1/4 mile' / '1/8 mile' back to the internal values, so the CSV
+    // still round-trips through the importer and the team sheet.
+    if (k === 'distance') return r.distance === '1/8' ? '1/8 mile' : '1/4 mile';
     return r[k];
   };
   const head = CSV_COLS.map(([, label]) => label).join(',');

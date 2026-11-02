@@ -36,6 +36,7 @@
     "atob": "readonly",
     "TextEncoder": "readonly",
     "Blob": "readonly",
+    "File": "readonly",
     "location": "readonly",
     "history": "readonly",
     "confirm": "readonly",

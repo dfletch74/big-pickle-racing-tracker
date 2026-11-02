@@ -62,6 +62,10 @@ let windTest = readFileSync(join(here, 'wind-merge.test.js'), 'utf8');
 windTest = windTest.replace("'../src/lib/teamSync.js'", `'${join(tmp, 'teamSync.js')}'`);
 writeFileSync(join(tmp, 'tests', 'wind-merge.test.js'), windTest);
 
+let exportTest = readFileSync(join(here, 'export-distance.test.js'), 'utf8');
+exportTest = exportTest.replace("'../src/lib/io.js'", `'${join(tmp, 'io.js')}'`);
+writeFileSync(join(tmp, 'tests', 'export-distance.test.js'), exportTest);
+
 try {
   execSync(`node --input-type=module -e "import('${join(tmp, 'tests', 'sync-races.test.js')}')"`, {
     stdio: 'inherit',
@@ -92,6 +96,10 @@ try {
     cwd: root,
   });
   execSync(`node --input-type=module -e "import('${join(tmp, 'tests', 'wind-merge.test.js')}')"`, {
+    stdio: 'inherit',
+    cwd: root,
+  });
+  execSync(`node --input-type=module -e "import('${join(tmp, 'tests', 'export-distance.test.js')}')"`, {
     stdio: 'inherit',
     cwd: root,
   });
