@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-10-25T07:30:11.689Z",
+  "updatedAt": "2026-11-18T19:32:59.195Z",
   "racers": [
     {
       "name": "Dwayne",
@@ -263,6 +263,78 @@
           "tree": "500",
           "mode": "sportsman",
           "delayBox": 0.41
+        },
+        {
+          "id": "mwmic62n-si32wfg",
+          "rt": 0.247,
+          "red": false,
+          "date": "2026-11-18",
+          "tree": "500",
+          "mode": "sportsman",
+          "delayBox": 0.02
+        },
+        {
+          "id": "mwmicred-1bo6hqq",
+          "rt": 0.081,
+          "red": false,
+          "date": "2026-11-18",
+          "tree": "500",
+          "mode": "sportsman",
+          "delayBox": 0.02
+        },
+        {
+          "id": "mwmicwp4-36w94tb",
+          "rt": 0.082,
+          "red": false,
+          "date": "2026-11-18",
+          "tree": "500",
+          "mode": "sportsman",
+          "delayBox": 0.02
+        },
+        {
+          "id": "mwmiczu4-2nf1twv",
+          "rt": -0.051,
+          "red": true,
+          "date": "2026-11-18",
+          "tree": "500",
+          "mode": "sportsman",
+          "delayBox": 0.02
+        },
+        {
+          "id": "mwmid2dc-xh0vwcm",
+          "rt": -0.169,
+          "red": true,
+          "date": "2026-11-18",
+          "tree": "500",
+          "mode": "sportsman",
+          "delayBox": 0.02
+        },
+        {
+          "id": "mwmid48h-xwi1ac4",
+          "rt": 0.032,
+          "red": false,
+          "date": "2026-11-18",
+          "tree": "500",
+          "mode": "sportsman",
+          "delayBox": 0.02
+        },
+        {
+          "id": "mwmid76i-mjay896",
+          "rt": 0.029,
+          "red": false,
+          "date": "2026-11-18",
+          "tree": "500",
+          "mode": "sportsman",
+          "delayBox": 0.02
+        },
+        {
+          "id": "mwmidcin-7wrifhd",
+          "rt": 0.047,
+          "red": false,
+          "date": "2026-11-18",
+          "tree": "500",
+          "mode": "sportsman",
+          "delayBox": 0.02
         }
       ]
     },
