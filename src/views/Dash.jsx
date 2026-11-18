@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Card, SectionTitle, Badge, Segmented, EmptyState, Btn, Icon } from '../components/ui';
 import { LineChart, WinBar } from '../components/charts';
+import { LOGO_DATA_URI } from '../components/logo';
 import { fmtET, fmtMPH, fmtRT, fmtDate, isNum } from '../lib/format';
 import {
   runsForCar, raceRuns, filterDistance, latestRun, personalBests, consistency,
@@ -8,7 +9,6 @@ import {
 } from '../lib/stats';
 
 export default function Dash({ state, onAddRun, onImport, onSeeRuns }) {
-  const car = state.cars.find((c) => c.id === state.activeCarId);
   const allRuns = useMemo(() => runsForCar(state, state.activeCarId), [state]);
   // Backup (lifted/braked/aborted) runs stay in the log but never feed stats.
   const fullRuns = useMemo(() => raceRuns(allRuns), [allRuns]);
@@ -154,17 +154,26 @@ export default function Dash({ state, onAddRun, onImport, onSeeRuns }) {
 
   return (
     <div className="space-y-4">
-      {/* header + distance filter */}
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div>
-          <div className="font-display text-[28px] font-bold uppercase leading-none tracking-wide">
-            {car?.name || 'Garage'}
-          </div>
-          <div className="mt-1 text-[11px] font-medium uppercase tracking-[0.16em] text-white/40">
-            {[car?.year, car?.make, car?.model].filter(Boolean).join(' · ')}
-          </div>
+      {/* header: team logo plate (team branding — same for every car) */}
+      <div className="relative mt-9">
+        <div className="plate" aria-hidden>
+          <i className="rivet tl" />
+          <i className="rivet tr" />
+          <i className="rivet bl" />
+          <i className="rivet br" />
+          <div className="plate-panel h-[104px]" />
         </div>
-        <div className="flex flex-wrap items-end gap-3">
+        <div className="pointer-events-none absolute right-[4%] top-1 z-[2] h-24 w-44 rounded-full bg-pickle-400/15 blur-xl" />
+        <img
+          src={LOGO_DATA_URI}
+          alt="Big Pickle Racing"
+          className="absolute -top-9 left-1/2 z-[3] h-32 w-auto -translate-x-1/2 drop-shadow-[0_7px_13px_rgba(0,0,0,0.6)]"
+        />
+      </div>
+
+      {/* distance + time filters */}
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex flex-1 flex-wrap items-end justify-between gap-3">
           <div>
             <div className="mb-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-white/40">Time</div>
             <Segmented
@@ -249,15 +258,15 @@ export default function Dash({ state, onAddRun, onImport, onSeeRuns }) {
             {con ? (
               <>
                 <div className="flex items-center gap-4">
-                  <div className={`flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl font-display text-3xl font-extrabold ${
+                  <div className={`flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl font-num text-[36px] ${
                     con.grade === 'A' ? 'bg-pickle-400 text-black shadow-glow' : con.grade === 'B' ? 'bg-pickle-500/25 text-pickle-300'
                     : con.grade === 'C' ? 'bg-amber-500/20 text-amber-300' : 'bg-red-500/20 text-red-300'}`}>
                     {con.grade}
                   </div>
                   <div className="grid flex-1 grid-cols-3 gap-2 text-center">
-                    <div><div className="font-mono text-lg font-bold">{con.streak}</div><div className="text-[10px] uppercase tracking-wider text-white/45">Streak</div></div>
-                    <div><div className="font-mono text-lg font-bold">{Math.round(con.score)}%</div><div className="text-[10px] uppercase tracking-wider text-white/45">±0.05s</div></div>
-                    <div><div className="font-mono text-lg font-bold">{con.spread.toFixed(3)}</div><div className="text-[10px] uppercase tracking-wider text-white/45">Spread</div></div>
+                    <div><div className="font-num text-[30px] leading-none">{con.streak}</div><div className="mt-1 text-[10px] uppercase tracking-wider text-white/45">Streak</div></div>
+                    <div><div className="font-num text-[30px] leading-none">{Math.round(con.score)}%</div><div className="mt-1 text-[10px] uppercase tracking-wider text-white/45">±0.05s</div></div>
+                    <div><div className="font-num text-[30px] leading-none">{con.spread.toFixed(3)}</div><div className="mt-1 text-[10px] uppercase tracking-wider text-white/45">Spread</div></div>
                   </div>
                 </div>
                 <div className="mt-2 text-[11px] text-white/40">
@@ -275,7 +284,7 @@ export default function Dash({ state, onAddRun, onImport, onSeeRuns }) {
             <Card>
               <SectionTitle>Last run</SectionTitle>
               <div className="mb-2 text-sm font-bold">{last.track} <span className="font-normal text-white/45">· {fmtDate(last.date)}</span></div>
-              <div className="grid grid-cols-4 gap-2 font-mono text-sm">
+              <div className="grid grid-cols-4 gap-2 text-sm">
                 <Split label="R/T" value={fmtRT(last.rt)} rank={lastRanks.rt} />
                 <Split label="60FT" value={isNum(last.sixty) ? last.sixty.toFixed(3) : '—'} rank={lastRanks.sixty} />
                 <Split label="ET" value={fmtET(last.et)} rank={lastRanks.et} accent />
@@ -306,22 +315,24 @@ export default function Dash({ state, onAddRun, onImport, onSeeRuns }) {
           {sessions.length > 0 && (
             <div>
               <SectionTitle>Test sessions</SectionTitle>
-              <div className="grid gap-2 sm:grid-cols-2">
-                {sessions.map((s) => (
-                  <Card key={s.date} className="py-3 transition hover:border-white/20">
-                    <div className="mb-1 flex items-center justify-between">
-                      <span className="text-sm font-bold">{fmtDate(s.date)}</span>
-                      <Badge tone="neutral">{s.n} run{s.n === 1 ? '' : 's'}</Badge>
+              <Card className="py-1">
+                <div className="divide-y divide-white/[0.08]">
+                  {sessions.map((s) => (
+                    <div key={s.date} className="py-3 first:pt-2 last:pb-2">
+                      <div className="mb-1 flex items-center justify-between">
+                        <span className="text-sm font-bold">{fmtDate(s.date)}</span>
+                        <Badge tone="neutral">{s.n} run{s.n === 1 ? '' : 's'}</Badge>
+                      </div>
+                      <div className="flex gap-4 text-xs">
+                        <span>Best <b className="font-num text-[14px] font-normal text-pickle-400">{fmtET(s.best)}</b></span>
+                        <span>Avg <b className="font-num text-[14px] font-normal">{fmtET(s.avgET)}</b></span>
+                        {s.tempLo != null && <span className="text-white/50">{s.tempLo.toFixed(0)}–{s.tempHi.toFixed(0)}°F</span>}
+                      </div>
+                      {s.tune && <div className="mt-1 text-[11px] text-white/45">{s.tune}</div>}
                     </div>
-                    <div className="flex gap-4 font-mono text-xs">
-                      <span>Best <b className="text-pickle-400">{fmtET(s.best)}</b></span>
-                      <span>Avg <b>{fmtET(s.avgET)}</b></span>
-                      {s.tempLo != null && <span className="text-white/50">{s.tempLo.toFixed(0)}–{s.tempHi.toFixed(0)}°F</span>}
-                    </div>
-                    {s.tune && <div className="mt-1 text-[11px] text-white/45">{s.tune}</div>}
-                  </Card>
-                ))}
-              </div>
+                  ))}
+                </div>
+              </Card>
             </div>
           )}
 
@@ -342,14 +353,16 @@ export default function Dash({ state, onAddRun, onImport, onSeeRuns }) {
           {/* recent */}
           <div>
             <SectionTitle right={<button onClick={onSeeRuns} className="flex items-center gap-1 text-xs font-semibold text-pickle-400 hover:text-pickle-300">See all <Icon name="chevR" className="h-3.5 w-3.5" /></button>}>Recent runs</SectionTitle>
-            <div className="space-y-2">
-              {[...runs].sort((a, b) => b.createdAt - a.createdAt).slice(0, 5).map((r) => (
-                <Card key={r.id} className="flex items-center justify-between py-3 transition hover:border-white/20">
-                  <div className="text-sm"><b>{r.track}</b> <span className="text-white/40">· {fmtDate(r.date)}</span></div>
-                  <div className="font-mono text-sm"><b className="text-pickle-400">{fmtET(r.et)}</b> <span className="text-white/50">@ {fmtMPH(r.mph)}</span></div>
-                </Card>
-              ))}
-            </div>
+            <Card className="py-1">
+              <div className="divide-y divide-white/[0.08]">
+                {[...runs].sort((a, b) => b.createdAt - a.createdAt).slice(0, 5).map((r) => (
+                  <div key={r.id} className="flex items-center justify-between gap-2 py-3 first:pt-2 last:pb-2">
+                    <div className="flex min-w-0 items-baseline gap-1 text-sm"><b className="truncate">{r.track}</b> <span className="shrink-0 text-white/40">· {shortDate(r.date)}</span></div>
+                    <div className="shrink-0 whitespace-nowrap font-num text-[16px]"><b className="font-normal text-pickle-400">{fmtET(r.et)}</b> <span className="text-white/50">@ {fmtMPH(r.mph)}</span></div>
+                  </div>
+                ))}
+              </div>
+            </Card>
           </div>
         </>
       )}
@@ -357,12 +370,19 @@ export default function Dash({ state, onAddRun, onImport, onSeeRuns }) {
   );
 }
 
+const MONTHS_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+function shortDate(iso) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso || '');
+  if (!m) return fmtDate(iso);
+  return `${MONTHS_SHORT[Number(m[2]) - 1]} ${Number(m[3])}`;
+}
+
 function HeroET({ label, run, big }) {
   return (
     <div className={big ? 'mt-1 flex items-end justify-between gap-3' : ''}>
       <div>
         {label && <div className="font-display text-[13px] font-semibold uppercase tracking-[0.18em] text-white/45">{label}</div>}
-        <div className={`font-mono font-bold leading-none text-pickle-400 [text-shadow:0_0_32px_rgba(163,230,53,0.35)] ${big ? 'text-[52px]' : 'text-4xl'}`}>
+        <div className={`font-num leading-none text-pickle-400 [text-shadow:0_0_32px_rgba(163,230,53,0.35)] ${big ? 'text-[84px]' : 'text-[42px]'}`}>
           {fmtET(run?.et)}
         </div>
         <div className="mt-1.5 text-xs text-white/45">
@@ -370,7 +390,7 @@ function HeroET({ label, run, big }) {
         </div>
       </div>
       {big && (
-        <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-pickle-400/10 text-pickle-400">
+        <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-[10px] border border-pickle-400/50 bg-pickle-400/15 text-pickle-400 shadow-[inset_0_1px_0_rgba(255,255,255,0.25),0_0_18px_rgba(163,230,53,0.20)]">
           <Icon name="trophy" className="h-7 w-7" />
         </div>
       )}
@@ -382,7 +402,7 @@ function Stat({ label, value, sub }) {
   return (
     <Card className="p-3 text-center">
       <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-white/45">{label}</div>
-      <div className="mt-0.5 font-mono text-xl font-bold">{value}</div>
+      <div className="mt-0.5 font-num text-[34px] leading-none">{value}</div>
       {sub && <div className="mt-0.5 truncate text-[10px] text-white/40">{sub}</div>}
     </Card>
   );
@@ -392,7 +412,7 @@ function Split({ label, value, rank, accent }) {
   return (
     <div>
       <div className="text-[10px] uppercase tracking-wider text-white/40">{label}</div>
-      <div className={accent ? 'text-base font-bold text-pickle-400' : ''}>{value}</div>
+      <div className={`font-num text-[21px] leading-tight ${accent ? 'text-pickle-400' : ''}`}>{value}</div>
       {rank && <div className="text-[10px] text-white/35">{rank.rank} of {rank.of}</div>}
     </div>
   );
@@ -402,9 +422,14 @@ function PBRow({ label, run, text }) {
   return (
     <div className="grid grid-cols-[76px_88px_minmax(0,1fr)] items-baseline gap-x-3 border-t border-white/5 py-2 text-sm first:border-0">
       <span className="truncate text-[13px] font-medium text-white/55">{label}</span>
-      <span className="text-right font-mono text-[15px] font-bold tabular-nums text-white">{text}</span>
-      <span className="truncate text-right text-[11px] text-white/35">
-        {run ? `${run.track} · ${fmtDate(run.date)}` : ''}
+      <span className="text-right font-num text-[22px] tabular-nums text-white">{text}</span>
+      <span className="flex min-w-0 items-baseline justify-end gap-1 text-[11px] text-white/35">
+        {run && (
+          <>
+            <span className="truncate">{run.track}</span>
+            <span className="shrink-0">· {fmtDate(run.date)}</span>
+          </>
+        )}
       </span>
     </div>
   );
@@ -418,7 +443,7 @@ function PerfCard({ title, subtitle, improvement, children }) {
         {title}
       </h3>
       {improvement && (
-        <div className={`mt-1 font-mono text-[13px] font-semibold ${improvement.good ? 'text-pickle-400' : 'text-amber-300'}`}>
+        <div className={`mt-1 font-display text-[15px] font-semibold tracking-[0.06em] ${improvement.good ? 'text-pickle-400' : 'text-amber-300'}`}>
           {improvement.text}
         </div>
       )}
@@ -449,7 +474,7 @@ function PbByTrack({ runs, scopeLabel }) {
         return (
           <div key={t} className="grid grid-cols-[minmax(0,1fr)_88px_auto] items-baseline gap-x-3 border-t border-white/5 py-2 text-sm first:border-0">
             <span className="truncate font-medium text-white/75">{t}</span>
-            <span className="text-right font-mono text-[15px] font-bold tabular-nums text-white">{val}</span>
+            <span className="text-right font-num text-[22px] tabular-nums text-white">{val}</span>
             <span className="text-right text-[11px] tabular-nums text-white/35">{fmtDate(best.date)}</span>
           </div>
         );

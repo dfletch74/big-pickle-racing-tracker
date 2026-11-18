@@ -257,7 +257,7 @@ export default function App() {
   // Show lock screen on every launch until unlocked with a crew PIN.
   if (isLocked) {
     return (
-      <div className="min-h-screen bg-coal-950 text-white">
+      <div className="steel-bg min-h-screen text-white">
         <LockScreen pinHashes={effectiveHashes} users={users} onUnlock={handleUnlock} onSetupPin={handleSetupAdminPin} />
         <Toasts toasts={toasts} />
       </div>
@@ -274,9 +274,9 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-coal-950 text-white">
+    <div className="steel-bg min-h-screen text-white">
       {/* header */}
-      <header className="app-chrome asphalt sticky top-0 z-40 border-b border-white/10 bg-coal-950/90 pt-[env(safe-area-inset-top)] backdrop-blur">
+      <header className="app-chrome appbar-steel sticky top-0 z-40 pt-[env(safe-area-inset-top)]">
         <div className="mx-auto flex max-w-3xl items-center justify-between px-4 py-2.5">
           <button
             onClick={() => setOverlay('garage')}
@@ -303,7 +303,7 @@ export default function App() {
                 }
                 setOverlay('tree');
               }}
-              className="flex items-center gap-1.5 rounded-xl border border-white/10 px-3 py-2 font-display text-[15px] font-semibold uppercase tracking-wider text-white/75 transition hover:bg-white/5 hover:text-white active:scale-95"
+              className="hbtn flex items-center gap-1.5 px-3 py-2 font-display text-[15px] font-semibold uppercase tracking-wider active:scale-95"
               title="Tree simulator"
             >
               <Icon name="tree" className="h-4 w-4" />
@@ -312,7 +312,7 @@ export default function App() {
             {role.canSettings && (
               <button
                 onClick={() => setOverlay('crew')}
-                className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 text-white/70 transition hover:bg-white/5 hover:text-white active:scale-95"
+                className="hbtn flex h-10 w-10 items-center justify-center active:scale-95"
                 title="Crew management"
                 aria-label="Crew management"
               >
@@ -322,7 +322,7 @@ export default function App() {
             {role.canSettings ? (
               <button
                 onClick={() => setOverlay('settings')}
-                className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 text-white/70 transition hover:bg-white/5 hover:text-white active:scale-95"
+                className="hbtn flex h-10 w-10 items-center justify-center active:scale-95"
                 title="Settings"
                 aria-label="Settings"
               >
@@ -331,7 +331,7 @@ export default function App() {
             ) : (
               <button
                 onClick={handleLock}
-                className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 text-white/70 transition hover:bg-white/5 hover:text-white active:scale-95"
+                className="hbtn flex h-10 w-10 items-center justify-center active:scale-95"
                 title="Switch user"
                 aria-label="Switch user"
               >
@@ -380,7 +380,10 @@ export default function App() {
       </main>
 
       {/* bottom nav */}
-      <nav className="app-chrome fixed inset-x-0 bottom-0 z-40 border-t border-white/10 bg-coal-950/95 pb-[env(safe-area-inset-bottom)] backdrop-blur">
+      <nav
+        className="app-chrome nav-steel fixed inset-x-3 z-40 pb-[env(safe-area-inset-bottom)]"
+        style={{ bottom: 'max(0.65rem, env(safe-area-inset-bottom))' }}
+      >
         <div className="mx-auto grid max-w-3xl grid-cols-6 items-end px-2">
           {NAV.map((n) => {
             const off = navDisabled(n);
@@ -391,8 +394,8 @@ export default function App() {
                 aria-label="Log a run"
                 title={off ? 'Not available for your role' : 'Log a run'}
                 disabled={off}
-                className={`relative mx-auto -mt-7 flex h-16 w-16 items-center justify-center rounded-full shadow-glow transition active:scale-95 ${
-                  off ? 'cursor-not-allowed bg-coal-700 text-white/25' : 'bg-pickle-400 text-black hover:bg-pickle-300'
+                className={`relative mx-auto -mt-6 flex h-14 w-14 items-center justify-center rounded-2xl shadow-glow transition active:scale-95 ${
+                  off ? 'cursor-not-allowed bg-coal-700 text-white/25' : 'border border-[#d8ff8a] bg-gradient-to-b from-[#c8f75e] to-[#8fd12a] text-black'
                 }`}
               >
                 <Icon name="plus" className="h-7 w-7" strokeWidth={2.4} />
@@ -404,7 +407,7 @@ export default function App() {
                 onClick={() => setView(n.id)}
                 title={off ? 'Not available for your role' : n.label}
                 disabled={off}
-                className={`relative flex flex-col items-center py-2.5 font-display text-[15px] font-semibold uppercase tracking-[0.12em] transition ${
+                className={`relative flex flex-col items-center py-2.5 font-display text-[13px] font-semibold uppercase tracking-[0.08em] transition ${
                   off ? 'cursor-not-allowed text-white/20' : view === n.id ? 'text-pickle-400' : 'text-white/40 hover:text-white/75'
                 }`}
               >

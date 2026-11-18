@@ -196,11 +196,12 @@ export function Icon({ name, className = 'h-5 w-5', strokeWidth = 1.8 }) {
 /* ---------------- Primitives ---------------- */
 
 export const Card = ({ className = '', children, onClick }) => (
-  <div
-    onClick={onClick}
-    className={`rounded-2xl border border-white/[0.08] bg-coal-850 p-4 shadow-card ${className}`}
-  >
-    {children}
+  <div onClick={onClick} className="plate">
+    <i className="rivet tl" />
+    <i className="rivet tr" />
+    <i className="rivet bl" />
+    <i className="rivet br" />
+    <div className={`plate-panel p-4 ${className}`}>{children}</div>
   </div>
 );
 
@@ -216,9 +217,9 @@ export const SectionTitle = ({ children, right }) => (
 export const Btn = ({ children, onClick, kind = 'primary', className = '', disabled, type = 'button' }) => {
   const styles =
     kind === 'primary'
-      ? 'bg-pickle-400 text-black font-display font-bold uppercase tracking-[0.12em] hover:bg-pickle-300 hover:shadow-glow disabled:opacity-40 disabled:shadow-none'
+      ? 'bg-gradient-to-b from-[#c4f65a] to-[#92d82a] text-black font-display font-bold uppercase tracking-[0.12em] hover:shadow-glow disabled:opacity-40 disabled:shadow-none'
       : kind === 'ghost'
-        ? 'border border-white/15 text-white/80 hover:bg-white/5 hover:border-white/25'
+        ? 'border border-[#4a5140] bg-white/[0.03] text-white/80 hover:bg-white/5 hover:border-[#5c6450]'
         : 'text-white/60 hover:text-white hover:bg-white/5';
   return (
     <button
@@ -242,7 +243,7 @@ export const Badge = ({ children, tone = 'neutral' }) => {
     blue: 'bg-sky-500/15 text-sky-300 border border-sky-500/30',
   };
   return (
-    <span className={`inline-block rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${tones[tone]}`}>
+    <span className={`inline-block rounded-md px-2.5 py-0.5 font-display text-[12px] font-semibold uppercase tracking-[0.1em] ${tones[tone]}`}>
       {children}
     </span>
   );
@@ -258,18 +259,16 @@ export const Field = ({ label, children, className = '' }) => (
 );
 
 export const inputCls =
-  'w-full rounded-xl border border-white/10 bg-coal-900 px-3 py-2.5 text-sm text-white placeholder-white/25 outline-none transition focus:border-pickle-500/60 focus:ring-2 focus:ring-pickle-500/20';
+  'w-full rounded-xl border border-white/10 bg-[#0a0b06] px-3 py-2.5 text-sm text-white shadow-[inset_0_2px_5px_rgba(0,0,0,0.65)] placeholder-white/25 outline-none transition focus:border-pickle-500/60 focus:ring-2 focus:ring-pickle-500/20';
 
 export const Segmented = ({ options, value, onChange }) => (
-  <div className="inline-flex rounded-xl border border-white/10 bg-coal-900 p-1">
+  <div className="seg">
     {options.map((o) => (
       <button
         key={o.value}
         type="button"
         onClick={() => onChange(o.value)}
-        className={`rounded-lg px-3 py-1.5 font-display text-[15px] font-semibold uppercase tracking-wider transition ${
-          value === o.value ? 'bg-pickle-400 text-black shadow-glow' : 'text-white/55 hover:text-white'
-        }`}
+        className={value === o.value ? 'on' : ''}
       >
         {o.label}
       </button>
@@ -288,21 +287,25 @@ export function Modal({ title, onClose, children, wide }) {
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 backdrop-blur-[2px] sm:items-center" onClick={onClose}>
       <div
         onClick={(e) => e.stopPropagation()}
-        className={`max-h-[92vh] w-full overflow-y-auto rounded-t-3xl border border-white/10 bg-coal-900 p-5 shadow-card sm:rounded-3xl ${
-          wide ? 'sm:max-w-2xl' : 'sm:max-w-lg'
-        }`}
+        className={`plate w-full ${wide ? 'sm:max-w-2xl' : 'sm:max-w-lg'}`}
       >
-        <div className="mb-4 flex items-center justify-between">
-          <h2 className="font-display text-xl font-bold uppercase tracking-[0.1em]">{title}</h2>
-          <button
-            onClick={onClose}
-            className="flex h-9 w-9 items-center justify-center rounded-xl text-white/60 transition hover:bg-white/10 hover:text-white"
-            aria-label="Close"
-          >
-            <Icon name="x" className="h-5 w-5" />
-          </button>
+        <i className="rivet tl" />
+        <i className="rivet tr" />
+        <i className="rivet bl" />
+        <i className="rivet br" />
+        <div className="plate-panel max-h-[92vh] overflow-y-auto p-5">
+          <div className="mb-4 flex items-center justify-between">
+            <h2 className="font-display text-xl font-bold uppercase tracking-[0.1em]">{title}</h2>
+            <button
+              onClick={onClose}
+              className="flex h-9 w-9 items-center justify-center rounded-xl text-white/60 transition hover:bg-white/10 hover:text-white"
+              aria-label="Close"
+            >
+              <Icon name="x" className="h-5 w-5" />
+            </button>
+          </div>
+          {children}
         </div>
-        {children}
       </div>
     </div>
   );

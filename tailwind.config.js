@@ -23,6 +23,7 @@ export default {
       },
       fontFamily: {
         display: ['"Barlow Condensed"', '"Arial Narrow"', 'sans-serif'],
+        num: ['Anton', '"Arial Narrow"', 'sans-serif'],
         sans: ['Inter', 'system-ui', '-apple-system', '"Segoe UI"', 'Roboto', 'sans-serif'],
         mono: ['"JetBrains Mono"', 'ui-monospace', 'SFMono-Regular', 'Menlo', 'monospace'],
       },

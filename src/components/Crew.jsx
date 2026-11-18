@@ -52,7 +52,7 @@ export function LockScreen({ pinHashes, users, onUnlock, onSetupPin }) {
       onSetupPin(pin);
     };
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-coal-950 p-6">
+      <div className="steel-bg fixed inset-0 z-50 flex items-center justify-center p-6">
         <div className="w-full max-w-xs space-y-4">
           <div className="text-center">
             <div className="font-display text-2xl font-bold uppercase tracking-wider text-white/90">Big Pickle Racing</div>
@@ -119,7 +119,7 @@ export function LockScreen({ pinHashes, users, onUnlock, onSetupPin }) {
 
   if (stage === 'role') {
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-coal-950 p-6">
+      <div className="steel-bg fixed inset-0 z-50 flex items-center justify-center p-6">
         <div className="w-full max-w-xs space-y-3">
           <div className="text-center">
             <div className="font-display text-2xl font-bold uppercase tracking-wider text-white/90">Who are you?</div>
@@ -141,7 +141,7 @@ export function LockScreen({ pinHashes, users, onUnlock, onSetupPin }) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-coal-950 p-6">
+    <div className="steel-bg fixed inset-0 z-50 flex items-center justify-center p-6">
       <div className="w-full max-w-xs space-y-4">
         <div className="text-center">
           <div className="font-display text-2xl font-bold uppercase tracking-wider text-white/90">Big Pickle Racing</div>

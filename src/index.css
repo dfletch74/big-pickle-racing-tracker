@@ -88,6 +88,150 @@ input[type='number'] {
   background-size: 14px 14px;
 }
 
+/* ---------- steel plate design system (v5.5 restyle) ---------- */
+
+/* app background: dark distressed steel with a faint lime bloom */
+.steel-bg {
+  background:
+    radial-gradient(120% 340px at 50% -80px, rgba(163, 230, 53, 0.07), transparent 70%),
+    radial-gradient(90% 500px at 110% 30%, rgba(122, 72, 32, 0.1), transparent 60%),
+    radial-gradient(90% 500px at -10% 75%, rgba(122, 72, 32, 0.08), transparent 60%),
+    linear-gradient(175deg, #101210 0%, #0a0b09 40%, #070807 100%);
+  background-color: #070807;
+}
+
+/* framed plate: slim metal rim + recessed panel. One system for every card. */
+.plate {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  padding: 8px;
+  background:
+    repeating-linear-gradient(93deg, rgba(255, 255, 255, 0.016) 0 2px, transparent 2px 5px),
+    linear-gradient(150deg, #4a5040 0%, #272b21 48%, #13150e 100%);
+  border: 1px solid #59614e;
+  clip-path: polygon(
+    12px 0, calc(100% - 12px) 0, 100% 12px, 100% calc(100% - 12px),
+    calc(100% - 12px) 100%, 12px 100%, 0 calc(100% - 12px), 0 12px
+  );
+}
+.plate-panel {
+  position: relative;
+  z-index: 1;
+  flex: 1 1 auto;
+  border-radius: 5px;
+  background: linear-gradient(170deg, #12140b 0%, #0b0c07 58%, #080906 100%);
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.9),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.06),
+    inset 0 3px 5px rgba(0, 0, 0, 0.85),
+    inset 0 16px 28px rgba(0, 0, 0, 0.5);
+}
+
+/* rivet: bolt head seated in a dark socket, corners only */
+.rivet {
+  position: absolute;
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  z-index: 5;
+  pointer-events: none;
+  background: radial-gradient(circle, rgba(5, 6, 4, 0.92) 0 52%, #23261e 74%, rgba(255, 255, 255, 0.07) 90%, rgba(0, 0, 0, 0) 100%);
+}
+.rivet::before {
+  content: '';
+  position: absolute;
+  inset: 2.5px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 34% 30%, #f5f7ec 0%, #bcc1ab 30%, #787e6a 56%, #3b4033 82%, #1e2019 100%);
+  box-shadow: inset 0 -1px 2px rgba(0, 0, 0, 0.75), 0 1px 1px rgba(0, 0, 0, 0.55);
+}
+.rivet::after {
+  content: '';
+  position: absolute;
+  left: 4px;
+  right: 4px;
+  top: 50%;
+  height: 1.6px;
+  margin-top: -0.8px;
+  z-index: 2;
+  background: rgba(18, 20, 14, 0.9);
+  border-radius: 1px;
+  transform: rotate(38deg);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.16);
+}
+.rivet.tl { top: 2px; left: 2px; }
+.rivet.tr { top: 2px; right: 2px; }
+.rivet.bl { bottom: 2px; left: 2px; }
+.rivet.br { bottom: 2px; right: 2px; }
+
+/* angled segmented tabs */
+.seg {
+  display: inline-flex;
+  max-width: 100%;
+}
+.seg > button {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 7px 12px 6px;
+  font-family: 'Barlow Condensed', 'Arial Narrow', sans-serif;
+  font-weight: 600;
+  font-size: 15px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: #b0b4a4;
+  background: linear-gradient(180deg, #282c24, #171914);
+  border: 1px solid #434839;
+  border-left: none;
+  clip-path: polygon(0 0, 100% 0, calc(100% - 8px) 100%, 0 100%);
+  margin-right: -3px;
+  transition: color 0.15s ease;
+}
+.seg > button:first-child {
+  border-left: 1px solid #434839;
+  border-radius: 7px 0 0 7px;
+}
+.seg > button:last-child {
+  clip-path: none;
+  border-radius: 0 7px 7px 0;
+  margin-right: 0;
+}
+.seg > button:first-child:last-child {
+  clip-path: none;
+  border-radius: 7px;
+}
+.seg > button.on {
+  color: #0c0f04;
+  font-weight: 700;
+  background: linear-gradient(180deg, #c4f65a, #92d82a);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5), 0 0 14px rgba(163, 230, 53, 0.3);
+}
+
+/* app bar + header buttons + bottom nav */
+.appbar-steel {
+  background: linear-gradient(180deg, #262a21, #14160f);
+  border-bottom: 1px solid #4a5140;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+.hbtn {
+  border-radius: 12px;
+  border: 1px solid #4a5140;
+  background: linear-gradient(180deg, #2e332a, #1a1c15);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12);
+  color: #cfd3c0;
+  transition: color 0.15s ease, transform 0.1s ease;
+}
+.hbtn:hover {
+  color: #fff;
+}
+.nav-steel {
+  background: linear-gradient(180deg, #2b2f26, #14160f);
+  border: 1px solid #59614e;
+  border-radius: 18px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+}
+
 /* ---------- print: clean run sheet ---------- */
 .print-sheet {
   display: none;
