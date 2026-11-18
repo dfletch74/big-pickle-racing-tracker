@@ -1,5 +1,5 @@
 import { useMemo, useState, useEffect, useRef } from 'react';
-import { Card, SectionTitle, Btn, inputCls, Segmented, Badge, EmptyState } from '../components/ui';
+import { Card, SectionTitle, Btn, inputCls, Segmented, Badge } from '../components/ui';
 import { fmtET, fmtMPH, fmtTemp, fmtDA, fmtDate, isNum } from '../lib/format';
 import { runsForCar, raceRuns, filterDistance, latestRun, segmentSplits, bestSegments, predictET, cheatSheet } from '../lib/stats';
 import { DA_BANDS, TEMP_BANDS, airTrendLabel } from '../lib/physics';
@@ -68,39 +68,45 @@ export default function TrackDay({ state, update, toast, dist, setDist, onAddRun
         <div className="mt-1 text-center text-[10px] text-white/35">Higher DA = thinner air = slower. Correcting to a lower DA gives a faster ET.</div>
       </WeatherEntryCard>
 
-      {/* build the pass */}
-      {last ? (
-        <Card>
-          <SectionTitle>Build the pass <span className="normal-case tracking-normal">— {fmtDate(last.date)}</span></SectionTitle>
-          <div className="mb-2 text-xs text-white/50">Last run vs your best per segment:</div>
-          <table className="w-full font-mono text-xs">
-            <tbody>
-              {buildPass.map((s) => (
-                <tr key={s.name} className="border-t border-white/5">
-                  <td className="py-1.5 text-white/60">{s.name}</td>
-                  <td className="text-right">{isNum(s.dur) ? s.dur.toFixed(3) : '—'}</td>
-                  <td className="text-right text-white/40">best {isNum(s.best) ? s.best.toFixed(3) : '—'}</td>
-                  <td className={`text-right ${s.delta > 0.001 ? 'text-amber-300' : 'text-pickle-400'}`}>
-                    {s.delta == null ? '' : s.delta <= 0.0005 ? '✓' : `+${s.delta.toFixed(3)}`}
-                  </td>
-                </tr>
-              ))}
-              <tr className="border-t border-white/10 font-bold">
-                <td className="py-1.5">Full pass</td>
-                <td className="text-right text-pickle-400">{fmtET(last.et)}</td>
-                <td className="text-right text-white/40">@ {fmtMPH(last.mph)}</td>
-                <td />
-              </tr>
-            </tbody>
-          </table>
-        </Card>
-      ) : (
-        <EmptyState title="No runs yet" body="Log a run to build your first pass analysis." action={<Btn onClick={onAddRun}>Log a run</Btn>} />
-      )}
+      {/* pass tools — build the pass, predictor and cheat sheets share one frame */}
+      <Card className="py-1">
+        <div className="divide-y divide-white/[0.08]">
+          {last ? (
+            <section className="py-3 first:pt-2 last:pb-2">
+              <SectionTitle>Build the pass <span className="normal-case tracking-normal">— {fmtDate(last.date)}</span></SectionTitle>
+              <div className="mb-2 text-xs text-white/50">Last run vs your best per segment:</div>
+              <table className="w-full font-mono text-xs">
+                <tbody>
+                  {buildPass.map((s) => (
+                    <tr key={s.name} className="border-t border-white/5">
+                      <td className="py-1.5 text-white/60">{s.name}</td>
+                      <td className="text-right">{isNum(s.dur) ? s.dur.toFixed(3) : '—'}</td>
+                      <td className="text-right text-white/40">best {isNum(s.best) ? s.best.toFixed(3) : '—'}</td>
+                      <td className={`text-right ${s.delta > 0.001 ? 'text-amber-300' : 'text-pickle-400'}`}>
+                        {s.delta == null ? '' : s.delta <= 0.0005 ? '✓' : `+${s.delta.toFixed(3)}`}
+                      </td>
+                    </tr>
+                  ))}
+                  <tr className="border-t border-white/10 font-bold">
+                    <td className="py-1.5">Full pass</td>
+                    <td className="text-right text-pickle-400">{fmtET(last.et)}</td>
+                    <td className="text-right text-white/40">@ {fmtMPH(last.mph)}</td>
+                    <td />
+                  </tr>
+                </tbody>
+              </table>
+            </section>
+          ) : (
+            <section className="py-3 first:pt-2 last:pb-2">
+              <SectionTitle>Build the pass</SectionTitle>
+              <div className="py-1 text-center text-sm text-white/40">No runs yet — log a run to build your first pass analysis.</div>
+              <div className="flex justify-center pb-1"><Btn onClick={onAddRun}>Log a run</Btn></div>
+            </section>
+          )}
 
-      {/* next pass predictor */}
-      <Card>
-        <SectionTitle>Next pass predictor</SectionTitle>
+          {/* next pass predictor */}
+          <section className="py-3 first:pt-2 last:pb-2">
+            <SectionTitle>Next pass predictor</SectionTitle>
         {prediction != null ? (
           <div>
             <div className="font-mono text-2xl font-black text-pickle-400">{prediction.et.toFixed(3)}s <span className="text-sm font-normal text-white/50">predicted ET</span></div>
@@ -113,34 +119,38 @@ export default function TrackDay({ state, update, toast, dist, setDist, onAddRun
             <div className="mt-1 text-xs text-white/40">{prediction.detail}</div>
           </div>
         ) : (
-          <div className="text-sm text-white/50">Log a run to get a prediction.</div>
-        )}
-      </Card>
+              <div className="text-sm text-white/50">Log a run to get a prediction.</div>
+            )}
+          </section>
 
-      {/* cheat sheets */}
-      <Card>
-        <SectionTitle>ET cheat sheet</SectionTitle>
+          {/* cheat sheets */}
+          <section className="py-3 first:pt-2 last:pb-2">
+            <SectionTitle>ET cheat sheet</SectionTitle>
         <div className="mb-1 text-[11px] font-semibold text-white/50">By density altitude</div>
         <SheetTable rows={sheets.da} />
-        <div className="mb-1 mt-3 text-[11px] font-semibold text-white/50">By temperature</div>
-        <SheetTable rows={sheets.temp} />
+            <div className="mb-1 mt-3 text-[11px] font-semibold text-white/50">By temperature</div>
+            <SheetTable rows={sheets.temp} />
+          </section>
+        </div>
       </Card>
 
-      {/* eliminations */}
-      <Card>
-        <div className="mb-2 flex items-center justify-between">
-          <SectionTitle>Eliminations</SectionTitle>
+      {/* track book — eliminations, notes and tracks share one frame */}
+      <Card className="py-1">
+        <div className="divide-y divide-white/[0.08]">
+          <section className="py-3 first:pt-2 last:pb-2">
+            <div className="mb-2 flex items-center justify-between">
+              <SectionTitle>Eliminations</SectionTitle>
           {canEdit && (
             <Btn kind="ghost" onClick={() => setShowElims((s) => !s)} className="!py-1.5 text-xs">{showElims ? 'Hide' : 'Manage'}</Btn>
           )}
         </div>
         {showElims && <Elims state={state} update={update} toast={toast} track={track} dist={dist} />}
-        {!showElims && <div className="text-xs text-white/45">{state.events.length} event{state.events.length === 1 ? '' : 's'} on record.</div>}
-      </Card>
+            {!showElims && <div className="text-xs text-white/45">{state.events.length} event{state.events.length === 1 ? '' : 's'} on record.</div>}
+          </section>
 
-      {/* track notes */}
-      <Card>
-        <SectionTitle>Track notes</SectionTitle>
+          {/* track notes */}
+          <section className="py-3 first:pt-2 last:pb-2">
+            <SectionTitle>Track notes</SectionTitle>
         {canEdit && (
           <div className="mb-2 flex gap-2">
             <input value={noteText} onChange={(e) => setNoteText(e.target.value)} placeholder="Lane 2 hooking better after 6pm…" className={`${inputCls} flex-1`} />
@@ -155,13 +165,13 @@ export default function TrackDay({ state, update, toast, dist, setDist, onAddRun
               <button onClick={() => update((s) => { s.trackNotes = s.trackNotes.filter((x) => x.id !== n.id); })} className="text-xs text-red-400/70">✕</button>
             )}
           </div>
-        ))}
-      </Card>
+            ))}
+          </section>
 
-      {/* manage tracks */}
-      <Card>
-        <div className="mb-2 flex items-center justify-between">
-          <SectionTitle>Tracks</SectionTitle>
+          {/* manage tracks */}
+          <section className="py-3 first:pt-2 last:pb-2">
+            <div className="mb-2 flex items-center justify-between">
+              <SectionTitle>Tracks</SectionTitle>
           {canEdit && (
             <Btn kind="ghost" onClick={() => setShowTracks((s) => !s)} className="!py-1.5 text-xs">{showTracks ? 'Hide' : 'Manage'}</Btn>
           )}
@@ -169,8 +179,10 @@ export default function TrackDay({ state, update, toast, dist, setDist, onAddRun
         {showTracks ? (
           <ManageTracks state={state} update={update} toast={toast} selectedId={trackId} onSelectTrack={setTrackId} />
         ) : (
-          <div className="text-xs text-white/45">{state.tracks.length} track{state.tracks.length === 1 ? '' : 's'} in the list.</div>
-        )}
+              <div className="text-xs text-white/45">{state.tracks.length} track{state.tracks.length === 1 ? '' : 's'} in the list.</div>
+            )}
+          </section>
+        </div>
       </Card>
     </div>
   );
