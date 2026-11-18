@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Modal, SectionTitle, Btn, Field, inputCls, Badge, Icon } from '../components/ui';
+import { Modal, SectionTitle, Btn, Field, inputCls, Badge, Icon, Card } from '../components/ui';
 import { uid, makeDemoState } from '../lib/store';
 import { runsForCar } from '../lib/stats';
 import { runsToCSV, downloadFile } from '../lib/io';
@@ -150,16 +150,14 @@ function TreeBulb({ on, color, className = 'h-16 w-16' }) {
   );
 }
 
-function TreeSeg({ options, value, onChange, labelClass = '', compact = false }) {
+function TreeSeg({ options, value, onChange, labelClass = '' }) {
   return (
-    <div className="grid grid-cols-2 gap-2">
+    <div className="seg w-full">
       {options.map((o) => (
         <button
           key={o.value}
           onClick={() => onChange(o.value)}
-          className={`rounded-2xl font-bold transition active:scale-[0.98] ${compact ? 'py-2.5 text-[15px]' : 'py-3.5 text-[17px]'} ${labelClass} ${
-            value === o.value ? 'bg-pickle-400 text-black shadow-glow' : 'bg-white/[0.06] text-white/45 hover:text-white'
-          }`}
+          className={`${labelClass} ${value === o.value ? 'on' : ''}`}
         >
           {o.label}
         </button>
@@ -177,8 +175,10 @@ function RacerPicker({ racers, racerId, onPick, onClose }) {
     <div className="fixed inset-0 z-[70] flex items-end justify-center bg-black/75 p-4 sm:items-center" onClick={onClose}>
       <div
         onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-md rounded-[26px] border border-white/10 bg-[#14161b] p-5 shadow-card"
+        className="plate w-full max-w-md"
       >
+        <i className="rivet tl" /><i className="rivet tr" /><i className="rivet bl" /><i className="rivet br" />
+        <div className="plate-panel p-5">
         <div className="mb-1 flex items-center gap-2.5">
           <Icon name="user" className="h-6 w-6 shrink-0 text-pickle-400" />
           <h2 className="font-display text-[30px] font-bold uppercase leading-none tracking-[0.04em]">
@@ -208,6 +208,7 @@ function RacerPicker({ racers, racerId, onPick, onClose }) {
             );
           })}
           {!racers.length && <div className="py-4 text-center text-sm text-white/40">No racers yet.</div>}
+        </div>
         </div>
       </div>
     </div>
@@ -248,6 +249,7 @@ export function TreeSimModal({ state, update, toast, onClose, roleId, users }) {
   const [oppLit, setOppLit] = useState([]);
   const timers = useRef([]);
   const greenAt = useRef(0);
+  const scrollRef = useRef(null);
 
   // Delay box persists in settings so it survives closing the Tree.
   const persistDelay = (v) => {
@@ -262,6 +264,14 @@ export function TreeSimModal({ state, update, toast, onClose, roleId, users }) {
   const racer = state.racers.find((r) => r.id === racerId);
   const clearTimers = () => { timers.current.forEach(clearTimeout); timers.current = []; };
   useEffect(() => clearTimers, []);
+
+  // While staging/running, the configuration collapses away so the tree
+  // owns the screen; it returns for idle/done — delay-box tweaks and tree
+  // changes happen between runs, not during one.
+  const configCollapsed = phase === 'staged' || phase === 'running';
+  useEffect(() => {
+    if (configCollapsed) scrollRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+  }, [configCollapsed]);
 
   const later = (ms, fn) => timers.current.push(setTimeout(fn, ms));
 
@@ -380,7 +390,7 @@ export function TreeSimModal({ state, update, toast, onClose, roleId, users }) {
         <button
           ref={stageTapRef}
           onClick={stage}
-          className="w-full rounded-2xl bg-white/[0.07] py-4 font-display text-[20px] font-bold uppercase tracking-[0.1em] text-white transition hover:bg-white/[0.1] active:scale-[0.99]"
+          className="w-full rounded-2xl bg-gradient-to-b from-pickle-300 to-pickle-500 py-4 font-display text-[20px] font-bold uppercase tracking-[0.1em] text-black shadow-glow transition hover:brightness-110 active:scale-[0.99]"
         >
           Tap to stage
         </button>
@@ -390,7 +400,7 @@ export function TreeSimModal({ state, update, toast, onClose, roleId, users }) {
           ref={setHoldBtnRef}
           onMouseDown={holdStart} onMouseUp={holdEnd} onMouseLeave={holdEnd}
           onContextMenu={(e) => e.preventDefault()}
-          className="w-full select-none rounded-2xl bg-pickle-400 py-4 font-display text-[20px] font-bold uppercase tracking-[0.1em] text-black shadow-glow transition active:bg-pickle-300"
+          className="w-full select-none rounded-2xl bg-gradient-to-b from-pickle-300 to-pickle-500 py-4 font-display text-[20px] font-bold uppercase tracking-[0.1em] text-black shadow-glow transition active:brightness-110"
           style={{ touchAction: 'none', WebkitTouchCallout: 'none' }}
         >
           Hold — launch
@@ -407,7 +417,7 @@ export function TreeSimModal({ state, update, toast, onClose, roleId, users }) {
             <button
               ref={stageTapRef}
               onClick={stage}
-              className="flex-1 rounded-2xl bg-white/[0.07] py-3.5 font-display text-lg font-bold uppercase tracking-[0.1em] transition hover:bg-white/[0.1] active:scale-[0.99]"
+              className="flex-1 rounded-2xl bg-gradient-to-b from-pickle-300 to-pickle-500 py-3.5 font-display text-lg font-bold uppercase tracking-[0.1em] text-black shadow-glow transition hover:brightness-110 active:scale-[0.99]"
             >
               Stage again
             </button>
@@ -429,7 +439,7 @@ export function TreeSimModal({ state, update, toast, onClose, roleId, users }) {
       <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/75 sm:items-center" onClick={handleClose}>
         <div
           onClick={(e) => e.stopPropagation()}
-          className="flex max-h-[94dvh] w-full flex-col overflow-hidden rounded-t-3xl border border-white/10 bg-coal-950 sm:max-w-md sm:rounded-3xl"
+          className="steel-bg flex max-h-[94dvh] w-full flex-col overflow-hidden rounded-t-3xl border border-[#59614e]/60 sm:max-w-md sm:rounded-3xl"
         >
           {/* header — fixed */}
           <div className="flex shrink-0 items-center gap-2.5 px-5 pt-4">
@@ -452,7 +462,9 @@ export function TreeSimModal({ state, update, toast, onClose, roleId, users }) {
           </div>
 
           {/* scrollable middle */}
-          <div className="min-h-0 flex-1 overflow-y-auto px-5 py-3">
+          <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto px-5 py-3">
+            <div className={`grid transition-all duration-300 ease-in-out ${configCollapsed ? 'grid-rows-[0fr] opacity-0' : 'grid-rows-[1fr] opacity-100'}`}>
+              <div className="min-h-0 overflow-hidden">
             <div className="space-y-2">
               <TreeSeg
                 options={[{ value: '400', label: '.400' }, { value: '500', label: '.500' }]}
@@ -462,7 +474,7 @@ export function TreeSimModal({ state, update, toast, onClose, roleId, users }) {
                 options={[{ value: 'sportsman', label: 'SPORTSMAN' }, { value: 'pro', label: 'PRO' }]}
                 value={mode} onChange={setMode} labelClass="font-display tracking-[0.08em]" compact
               />
-              <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
+              <div className="rounded-xl border border-[#59614e]/50 bg-black/40 p-3 shadow-[inset_0_2px_10px_rgba(0,0,0,0.55)]">
                 <div className="mb-2 flex items-center justify-between">
                   <span className="text-xs font-semibold uppercase tracking-wider text-white/60">Delay box</span>
                   <span className="font-mono text-sm font-bold text-pickle-400">{delayBox.toFixed(3)}s</span>
@@ -495,8 +507,8 @@ export function TreeSimModal({ state, update, toast, onClose, roleId, users }) {
               </div>
               <button
                 onClick={() => setCrossTalk((v) => !v)}
-                className={`w-full rounded-2xl border px-3 py-2.5 text-sm font-semibold transition ${
-                  crossTalk ? 'border-pickle-500/50 bg-pickle-500/10 text-pickle-300' : 'border-white/10 bg-white/5 text-white/60'
+                className={`w-full rounded-xl border px-3 py-2.5 text-sm font-semibold transition ${
+                  crossTalk ? 'border-pickle-500/50 bg-pickle-500/10 text-pickle-300' : 'border-[#59614e]/60 bg-black/30 text-white/60'
                 }`}
               >
                 Cross Talk {crossTalk ? 'ON' : 'OFF'}
@@ -520,10 +532,14 @@ export function TreeSimModal({ state, update, toast, onClose, roleId, users }) {
                 <p className="mt-1.5">Release the instant you see green. Red means you left early — foul.</p>
               </div>
             )}
+              </div>
+            </div>
 
             {/* the tree — compact so bulbs + action bar share one screen */}
             <div className="flex items-start justify-center gap-4">
-              <div className="mx-auto mt-1 w-full max-w-[250px] rounded-[22px] border border-white/[0.08] bg-[#12141a] px-6 py-4">
+              <div className="plate mx-auto mt-1 w-full max-w-[266px]">
+                <i className="rivet tl" /><i className="rivet tr" /><i className="rivet bl" /><i className="rivet br" />
+                <div className="plate-panel px-6 py-4">
                 <div className="mb-2 text-center text-[10px] uppercase tracking-[0.2em] text-white/40">You</div>
                 <div className="flex items-start justify-center gap-8">
                   <div className="flex flex-col items-center gap-1.5">
@@ -550,10 +566,13 @@ export function TreeSimModal({ state, update, toast, onClose, roleId, users }) {
                     </div>
                   ))}
                 </div>
+                </div>
               </div>
 
               {crossTalk && (
-                <div className="mt-1 w-full max-w-[140px] rounded-[22px] border border-white/[0.06] bg-[#0f1116] px-4 py-4 opacity-70">
+                <div className="plate mt-1 w-full max-w-[156px] opacity-70">
+                  <i className="rivet tl" /><i className="rivet tr" /><i className="rivet bl" /><i className="rivet br" />
+                  <div className="plate-panel px-4 py-4">
                   <div className="mb-2 text-center text-[10px] uppercase tracking-[0.2em] text-white/30">Opponent</div>
                   <div className="space-y-2">
                     {[
@@ -568,6 +587,7 @@ export function TreeSimModal({ state, update, toast, onClose, roleId, users }) {
                     ))}
                   </div>
                   <div className="mt-2 text-center text-[9px] text-white/30">Ignore this tree</div>
+                  </div>
                 </div>
               )}
             </div>
@@ -582,7 +602,7 @@ export function TreeSimModal({ state, update, toast, onClose, roleId, users }) {
             </div>
 
             {/* rankings */}
-            <div className="mb-1 mt-4 rounded-3xl border border-white/[0.08] bg-[#12141a] p-4">
+            <Card className="mb-1 mt-4">
                 <div className="mb-2.5 flex items-center gap-2">
                   <Icon name="trophy" className="h-5 w-5 text-pickle-400" />
                 <h3 className="font-display text-[20px] font-bold uppercase tracking-[0.06em]">Racer Rankings</h3>
@@ -626,7 +646,7 @@ export function TreeSimModal({ state, update, toast, onClose, roleId, users }) {
                 })}
                 {!ranked.length && <div className="py-2 text-center text-sm text-white/40">No racers yet.</div>}
               </div>
-            </div>
+            </Card>
           </div>
 
           {/* sticky action bar — always visible during play */}
