@@ -381,7 +381,7 @@ export default function App() {
 
       {/* bottom nav */}
       <nav
-        className="app-chrome nav-steel fixed inset-x-3 z-40 pb-[env(safe-area-inset-bottom)]"
+        className="app-chrome nav-steel fixed inset-x-3 z-40"
         style={{ bottom: 'max(0.65rem, env(safe-area-inset-bottom))' }}
       >
         <div className="mx-auto grid max-w-3xl grid-cols-6 items-end px-2">
