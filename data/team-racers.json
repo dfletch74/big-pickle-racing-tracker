@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-11-18T19:32:59.195Z",
+  "updatedAt": "2026-11-18T19:34:19.019Z",
   "racers": [
     {
       "name": "Dwayne",
@@ -330,6 +330,24 @@
         {
           "id": "mwmidcin-7wrifhd",
           "rt": 0.047,
+          "red": false,
+          "date": "2026-11-18",
+          "tree": "500",
+          "mode": "sportsman",
+          "delayBox": 0.02
+        },
+        {
+          "id": "mwmirmom-whuvv81",
+          "rt": -0.035,
+          "red": true,
+          "date": "2026-11-18",
+          "tree": "500",
+          "mode": "sportsman",
+          "delayBox": 0.02
+        },
+        {
+          "id": "mwmis1z4-knyqber",
+          "rt": 0.048,
           "red": false,
           "date": "2026-11-18",
           "tree": "500",
