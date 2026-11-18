@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Card, Badge, Btn, Icon } from './ui';
+import { Badge, Btn, Icon } from './ui';
 import { fmtET, fmtMPH, fmtRT, fmtTemp, fmtRH, fmtDA, fmtDate, isNum } from '../lib/format';
 import { detectIssues, segmentSplits, correctedETOf } from '../lib/stats';
 
@@ -14,8 +14,8 @@ export default function RunCard({ run, ctx, baseline, onEdit, onDelete, onFlag, 
   const segs = segmentSplits(run);
 
   return (
-    <Card className="p-0">
-      <button onClick={() => setOpen((o) => !o)} className="block w-full p-4 text-left">
+    <div>
+      <button onClick={() => setOpen((o) => !o)} className="block w-full py-3.5 text-left">
         <div className="mb-1 flex flex-wrap items-center gap-2">
           <span className="font-bold">{run.track}</span>
           <Badge tone={run.distance === '1/4' ? 'blue' : 'neutral'}>{run.distance} mi</Badge>
@@ -31,11 +31,11 @@ export default function RunCard({ run, ctx, baseline, onEdit, onDelete, onFlag, 
           <span className="ml-auto text-white/35"><Icon name="chevD" className={`h-4 w-4 transition-transform ${open ? 'rotate-180' : ''}`} /></span>
         </div>
         <div className="text-xs text-white/45">{fmtDate(run.date)}{run.time ? ` · ${run.time}` : ''}</div>
-        <div className="mt-2 grid grid-cols-4 gap-2 font-mono text-sm">
-          <div><div className="text-[10px] uppercase tracking-wider text-white/40">R/T</div><div className={run.rt < 0 ? 'text-red-400' : ''}>{fmtRT(run.rt)}</div></div>
-          <div><div className="text-[10px] uppercase tracking-wider text-white/40">60FT</div><div>{isNum(run.sixty) ? run.sixty.toFixed(3) : '—'}</div></div>
-          <div><div className="text-[10px] uppercase tracking-wider text-white/40">ET</div><div className="text-base font-bold text-pickle-400">{fmtET(run.et)}</div></div>
-          <div><div className="text-[10px] uppercase tracking-wider text-white/40">MPH</div><div>{fmtMPH(run.mph)}</div></div>
+        <div className="mt-2 grid grid-cols-4 gap-2 text-sm">
+          <div><div className="text-[10px] uppercase tracking-wider text-white/40">R/T</div><div className={`font-num text-[16px] ${run.rt < 0 ? 'text-red-400' : ''}`}>{fmtRT(run.rt)}</div></div>
+          <div><div className="text-[10px] uppercase tracking-wider text-white/40">60FT</div><div className="font-num text-[16px]">{isNum(run.sixty) ? run.sixty.toFixed(3) : '—'}</div></div>
+          <div><div className="text-[10px] uppercase tracking-wider text-white/40">ET</div><div className="font-num text-[19px] text-pickle-400">{fmtET(run.et)}</div></div>
+          <div><div className="text-[10px] uppercase tracking-wider text-white/40">MPH</div><div className="font-num text-[16px]">{fmtMPH(run.mph)}</div></div>
         </div>
         {issues.length > 0 && (
           <div className="mt-2 space-y-1">
@@ -47,7 +47,7 @@ export default function RunCard({ run, ctx, baseline, onEdit, onDelete, onFlag, 
       </button>
 
       {open && (
-        <div className="border-t border-white/10 p-4 text-sm">
+        <div className="border-t border-white/10 pb-2 pt-3 text-sm">
           <div className="mb-3 grid grid-cols-3 gap-2 font-mono text-xs">
             <div><div className="text-white/40">330FT</div>{isNum(run.threeThirty) ? run.threeThirty.toFixed(3) : '—'}</div>
             <div><div className="text-white/40">1/8 ET</div>{fmtET(run.eighthET)}</div>
@@ -95,7 +95,7 @@ export default function RunCard({ run, ctx, baseline, onEdit, onDelete, onFlag, 
           </div>
         </div>
       )}
-    </Card>
+    </div>
   );
 }
 

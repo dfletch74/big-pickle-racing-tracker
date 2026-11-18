@@ -203,12 +203,14 @@ export default function Runs({ state, update, toast, dist, setDist, onPrint, onA
           action={carRuns.length ? null : <div className="flex justify-center gap-2"><Btn onClick={onAddRun}>Log a run</Btn><Btn kind="ghost" onClick={() => setMode('import')}>Import</Btn></div>}
         />
       ) : (
-        <div className="space-y-2">
-          {filtered.map((r) => (
-            <RunCard key={r.id} run={r} ctx={ctx} baseline={baseline}
-              onEdit={role?.canLog ? (run) => onAddRun(run.id) : null} onDelete={role?.canDelete ? doDelete : null} onPrint={onPrint} onFlag={doFlag} />
-          ))}
-        </div>
+        <Card className="py-1">
+          <div className="divide-y divide-white/[0.08]">
+            {filtered.map((r) => (
+              <RunCard key={r.id} run={r} ctx={ctx} baseline={baseline}
+                onEdit={role?.canLog ? (run) => onAddRun(run.id) : null} onDelete={role?.canDelete ? doDelete : null} onPrint={onPrint} onFlag={doFlag} />
+            ))}
+          </div>
+        </Card>
       )}
     </div>
   );
