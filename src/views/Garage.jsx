@@ -1,6 +1,8 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import { Card, SectionTitle, Btn, inputCls, Badge, Segmented } from '../components/ui';
-import { predictET, runsForCar } from '../lib/stats';
+import { predictET, runsForCar, raceRuns, filterDistance, personalBests, consistency } from '../lib/stats';
+import { fmtET, fmtMPH, fmtRT, fmtDate, isNum } from '../lib/format';
+import { jsPDF } from 'jspdf';
 import { migrateMaintenanceCarIds, carRunCount, runsSinceService } from '../lib/maintenance';
 
 /**
@@ -16,6 +18,7 @@ export default function Garage({ state, update, toast, role }) {
     ['maint', 'Maintenance'],
     ['check', 'Checklists'],
     ['report', 'Report Card'],
+    ['season', 'Season Report'],
     ['video', 'Video'],
   ];
 
@@ -27,7 +30,9 @@ export default function Garage({ state, update, toast, role }) {
             key={id}
             onClick={() => setTab(id)}
             className={`shrink-0 rounded-xl px-4 py-2 font-display text-sm font-semibold uppercase tracking-wider transition ${
-              tab === id ? 'bg-pickle-400 text-black' : 'bg-white/5 text-white/60 hover:bg-white/10'
+              tab === id
+                ? 'bg-gradient-to-b from-pickle-300 to-pickle-500 text-black shadow-glow'
+                : 'border border-[#59614e]/60 bg-black/30 text-white/60 hover:text-white'
             }`}
           >
             {label}
@@ -38,6 +43,7 @@ export default function Garage({ state, update, toast, role }) {
       {tab === 'maint' && <Maintenance state={state} update={update} toast={toast} canEdit={canEdit} isAdmin={isAdmin} />}
       {tab === 'check' && <Checklists state={state} update={update} toast={toast} canEdit={canEdit} />}
       {tab === 'report' && <ReportCard state={state} />}
+      {tab === 'season' && <SeasonReport state={state} />}
       {tab === 'video' && <VideoOverlay state={state} toast={toast} />}
     </div>
   );
@@ -174,13 +180,16 @@ function Maintenance({ state, update, toast, canEdit, isAdmin }) {
       <div className="text-xs text-white/45">
         Tracked per car — showing maintenance for <span className="font-semibold text-white/80">{carName}</span>. Switch cars via the logo to see theirs.
       </div>
+      {parts.length > 0 && (
+        <Card className="py-1">
+          <div className="divide-y divide-white/[0.08]">
       {parts.map((p) => {
         const since = runsSinceService(state, p);
         const remaining = p.runsPerService - since;
         const overdue = remaining <= 0;
         const soon = !overdue && remaining <= Math.ceil(p.runsPerService * 0.2);
         return (
-          <Card key={p.id}>
+          <div key={p.id} className="py-3 first:pt-2 last:pb-2">
             <div className="flex items-center justify-between">
               <div className="font-semibold text-white/90">{p.name}</div>
               {overdue ? (
@@ -220,9 +229,12 @@ function Maintenance({ state, update, toast, canEdit, isAdmin }) {
                 )}
               </div>
             )}
-          </Card>
+          </div>
         );
       })}
+          </div>
+        </Card>
+      )}
       {parts.length === 0 && (
         <div className="text-sm text-white/40">No parts tracked yet. Load the standard schedule below or add your own.</div>
       )}
@@ -608,6 +620,155 @@ function VideoOverlay({ state, toast }) {
           )}
         </Card>
       )}
+    </div>
+  );
+}
+
+/* ---------------- Season report ----------------
+   Garage-only (admin + driver): the season on one card, exportable as a
+   one-page PDF for sponsors. Stats follow the dashboard's rules — race
+   runs only, headline numbers from the 1/4-mile set when there is one. */
+function SeasonReport({ state }) {
+  const car = state.cars.find((c) => c.id === state.activeCarId) || state.cars[0];
+  const allRuns = useMemo(() => runsForCar(state, car?.id), [state, car]);
+  const years = useMemo(() => {
+    const ys = [...new Set(allRuns.map((r) => (r.date || '').slice(0, 4)).filter(Boolean))].sort().reverse();
+    return ys.length ? ys : [String(new Date().getFullYear())];
+  }, [allRuns]);
+  const [year, setYear] = useState(null);
+  const yr = year && years.includes(year) ? year : years[0];
+
+  const runs = useMemo(
+    () => raceRuns(allRuns.filter((r) => (r.date || '').startsWith(yr))),
+    [allRuns, yr]
+  );
+  const qRuns = useMemo(() => filterDistance(runs, '1/4'), [runs]);
+  const pbs = personalBests(qRuns.length ? qRuns : runs);
+  const con = consistency(qRuns, state.settings?.daBaseline ?? 2500);
+  const rtVals = runs.map((r) => r.rt).filter((v) => isNum(v) && v >= 0);
+  const avgRt = rtVals.length ? rtVals.reduce((a, b) => a + b, 0) / rtVals.length : null;
+
+  let w = 0, l = 0, eventCount = 0;
+  for (const ev of state.events || []) {
+    if (!(ev.date || '').startsWith(yr)) continue;
+    eventCount++;
+    for (const r of ev.rounds || []) {
+      if (r.result === 'W') w++;
+      else if (r.result === 'L') l++;
+    }
+  }
+  const winRate = w + l ? Math.round((w / (w + l)) * 100) : null;
+
+  const counts = {};
+  for (const r of runs) counts[r.track] = (counts[r.track] || 0) + 1;
+  const pbByTrack = Object.keys(counts)
+    .map((t) => {
+      const tr = runs.filter((r) => r.track === t && isNum(r.et));
+      const best = tr.length ? tr.reduce((a, b) => (b.et < a.et ? b : a)) : null;
+      return { track: t, n: counts[t], best };
+    })
+    .filter((x) => x.best)
+    .sort((a, b) => a.best.et - b.best.et);
+
+  const exportPdf = () => {
+    const doc = new jsPDF();
+    const L = 40;
+    let y = 48;
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(22);
+    doc.text('BIG PICKLE RACING', L, y);
+    y += 26;
+    doc.setFontSize(13);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`${car?.name || 'Season'} — ${yr} Season Report`, L, y);
+    y += 18;
+    if (car?.year) {
+      doc.setFontSize(11);
+      doc.setTextColor(110);
+      doc.text(`${car.year} ${car.make || ''} ${car.model || ''}`.replace(/\s+/g, ' ').trim(), L, y);
+      y += 22;
+      doc.setTextColor(0);
+    }
+    const line = (label, value) => {
+      doc.setFont('helvetica', 'bold');
+      doc.text(label, L, y);
+      doc.setFont('helvetica', 'normal');
+      doc.text(String(value), L + 130, y);
+      y += 17;
+    };
+    doc.setFontSize(11);
+    line('Runs', runs.length);
+    line('Events attended', eventCount);
+    if (pbs.et) line('Best ET', `${fmtET(pbs.et.et)} — ${pbs.et.track}, ${fmtDate(pbs.et.date)}`);
+    if (pbs.mph) line('Best MPH', fmtMPH(pbs.mph.mph));
+    if (pbs.sixty) line('Best 60 ft', pbs.sixty.sixty.toFixed(3));
+    if (avgRt != null) line('Avg R/T', fmtRT(avgRt));
+    if (w + l) line('Elimination record', `${w}W – ${l}L (${winRate}% wins)`);
+    if (con) line('Consistency', `Grade ${con.grade} · spread ${con.spread.toFixed(3)}s`);
+    if (pbByTrack.length) {
+      y += 10;
+      doc.setFont('helvetica', 'bold');
+      doc.text('Personal best by track', L, y);
+      y += 18;
+      doc.setFont('helvetica', 'normal');
+      for (const p of pbByTrack) {
+        doc.text(`${p.track}: ${fmtET(p.best.et)} @ ${fmtMPH(p.best.mph)} (${p.n} runs, ${fmtDate(p.best.date)})`, L, y);
+        y += 16;
+      }
+    }
+    y += 16;
+    doc.setFontSize(9);
+    doc.setTextColor(110);
+    doc.text('Generated by the Big Pickle Racing Tracker', L, y);
+    doc.save(`big-pickle-season-${yr}.pdf`);
+  };
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between gap-2">
+        <div className="text-xs text-white/45">
+          Season summary for <span className="font-semibold text-white/80">{car?.name}</span> — Garage only, so just admin + driver see it.
+        </div>
+        <Segmented value={yr} onChange={setYear} options={years.map((y) => ({ value: y, label: y }))} />
+      </div>
+      <Card>
+        <div className="text-center">
+          <div className="font-display text-[26px] font-bold uppercase leading-tight tracking-[0.06em]">Big Pickle Racing</div>
+          <div className="mt-0.5 text-sm text-white/50">
+            {car?.name}{car?.year ? ` · ${car.year} ${car.make || ''} ${car.model || ''}` : ''}
+          </div>
+          <div className="mt-1 font-display text-[15px] font-semibold uppercase tracking-[0.2em] text-pickle-400">{yr} Season</div>
+        </div>
+        <div className="mt-4 grid grid-cols-3 gap-3 text-center">
+          <div><div className="text-[10px] uppercase tracking-wider text-white/40">Runs</div><div className="font-num text-[26px]">{runs.length}</div></div>
+          <div><div className="text-[10px] uppercase tracking-wider text-white/40">Events</div><div className="font-num text-[26px]">{eventCount}</div></div>
+          <div><div className="text-[10px] uppercase tracking-wider text-white/40">Record</div><div className="font-num text-[26px]">{w + l ? `${w}–${l}` : '—'}</div></div>
+          <div><div className="text-[10px] uppercase tracking-wider text-white/40">Best ET</div><div className="font-num text-[26px] text-pickle-400">{pbs.et ? fmtET(pbs.et.et) : '—'}</div></div>
+          <div><div className="text-[10px] uppercase tracking-wider text-white/40">Best MPH</div><div className="font-num text-[26px]">{pbs.mph ? fmtMPH(pbs.mph.mph) : '—'}</div></div>
+          <div><div className="text-[10px] uppercase tracking-wider text-white/40">Avg R/T</div><div className="font-num text-[26px]">{avgRt != null ? fmtRT(avgRt) : '—'}</div></div>
+        </div>
+        {pbs.et && (
+          <div className="mt-2 text-center text-[11px] text-white/40">
+            Best ET at {pbs.et.track} · {fmtDate(pbs.et.date)}
+            {winRate != null ? ` · Win rate ${winRate}%` : ''}
+            {con ? ` · Consistency ${con.grade}` : ''}
+          </div>
+        )}
+        {pbByTrack.length > 0 && (
+          <div className="mt-3 border-t border-white/[0.08]">
+            {pbByTrack.map((p) => (
+              <div key={p.track} className="flex items-baseline justify-between gap-2 border-b border-white/[0.06] py-2 text-sm last:border-0">
+                <span className="min-w-0 truncate font-semibold">{p.track}</span>
+                <span className="shrink-0 text-xs text-white/40">{p.n} runs</span>
+                <span className="shrink-0 font-num text-[16px] text-pickle-400">{fmtET(p.best.et)}</span>
+              </div>
+            ))}
+          </div>
+        )}
+        {runs.length === 0 && <div className="mt-3 text-center text-sm text-white/40">No runs recorded in {yr} yet.</div>}
+      </Card>
+      <Btn onClick={exportPdf} className="w-full">Export one-page PDF</Btn>
+      <div className="text-center text-[11px] text-white/35">Built for sponsor outreach — bests, wins and events from your real log.</div>
     </div>
   );
 }

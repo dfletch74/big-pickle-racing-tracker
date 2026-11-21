@@ -250,7 +250,7 @@ export default function AddRun({ state, update, toast, editId, onDone }) {
       <SectionTitle>{editing ? 'Edit run' : 'Log a run'}</SectionTitle>
 
       {!editing && (
-        <div className="space-y-2">
+        <Card className="space-y-2">
           <div className="flex gap-2">
             <input
               value={quickNums}
@@ -267,7 +267,7 @@ export default function AddRun({ state, update, toast, editId, onDone }) {
           </Btn>
           {clipMsg && <div className="text-center text-xs text-amber-300/80">{clipMsg}</div>}
           <div className="text-center text-[11px] text-white/35">Tip: iPhone Photos can copy text off a slip (Live Text) — paste it with "Fill from clipboard".</div>
-        </div>
+        </Card>
       )}
 
       <Card className="space-y-3">
@@ -287,7 +287,7 @@ export default function AddRun({ state, update, toast, editId, onDone }) {
             </Field>
           )}
         </div>
-        <label className="flex cursor-pointer items-center gap-3 rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2.5">
+        <label className="flex cursor-pointer items-center gap-3 rounded-xl border border-[#59614e]/50 bg-black/30 px-3 py-2.5">
           <input
             type="checkbox"
             checked={backup}

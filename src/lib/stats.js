@@ -212,7 +212,27 @@ export function dialIn(runs, target) {
 }
 
 const SETUP_FIELDS = ['jet', 'lPsi', 'rPsi', 'lBar', 'rBar', 'comp', 'rebound', 'revLim'];
+export const SETUP_LABELS = [
+  ['jet', 'Jet'], ['lPsi', 'L PSI'], ['rPsi', 'R PSI'], ['lBar', 'L Bar'], ['rBar', 'R Bar'],
+  ['comp', 'Comp'], ['rebound', 'Rebound'], ['revLim', 'Rev Lim'],
+];
 export const hasSetupFields = (r) => SETUP_FIELDS.some((f) => isNum(r[f]));
+
+/**
+ * Setup fields that changed between the previous run and this one.
+ * Only fields recorded on BOTH runs count — a field appearing for the
+ * first time is new data, not a change.
+ */
+export function setupChanges(run, prev) {
+  if (!run || !prev) return [];
+  const out = [];
+  for (const [key, label] of SETUP_LABELS) {
+    if (isNum(run[key]) && isNum(prev[key]) && run[key] !== prev[key]) {
+      out.push({ key, label, from: prev[key], to: run[key] });
+    }
+  }
+  return out;
+}
 const setupKey = (r) => SETUP_FIELDS.map((f) => (isNum(r[f]) ? r[f] : '–')).join('|');
 
 /**

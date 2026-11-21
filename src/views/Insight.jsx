@@ -82,7 +82,9 @@ export default function Insight({ state, dist, setDist }) {
             key={id}
             onClick={() => setSubTab(id)}
             className={`shrink-0 rounded-xl px-4 py-2 font-display text-sm font-semibold uppercase tracking-wider transition ${
-              subTab === id ? 'bg-pickle-400 text-black' : 'bg-white/5 text-white/60 hover:bg-white/10'
+              subTab === id
+                ? 'bg-gradient-to-b from-pickle-300 to-pickle-500 text-black shadow-glow'
+                : 'border border-[#59614e]/60 bg-black/30 text-white/60 hover:text-white'
             }`}
           >
             {label}
@@ -94,18 +96,20 @@ export default function Insight({ state, dist, setDist }) {
       <>
       <WeatherEntryCard title="Race conditions" weather={weather} />
 
-      {/* dial-in predictor */}
-      <Card>
-        <div className="mb-2 flex items-center justify-between">
-          <SectionTitle>Dial-in predictor</SectionTitle>
+      {/* dial-in predictor + similar past runs — one frame */}
+      <Card className="py-1">
+        <div className="divide-y divide-white/[0.08]">
+          <section className="py-3 first:pt-2 last:pb-2">
+            <div className="mb-2 flex items-center justify-between">
+              <SectionTitle>Dial-in predictor</SectionTitle>
           {dialShow && <Badge tone={confTone}>{dialShow.confidence} CONFIDENCE</Badge>}
         </div>
         {dialShow == null ? (
           <div className="text-sm text-white/50">{target.daFt == null ? 'Live weather or manual entries above will feed the prediction.' : 'Log a run to get a prediction.'}</div>
         ) : (
           <div>
-            <div className="font-mono text-2xl font-black text-pickle-400">{dialShow.predicted.toFixed(3)}s</div>
-            <div className="mt-1 text-sm">Suggested dial: <b className="font-mono">{dialShow.dial.toFixed(2)}</b></div>
+            <div className="font-num text-[34px] leading-none text-pickle-400">{dialShow.predicted.toFixed(3)}s</div>
+            <div className="mt-1.5 text-sm">Suggested dial: <b className="font-num text-[16px]">{dialShow.dial.toFixed(2)}</b></div>
             {dialShow.kind === 'similar' ? (
               <div className="text-xs text-white/50">Expected range {dialShow.lo.toFixed(3)} – {dialShow.hi.toFixed(3)}s</div>
             ) : (
@@ -114,11 +118,11 @@ export default function Insight({ state, dist, setDist }) {
             <div className="mt-2 text-[11px] text-white/40">{dialShow.basis}</div>
           </div>
         )}
-      </Card>
+          </section>
 
-      {/* similar past runs */}
-      <Card>
-        <SectionTitle>Similar past runs</SectionTitle>
+          {/* similar past runs */}
+          <section className="py-3 first:pt-2 last:pb-2">
+            <SectionTitle>Similar past runs</SectionTitle>
         {target.daFt == null ? (
           <div className="text-sm text-white/50">Enter conditions to find similar runs.</div>
         ) : similarSorted.length === 0 ? (
@@ -126,11 +130,13 @@ export default function Insight({ state, dist, setDist }) {
         ) : (
           similarSorted.map(({ r, pct }) => (
             <div key={r.id} className="flex items-center justify-between border-t border-white/5 py-1.5 text-sm first:border-0">
-              <span><b className="font-mono text-pickle-400">{pct}%</b> <span className="text-white/60">{r.track} · {fmtDate(r.date)}</span></span>
-              <span className="font-mono"><b>{fmtET(r.et)}</b> <span className="text-white/45">@ {r.mph?.toFixed(1)}</span></span>
+              <span><b className="font-num text-[15px] text-pickle-400">{pct}%</b> <span className="text-white/60">{r.track} · {fmtDate(r.date)}</span></span>
+              <span className="font-mono"><b className="font-num text-[15px]">{fmtET(r.et)}</b> <span className="text-white/45">@ {r.mph?.toFixed(1)}</span></span>
             </div>
           ))
         )}
+          </section>
+        </div>
       </Card>
       </>
       )}
@@ -151,7 +157,7 @@ export default function Insight({ state, dist, setDist }) {
         {ranked.slice(0, 5).map((g, i) => (
           <div key={i} className="border-t border-white/5 py-2 first:border-0">
             <div className="flex items-center justify-between">
-              <div className="font-mono text-sm font-bold">#{i + 1} <span className="text-pickle-400">{g.avgCorrET.toFixed(3)}s</span> <span className="font-normal text-white/40">corr. avg</span></div>
+              <div className="text-sm font-bold">#{i + 1} <span className="font-num text-[16px] text-pickle-400">{g.avgCorrET.toFixed(3)}s</span> <span className="font-normal text-white/40">corr. avg</span></div>
               <div className="flex items-center gap-2">
                 <span className="text-[11px] text-white/45">{g.runs} run{g.runs === 1 ? '' : 's'}</span>
                 {g.lowSample && <Badge tone="amber">small sample</Badge>}

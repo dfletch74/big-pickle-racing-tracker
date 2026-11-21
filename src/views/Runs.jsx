@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { Card, SectionTitle, Badge, Btn, Segmented, Field, inputCls, EmptyState, Icon } from '../components/ui';
 import RunCard from '../components/RunCard';
 import { fmtET, fmtMPH, fmtRT, fmtDate, isNum, runDateTime } from '../lib/format';
-import { runsForCar, filterDistance, latestRun, avg, detectIssues, bestSegments, correctedETOf } from '../lib/stats';
+import { runsForCar, filterDistance, latestRun, avg, detectIssues, bestSegments, correctedETOf, setupChanges } from '../lib/stats';
 import { parseImportFile, runsToCSV, downloadFile } from '../lib/io';
 import { takeSnapshot } from '../lib/snapshots';
 import { tombstoneKey } from '../lib/teamSync';
@@ -38,6 +38,18 @@ export default function Runs({ state, update, toast, dist, setDist, onPrint, onA
       bestSegs: bestSegments(pool),
     };
   }, [carRuns, dist]);
+
+  // Setup-change badges: each run compared with the car's previous run in
+  // time order (backups included — the setup carries over between passes).
+  const setupChangeMap = useMemo(() => {
+    const sorted = [...carRuns].sort((a, b) => runDateTime(a) - runDateTime(b));
+    const map = {};
+    for (let i = 1; i < sorted.length; i++) {
+      const ch = setupChanges(sorted[i], sorted[i - 1]);
+      if (ch.length) map[sorted[i].id] = ch;
+    }
+    return map;
+  }, [carRuns]);
 
   const filtered = useMemo(() => {
     let list = filterDistance(carRuns, dist);
@@ -206,7 +218,7 @@ export default function Runs({ state, update, toast, dist, setDist, onPrint, onA
         <Card className="py-1">
           <div className="divide-y divide-white/[0.08]">
             {filtered.map((r) => (
-              <RunCard key={r.id} run={r} ctx={ctx} baseline={baseline}
+              <RunCard key={r.id} run={r} ctx={ctx} baseline={baseline} setupChanges={setupChangeMap[r.id] || []}
                 onEdit={role?.canLog ? (run) => onAddRun(run.id) : null} onDelete={role?.canDelete ? doDelete : null} onPrint={onPrint} onFlag={doFlag} />
             ))}
           </div>

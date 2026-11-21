@@ -1,14 +1,9 @@
 import { useState } from 'react';
 import { Badge, Btn, Icon } from './ui';
 import { fmtET, fmtMPH, fmtRT, fmtTemp, fmtRH, fmtDA, fmtDate, isNum } from '../lib/format';
-import { detectIssues, segmentSplits, correctedETOf } from '../lib/stats';
+import { detectIssues, segmentSplits, correctedETOf, SETUP_LABELS } from '../lib/stats';
 
-const SETUP_LABELS = [
-  ['jet', 'Jet'], ['lPsi', 'L PSI'], ['rPsi', 'R PSI'], ['lBar', 'L Bar'], ['rBar', 'R Bar'],
-  ['comp', 'Comp'], ['rebound', 'Rebound'], ['revLim', 'Rev Lim'],
-];
-
-export default function RunCard({ run, ctx, baseline, onEdit, onDelete, onFlag, defaultOpen }) {
+export default function RunCard({ run, ctx, baseline, onEdit, onDelete, onFlag, defaultOpen, setupChanges = [] }) {
   const [open, setOpen] = useState(!!defaultOpen);
   const issues = detectIssues(run, ctx);
   const segs = segmentSplits(run);
@@ -28,6 +23,10 @@ export default function RunCard({ run, ctx, baseline, onEdit, onDelete, onFlag, 
           {issues.map((i) => (
             <Badge key={i.key} tone={i.key === 'red' ? 'red' : 'amber'}>{i.label}</Badge>
           ))}
+          {setupChanges.slice(0, 3).map((c) => (
+            <Badge key={c.key}>{c.label} {c.from}→{c.to}</Badge>
+          ))}
+          {setupChanges.length > 3 && <Badge>+{setupChanges.length - 3} setup</Badge>}
           <span className="ml-auto text-white/35"><Icon name="chevD" className={`h-4 w-4 transition-transform ${open ? 'rotate-180' : ''}`} /></span>
         </div>
         <div className="text-xs text-white/45">{fmtDate(run.date)}{run.time ? ` · ${run.time}` : ''}</div>
@@ -69,12 +68,20 @@ export default function RunCard({ run, ctx, baseline, onEdit, onDelete, onFlag, 
             <div className="mt-3">
               <div className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-white/45">Setup</div>
               <div className="flex flex-wrap gap-1.5">
-                {SETUP_LABELS.filter(([k]) => isNum(run[k])).map(([k, label]) => (
-                  <span key={k} className="rounded-lg bg-white/5 px-2 py-1 font-mono text-[11px] text-white/70">
-                    {label} {run[k]}
-                  </span>
-                ))}
+                {SETUP_LABELS.filter(([k]) => isNum(run[k])).map(([k, label]) => {
+                  const changed = setupChanges.some((c) => c.key === k);
+                  return (
+                    <span key={k} className={changed
+                      ? 'rounded-lg border border-pickle-500/50 bg-pickle-500/10 px-2 py-1 font-mono text-[11px] text-pickle-300'
+                      : 'rounded-lg bg-white/5 px-2 py-1 font-mono text-[11px] text-white/70'}>
+                      {label} {run[k]}{changed ? ' *' : ''}
+                    </span>
+                  );
+                })}
               </div>
+              {setupChanges.length > 0 && (
+                <div className="mt-1.5 text-[10px] text-white/35">* Changed from the previous run.</div>
+              )}
             </div>
           )}
 

@@ -54,6 +54,10 @@ let conTest = readFileSync(join(here, 'consistency-scope.test.js'), 'utf8');
 conTest = conTest.replace("'../src/lib/stats.js'", `'${join(tmp, 'stats.js')}'`);
 writeFileSync(join(tmp, 'tests', 'consistency-scope.test.js'), conTest);
 
+let setupTest = readFileSync(join(here, 'setup-changes.test.js'), 'utf8');
+setupTest = setupTest.replace("'../src/lib/stats.js'", `'${join(tmp, 'stats.js')}'`);
+writeFileSync(join(tmp, 'tests', 'setup-changes.test.js'), setupTest);
+
 let fmtTest = readFileSync(join(here, 'charts-format.test.js'), 'utf8');
 fmtTest = fmtTest.replace("'../src/lib/format.js'", `'${join(tmp, 'format.js')}'`);
 writeFileSync(join(tmp, 'tests', 'charts-format.test.js'), fmtTest);
@@ -88,6 +92,10 @@ try {
     cwd: root,
   });
   execSync(`node --input-type=module -e "import('${join(tmp, 'tests', 'consistency-scope.test.js')}')"`, {
+    stdio: 'inherit',
+    cwd: root,
+  });
+  execSync(`node --input-type=module -e "import('${join(tmp, 'tests', 'setup-changes.test.js')}')"`, {
     stdio: 'inherit',
     cwd: root,
   });
