@@ -763,6 +763,140 @@ export async function publishRacers(state, reset = false) {
 // name, lat, lon, elevationFt, locationLabel, heading, updatedAt.
 // Deletions propagate as tombstones {name, at}, same pattern as run deletes.
 // ---------------------------------------------------------------------------
+/* ---------------- Elimination events sync ---------------- */
+
+const EVENTS_PATH = 'data/team-events.json';
+const EVENT_TOMBSTONE_CAP = 200;
+
+// The shared copy of an event: everything the editor keeps, plus updatedAt.
+const eventShared = (e) => ({
+  id: e.id,
+  name: e.name || '',
+  trackId: e.trackId ?? null,
+  track: e.track || '',
+  date: e.date || '',
+  distance: e.distance || '1/4',
+  rounds: Array.isArray(e.rounds) ? e.rounds : [],
+  updatedAt: e.updatedAt || 0,
+});
+
+/**
+ * Merge local events with a remote list plus tombstones.
+ * Per event id: the copy with the later updatedAt wins wholesale (ties keep
+ * local). A tombstone at or after the winning copy's updatedAt removes the
+ * event; re-editing after a delete (newer updatedAt) resurrects it.
+ * Returns { events, deleted } — events sorted for a stable shared payload.
+ */
+export function mergeTeamEvents(localEvents, remoteEvents, deleted) {
+  const tomb = new Map();
+  for (const d of deleted || []) {
+    if (!d?.id) continue;
+    const cur = tomb.get(d.id);
+    if (!cur || (d.at || 0) > cur.at) tomb.set(d.id, { id: d.id, at: d.at || 0 });
+  }
+  const byId = new Map();
+  for (const e of remoteEvents || []) {
+    if (!e?.id) continue;
+    const cur = byId.get(e.id);
+    if (!cur || (e.updatedAt || 0) > (cur.updatedAt || 0)) byId.set(e.id, e);
+  }
+  for (const e of localEvents || []) {
+    if (!e?.id) continue;
+    const cur = byId.get(e.id);
+    if (!cur || (e.updatedAt || 0) >= (cur.updatedAt || 0)) byId.set(e.id, e); // local wins ties
+  }
+  const events = [];
+  for (const [id, e] of byId) {
+    const t = tomb.get(id);
+    if (t && t.at >= (e.updatedAt || 0)) continue; // deleted everywhere
+    events.push(eventShared(e));
+  }
+  events.sort((a, b) =>
+    (a.date || '').localeCompare(b.date || '') ||
+    (a.name || '').localeCompare(b.name || '') ||
+    a.id.localeCompare(b.id));
+  const outTomb = [];
+  for (const t of tomb.values()) {
+    const live = byId.get(t.id);
+    if (!live || t.at >= (live.updatedAt || 0)) outTomb.push(t);
+  }
+  outTomb.sort((a, b) => b.at - a.at);
+  return { events, deleted: outTomb.slice(0, EVENT_TOMBSTONE_CAP) };
+}
+
+/** Pull the shared events file and merge into local state. */
+export async function pullEvents(state, update) {
+  const url = TEAM_CSV_DEFAULT_URL.replace('Big_Pickle_runs_2026.csv', 'team-events.json');
+  const busted = url + '?t=' + Date.now();
+  const res = await fetch(busted, { cache: 'no-store' });
+  if (!res.ok) return { pulled: 0 };
+  const data = await res.json().catch(() => null);
+  if (!data || !Array.isArray(data.events)) return { pulled: 0 };
+
+  let pulled = 0;
+  update((s) => {
+    s.events = s.events || [];
+    s.deletedEvents = Array.isArray(s.deletedEvents) ? s.deletedEvents : [];
+    const before = new Map(s.events.map((e) => [e.id, JSON.stringify(eventShared(e))]));
+    const merged = mergeTeamEvents(s.events, data.events, [...(s.deletedEvents || []), ...(data.deleted || [])]);
+    s.events = merged.events;
+    s.deletedEvents = merged.deleted;
+    for (const e of merged.events) {
+      if (before.get(e.id) !== JSON.stringify(eventShared(e))) pulled++;
+    }
+  });
+  return { pulled };
+}
+
+/**
+ * Publish merged events to the shared file. Requires a PAT.
+ * Pull-then-push with SHA for optimistic concurrency (retries on 409).
+ */
+export async function publishEvents(state) {
+  const pat = getPat();
+  if (!pat) return { pushed: false, error: 'No GitHub token saved' };
+  const loc = parseRawUrl(TEAM_CSV_DEFAULT_URL);
+  if (!loc) throw new Error('Team CSV URL is not a GitHub raw URL');
+
+  for (let attempt = 0; attempt < 3; attempt++) {
+    let file = null;
+    let remote = { events: [], deleted: [] };
+    try {
+      file = await ghApi(`/repos/${loc.owner}/${loc.repo}/contents/${EVENTS_PATH}?ref=${loc.branch}`, pat);
+      remote = JSON.parse(b64decode(file.content || '')) || { events: [], deleted: [] };
+    } catch (e) {
+      if (e.status !== 404) throw e;
+    }
+
+    const merged = mergeTeamEvents(state.events, remote.events, [...(state.deletedEvents || []), ...(remote.deleted || [])]);
+    const payload = JSON.stringify(
+      { updatedAt: new Date().toISOString(), events: merged.events, deleted: merged.deleted },
+      null, 2,
+    );
+
+    try {
+      const remoteText = file ? b64decode(file.content || '') : '';
+      if (payload.replace(/\s+$/, '') === remoteText.replace(/\s+$/, '')) {
+        return { pushed: false };
+      }
+      await ghApi(`/repos/${loc.owner}/${loc.repo}/contents/${EVENTS_PATH}`, pat, {
+        method: 'PUT',
+        body: JSON.stringify({
+          message: `Team events sync via app (${new Date().toISOString().slice(0, 16).replace('T', ' ')})`,
+          content: b64encode(payload),
+          ...(file ? { sha: file.sha } : {}),
+          branch: loc.branch,
+        }),
+      });
+      return { pushed: true };
+    } catch (e) {
+      if (e.status === 409 && attempt < 2) continue;
+      throw e;
+    }
+  }
+  return { pushed: false, error: 'Conflict retries exhausted' };
+}
+
 const TRACKS_PATH = 'data/team-tracks.json';
 const TRACK_TOMBSTONE_CAP = 200;
 

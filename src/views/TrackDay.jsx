@@ -6,7 +6,7 @@ import { DA_BANDS, TEMP_BANDS, airTrendLabel } from '../lib/physics';
 import { useWeatherEntry } from '../lib/useWeatherEntry';
 import { WeatherEntryCard } from '../components/WeatherEntry';
 import { uid } from '../lib/store';
-import { publishTracks } from '../lib/teamSync';
+import { publishTracks, publishEvents } from '../lib/teamSync';
 
 export default function TrackDay({ state, update, toast, dist, setDist, onAddRun, role }) {
   const canEdit = role?.canLog ?? true;
@@ -290,7 +290,7 @@ function ManageTracks({ state, update, toast, selectedId, onSelectTrack }) {
           if (r.trackId === t.id || (r.trackId == null && r.track === oldName)) { r.track = existing.name; r.trackId = existing.id; moved++; }
         });
         s.events.forEach((e) => {
-          if (e.trackId === t.id || (e.trackId == null && e.track === oldName)) { e.track = existing.name; e.trackId = existing.id; }
+          if (e.trackId === t.id || (e.trackId == null && e.track === oldName)) { e.track = existing.name; e.trackId = existing.id; e.updatedAt = Date.now(); }
         });
         s.trackNotes.forEach((x) => { if (x.trackId === t.id) x.trackId = existing.id; });
         s.tracks = s.tracks.filter((x) => x.id !== t.id);
@@ -305,7 +305,7 @@ function ManageTracks({ state, update, toast, selectedId, onSelectTrack }) {
         }
         // Keep history together: runs/events logged at this track follow the rename.
         s.runs.forEach((r) => { if (r.trackId === t.id || (r.trackId == null && r.track === oldName)) r.track = n; });
-        s.events.forEach((e) => { if (e.trackId === t.id || (e.trackId == null && e.track === oldName)) e.track = n; });
+        s.events.forEach((e) => { if (e.trackId === t.id || (e.trackId == null && e.track === oldName)) { e.track = n; e.updatedAt = Date.now(); } });
       }
     });
     if (existing && selectedId === t.id) onSelectTrack(existing.id);
@@ -413,31 +413,55 @@ function Elims({ state, update, toast, track, dist }) {
   const [name, setName] = useState('');
   const events = state.events;
 
+  // Publish event changes to the shared team file. Debounced — round
+  // fields fire per keystroke, so the publish waits for a pause (and the
+  // publish itself no-ops when the merged payload is unchanged). Mirrors
+  // the tracks publish-on-change pattern above.
+  const publishDirty = useRef(false);
+  useEffect(() => {
+    if (!publishDirty.current) return;
+    const t = setTimeout(() => {
+      publishDirty.current = false;
+      publishEvents(state).catch(() => {});
+    }, 2000);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.events, state.deletedEvents]);
+
   const createEvent = () => {
+    publishDirty.current = true;
     update((s) => {
-      s.events.push({ id: uid(), name: name.trim() || `Event ${s.events.length + 1}`, trackId: track?.id, track: track?.name, date: new Date().toISOString().slice(0, 10), distance: dist, rounds: [] });
+      s.events.push({ id: uid(), name: name.trim() || `Event ${s.events.length + 1}`, trackId: track?.id, track: track?.name, date: new Date().toISOString().slice(0, 10), distance: dist, rounds: [], updatedAt: Date.now() });
     });
     setName('');
     toast('Event started.');
   };
 
   const addRound = (ev) => {
+    publishDirty.current = true;
     update((s) => {
       const e = s.events.find((x) => x.id === ev.id);
       e.rounds.push({ n: e.rounds.length + 1, dial: '', rt: '', et: '', mph: '', oppDial: '', result: '' });
+      e.updatedAt = Date.now();
     });
   };
 
   const setRound = (evId, idx, k, v) => {
+    publishDirty.current = true;
     update((s) => {
-      const r = s.events.find((x) => x.id === evId).rounds[idx];
-      r[k] = v;
+      const e = s.events.find((x) => x.id === evId);
+      e.rounds[idx][k] = v;
+      e.updatedAt = Date.now();
     });
   };
 
   const delEvent = (id) => {
     if (!window.confirm('Delete this event and its rounds?')) return;
-    update((s) => { s.events = s.events.filter((e) => e.id !== id); });
+    publishDirty.current = true;
+    update((s) => {
+      s.events = s.events.filter((e) => e.id !== id);
+      s.deletedEvents = [...(s.deletedEvents || []), { id, at: Date.now() }];
+    });
   };
 
   return (

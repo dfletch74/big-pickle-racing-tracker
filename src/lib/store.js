@@ -25,6 +25,7 @@ function seedState() {
     runs: [],
     deletedKeys: [],
     deletedTracks: [],
+    deletedEvents: [],
     racers: [
       { id: uid(), name: 'Dwayne Fletcher', attempts: [] },
       { id: uid(), name: 'Ethan Fletcher', attempts: [] },
@@ -47,7 +48,7 @@ export function loadState() {
     const seed = seedState();
     const merged = { ...seed, ...s };
     // Guard against corrupted collections (a non-array here would crash renders).
-    for (const k of ['cars', 'runs', 'tracks', 'racers', 'trackNotes', 'presets', 'events', 'maintenance', 'deletedKeys', 'deletedTracks']) {
+    for (const k of ['cars', 'runs', 'tracks', 'racers', 'trackNotes', 'presets', 'events', 'maintenance', 'deletedKeys', 'deletedTracks', 'deletedEvents']) {
       if (!Array.isArray(merged[k])) merged[k] = seed[k];
     }
     if (!merged.settings || typeof merged.settings !== 'object') merged.settings = seed.settings;
