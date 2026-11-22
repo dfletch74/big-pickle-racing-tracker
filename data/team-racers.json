@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-11-18T19:34:19.019Z",
+  "updatedAt": "2026-11-22T19:19:51.748Z",
   "racers": [
     {
       "name": "Dwayne",
@@ -350,6 +350,69 @@
           "rt": 0.048,
           "red": false,
           "date": "2026-11-18",
+          "tree": "500",
+          "mode": "sportsman",
+          "delayBox": 0.02
+        },
+        {
+          "id": "mws8047f-orezygu",
+          "rt": 0.033,
+          "red": false,
+          "date": "2026-11-22",
+          "tree": "500",
+          "mode": "sportsman",
+          "delayBox": 0.02
+        },
+        {
+          "id": "mws8082c-cm8v5on",
+          "rt": -0.001,
+          "red": true,
+          "date": "2026-11-22",
+          "tree": "500",
+          "mode": "sportsman",
+          "delayBox": 0.02
+        },
+        {
+          "id": "mws80bq9-f7114m3",
+          "rt": 0.048,
+          "red": false,
+          "date": "2026-11-22",
+          "tree": "500",
+          "mode": "sportsman",
+          "delayBox": 0.02
+        },
+        {
+          "id": "mws80daq-xbjqkja",
+          "rt": -1.368,
+          "red": true,
+          "date": "2026-11-22",
+          "tree": "500",
+          "mode": "sportsman",
+          "delayBox": 0.02
+        },
+        {
+          "id": "mws80fpt-wc5kvdy",
+          "rt": 0.017,
+          "red": false,
+          "date": "2026-11-22",
+          "tree": "500",
+          "mode": "sportsman",
+          "delayBox": 0.02
+        },
+        {
+          "id": "mws80img-1nas5a4",
+          "rt": 0.048,
+          "red": false,
+          "date": "2026-11-22",
+          "tree": "500",
+          "mode": "sportsman",
+          "delayBox": 0.02
+        },
+        {
+          "id": "mws80l66-3q503sd",
+          "rt": 0,
+          "red": false,
+          "date": "2026-11-22",
           "tree": "500",
           "mode": "sportsman",
           "delayBox": 0.02
