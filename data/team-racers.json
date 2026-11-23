@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-11-22T19:19:51.748Z",
+  "updatedAt": "2026-11-23T01:53:27.959Z",
   "racers": [
     {
       "name": "Dwayne",
@@ -416,6 +416,573 @@
           "tree": "500",
           "mode": "sportsman",
           "delayBox": 0.02
+        },
+        {
+          "id": "mwscjojm-35eemc0",
+          "rt": 0.058,
+          "red": false,
+          "date": "2026-11-22",
+          "tree": "500",
+          "mode": "sportsman",
+          "delayBox": 0.02
+        },
+        {
+          "id": "mwscjubi-z86hyxg",
+          "rt": 0.049,
+          "red": false,
+          "date": "2026-11-22",
+          "tree": "500",
+          "mode": "sportsman",
+          "delayBox": 0.02
+        },
+        {
+          "id": "mwscjy7d-fpapplp",
+          "rt": 0.017,
+          "red": false,
+          "date": "2026-11-22",
+          "tree": "500",
+          "mode": "sportsman",
+          "delayBox": 0.02
+        },
+        {
+          "id": "mwsck1f3-5nb81xi",
+          "rt": 0.032,
+          "red": false,
+          "date": "2026-11-22",
+          "tree": "500",
+          "mode": "sportsman",
+          "delayBox": 0.02
+        },
+        {
+          "id": "mwsck3zp-pgg7rqj",
+          "rt": -0.052,
+          "red": true,
+          "date": "2026-11-22",
+          "tree": "500",
+          "mode": "sportsman",
+          "delayBox": 0.02
+        },
+        {
+          "id": "mwsck6wu-q38fuf7",
+          "rt": -0.034,
+          "red": true,
+          "date": "2026-11-22",
+          "tree": "500",
+          "mode": "sportsman",
+          "delayBox": 0.02
+        },
+        {
+          "id": "mwsck9gw-obzld7h",
+          "rt": -0.021,
+          "red": true,
+          "date": "2026-11-22",
+          "tree": "500",
+          "mode": "sportsman",
+          "delayBox": 0.02
+        },
+        {
+          "id": "mwsckc0k-u5uckiw",
+          "rt": -0.033,
+          "red": true,
+          "date": "2026-11-22",
+          "tree": "500",
+          "mode": "sportsman",
+          "delayBox": 0.02
+        },
+        {
+          "id": "mwsckejq-kypjdab",
+          "rt": 0.082,
+          "red": false,
+          "date": "2026-11-22",
+          "tree": "500",
+          "mode": "sportsman",
+          "delayBox": 0.02
+        },
+        {
+          "id": "mwsckh5b-xpyl3ep",
+          "rt": -0.034,
+          "red": true,
+          "date": "2026-11-22",
+          "tree": "500",
+          "mode": "sportsman",
+          "delayBox": 0.02
+        },
+        {
+          "id": "mwsckjmn-jtxts8n",
+          "rt": 0.082,
+          "red": false,
+          "date": "2026-11-22",
+          "tree": "500",
+          "mode": "sportsman",
+          "delayBox": 0.02
+        },
+        {
+          "id": "mwsckm87-k36cq6m",
+          "rt": -0.018,
+          "red": true,
+          "date": "2026-11-22",
+          "tree": "500",
+          "mode": "sportsman",
+          "delayBox": 0.02
+        },
+        {
+          "id": "mwsckoss-09uu5ck",
+          "rt": 0.065,
+          "red": false,
+          "date": "2026-11-22",
+          "tree": "500",
+          "mode": "sportsman",
+          "delayBox": 0.02
+        },
+        {
+          "id": "mwsckrxr-9cho0ye",
+          "rt": 0.049,
+          "red": false,
+          "date": "2026-11-22",
+          "tree": "500",
+          "mode": "sportsman",
+          "delayBox": 0.02
+        },
+        {
+          "id": "mwsckuie-203lvap",
+          "rt": -0.001,
+          "red": true,
+          "date": "2026-11-22",
+          "tree": "500",
+          "mode": "sportsman",
+          "delayBox": 0.02
+        },
+        {
+          "id": "mwsckxne-w8kx324",
+          "rt": 0.001,
+          "red": false,
+          "date": "2026-11-22",
+          "tree": "500",
+          "mode": "sportsman",
+          "delayBox": 0.02
+        },
+        {
+          "id": "mwslyhae-xy72aym",
+          "rt": 0.078,
+          "red": false,
+          "date": "2026-11-23",
+          "tree": "500",
+          "mode": "sportsman",
+          "delayBox": 0.02
+        },
+        {
+          "id": "mwslykt2-15gmcop",
+          "rt": 0.005,
+          "red": false,
+          "date": "2026-11-23",
+          "tree": "500",
+          "mode": "sportsman",
+          "delayBox": 0.02
+        },
+        {
+          "id": "mwslyomx-6d20f1v",
+          "rt": -0.218,
+          "red": true,
+          "date": "2026-11-23",
+          "tree": "500",
+          "mode": "sportsman",
+          "delayBox": 0.02
+        },
+        {
+          "id": "mwslys64-dokx9ke",
+          "rt": 0.088,
+          "red": false,
+          "date": "2026-11-23",
+          "tree": "500",
+          "mode": "sportsman",
+          "delayBox": 0.02
+        },
+        {
+          "id": "mwslyuow-fgow6wu",
+          "rt": 0.019,
+          "red": false,
+          "date": "2026-11-23",
+          "tree": "500",
+          "mode": "sportsman",
+          "delayBox": 0.02
+        },
+        {
+          "id": "mwslyxcq-be1r2vz",
+          "rt": 0.099,
+          "red": false,
+          "date": "2026-11-23",
+          "tree": "500",
+          "mode": "sportsman",
+          "delayBox": 0.02
+        },
+        {
+          "id": "mwslyzq0-6sykezu",
+          "rt": 0.058,
+          "red": false,
+          "date": "2026-11-23",
+          "tree": "500",
+          "mode": "sportsman",
+          "delayBox": 0.02
+        },
+        {
+          "id": "mwslz27i-d0z6ebr",
+          "rt": 0.081,
+          "red": false,
+          "date": "2026-11-23",
+          "tree": "500",
+          "mode": "sportsman",
+          "delayBox": 0.02
+        },
+        {
+          "id": "mwslz4o4-f92tsoy",
+          "rt": 0.07,
+          "red": false,
+          "date": "2026-11-23",
+          "tree": "500",
+          "mode": "sportsman",
+          "delayBox": 0.02
+        },
+        {
+          "id": "mwslz7rw-rmdll4w",
+          "rt": 0.021,
+          "red": false,
+          "date": "2026-11-23",
+          "tree": "500",
+          "mode": "sportsman",
+          "delayBox": 0.02
+        },
+        {
+          "id": "mwslzb27-aot45hw",
+          "rt": 0.019,
+          "red": false,
+          "date": "2026-11-23",
+          "tree": "500",
+          "mode": "sportsman",
+          "delayBox": 0.02
+        },
+        {
+          "id": "mwslze9z-5kg9akv",
+          "rt": 0.019,
+          "red": false,
+          "date": "2026-11-23",
+          "tree": "500",
+          "mode": "sportsman",
+          "delayBox": 0.02
+        },
+        {
+          "id": "mwslzhao-nik7u83",
+          "rt": 0.099,
+          "red": false,
+          "date": "2026-11-23",
+          "tree": "500",
+          "mode": "sportsman",
+          "delayBox": 0.02
+        },
+        {
+          "id": "mwslzk08-fqz1cty",
+          "rt": 0.087,
+          "red": false,
+          "date": "2026-11-23",
+          "tree": "500",
+          "mode": "sportsman",
+          "delayBox": 0.02
+        },
+        {
+          "id": "mwslzmyd-suvc9xq",
+          "rt": 0.048,
+          "red": false,
+          "date": "2026-11-23",
+          "tree": "500",
+          "mode": "sportsman",
+          "delayBox": 0.02
+        },
+        {
+          "id": "mwslzpxc-cq7hzc1",
+          "rt": 0.065,
+          "red": false,
+          "date": "2026-11-23",
+          "tree": "500",
+          "mode": "sportsman",
+          "delayBox": 0.02
+        },
+        {
+          "id": "mwslzsws-7c6j7q8",
+          "rt": 0.037,
+          "red": false,
+          "date": "2026-11-23",
+          "tree": "500",
+          "mode": "sportsman",
+          "delayBox": 0.02
+        },
+        {
+          "id": "mwslzvx3-w19fnth",
+          "rt": 0.032,
+          "red": false,
+          "date": "2026-11-23",
+          "tree": "500",
+          "mode": "sportsman",
+          "delayBox": 0.02
+        },
+        {
+          "id": "mwslzyel-yblkcbs",
+          "rt": 0.053,
+          "red": false,
+          "date": "2026-11-23",
+          "tree": "500",
+          "mode": "sportsman",
+          "delayBox": 0.02
+        },
+        {
+          "id": "mwsm01bu-lej02uf",
+          "rt": 0.02,
+          "red": false,
+          "date": "2026-11-23",
+          "tree": "500",
+          "mode": "sportsman",
+          "delayBox": 0.02
+        },
+        {
+          "id": "mwsm04i7-k1dccog",
+          "rt": -0.012,
+          "red": true,
+          "date": "2026-11-23",
+          "tree": "500",
+          "mode": "sportsman",
+          "delayBox": 0.02
+        },
+        {
+          "id": "mwsm07qv-2wjxagw",
+          "rt": -0.031,
+          "red": true,
+          "date": "2026-11-23",
+          "tree": "500",
+          "mode": "sportsman",
+          "delayBox": 0.02
+        },
+        {
+          "id": "mwsm0aq3-1luq6y9",
+          "rt": -0.024,
+          "red": true,
+          "date": "2026-11-23",
+          "tree": "500",
+          "mode": "sportsman",
+          "delayBox": 0.02
+        },
+        {
+          "id": "mwsm0dqv-sbz51ou",
+          "rt": -0.028,
+          "red": true,
+          "date": "2026-11-23",
+          "tree": "500",
+          "mode": "sportsman",
+          "delayBox": 0.02
+        },
+        {
+          "id": "mwsm0gzr-wwem06z",
+          "rt": 0.039,
+          "red": false,
+          "date": "2026-11-23",
+          "tree": "500",
+          "mode": "sportsman",
+          "delayBox": 0.02
+        },
+        {
+          "id": "mwsm0kux-ha87z2l",
+          "rt": 0.04,
+          "red": false,
+          "date": "2026-11-23",
+          "tree": "500",
+          "mode": "sportsman",
+          "delayBox": 0.02
+        },
+        {
+          "id": "mwsm18xj-xqkug70",
+          "rt": 0.043,
+          "red": false,
+          "date": "2026-11-23",
+          "tree": "500",
+          "mode": "sportsman",
+          "delayBox": 0.41
+        },
+        {
+          "id": "mwsm1c4p-m59248h",
+          "rt": -0.01,
+          "red": true,
+          "date": "2026-11-23",
+          "tree": "500",
+          "mode": "sportsman",
+          "delayBox": 0.41
+        },
+        {
+          "id": "mwsm1fld-lucmbqu",
+          "rt": -0.022,
+          "red": true,
+          "date": "2026-11-23",
+          "tree": "500",
+          "mode": "sportsman",
+          "delayBox": 0.41
+        },
+        {
+          "id": "mwsm1n1c-946walz",
+          "rt": 0.442,
+          "red": false,
+          "date": "2026-11-23",
+          "tree": "500",
+          "mode": "sportsman",
+          "delayBox": 0.43
+        },
+        {
+          "id": "mwsm1pi9-69hzqnh",
+          "rt": -0.037,
+          "red": true,
+          "date": "2026-11-23",
+          "tree": "500",
+          "mode": "sportsman",
+          "delayBox": 0.43
+        },
+        {
+          "id": "mwsm1s7m-r77e1id",
+          "rt": 0.063,
+          "red": false,
+          "date": "2026-11-23",
+          "tree": "500",
+          "mode": "sportsman",
+          "delayBox": 0.43
+        },
+        {
+          "id": "mwsm1xfi-zhmofc3",
+          "rt": 0.209,
+          "red": false,
+          "date": "2026-11-23",
+          "tree": "500",
+          "mode": "sportsman",
+          "delayBox": 0.475
+        },
+        {
+          "id": "mwsm20b2-pexbf0v",
+          "rt": 0.178,
+          "red": false,
+          "date": "2026-11-23",
+          "tree": "500",
+          "mode": "sportsman",
+          "delayBox": 0.475
+        },
+        {
+          "id": "mwsm22pg-u7ovuph",
+          "rt": -0.025,
+          "red": true,
+          "date": "2026-11-23",
+          "tree": "500",
+          "mode": "sportsman",
+          "delayBox": 0.475
+        },
+        {
+          "id": "mwsm25b3-ua4oprt",
+          "rt": 0.074,
+          "red": false,
+          "date": "2026-11-23",
+          "tree": "500",
+          "mode": "sportsman",
+          "delayBox": 0.475
+        },
+        {
+          "id": "mwsm2875-7mynoy9",
+          "rt": 0.042,
+          "red": false,
+          "date": "2026-11-23",
+          "tree": "500",
+          "mode": "sportsman",
+          "delayBox": 0.475
+        },
+        {
+          "id": "mwsm2axf-625axzb",
+          "rt": 0.107,
+          "red": false,
+          "date": "2026-11-23",
+          "tree": "500",
+          "mode": "sportsman",
+          "delayBox": 0.475
+        },
+        {
+          "id": "mwsm2k76-qxputpq",
+          "rt": 0.339,
+          "red": false,
+          "date": "2026-11-23",
+          "tree": "500",
+          "mode": "sportsman",
+          "delayBox": 0.49
+        },
+        {
+          "id": "mwsm2mlz-pw4ldeu",
+          "rt": 0.024,
+          "red": false,
+          "date": "2026-11-23",
+          "tree": "500",
+          "mode": "sportsman",
+          "delayBox": 0.49
+        },
+        {
+          "id": "mwsm2pbw-q5lxtwc",
+          "rt": 0.056,
+          "red": false,
+          "date": "2026-11-23",
+          "tree": "500",
+          "mode": "sportsman",
+          "delayBox": 0.49
+        },
+        {
+          "id": "mwsm2rt5-9ru9c7d",
+          "rt": 0.023,
+          "red": false,
+          "date": "2026-11-23",
+          "tree": "500",
+          "mode": "sportsman",
+          "delayBox": 0.49
+        },
+        {
+          "id": "mwsm2uds-rudmb9m",
+          "rt": 0.177,
+          "red": false,
+          "date": "2026-11-23",
+          "tree": "500",
+          "mode": "sportsman",
+          "delayBox": 0.49
+        },
+        {
+          "id": "mwsm30zz-ud58d2g",
+          "rt": -0.322,
+          "red": true,
+          "date": "2026-11-23",
+          "tree": "500",
+          "mode": "sportsman",
+          "delayBox": 0
+        },
+        {
+          "id": "mwsm341m-ll84jpd",
+          "rt": -0.001,
+          "red": true,
+          "date": "2026-11-23",
+          "tree": "500",
+          "mode": "sportsman",
+          "delayBox": 0
+        },
+        {
+          "id": "mwsm37mq-elavhwb",
+          "rt": -0.128,
+          "red": true,
+          "date": "2026-11-23",
+          "tree": "500",
+          "mode": "sportsman",
+          "delayBox": 0
+        },
+        {
+          "id": "mwsm3b38-34ra9i5",
+          "rt": 0.014,
+          "red": false,
+          "date": "2026-11-23",
+          "tree": "500",
+          "mode": "sportsman",
+          "delayBox": 0
         }
       ]
     },
